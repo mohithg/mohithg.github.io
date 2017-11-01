@@ -5,6 +5,13 @@
 	color: #5c42a6 !important;
 }
 
+.typeform-share.button {
+	background-color: transparent !important;
+}
+
+.typeform-share.button:hover {
+	background-color: transparent !important;
+}
 
 .typeform-desktop {
 	display: block;
