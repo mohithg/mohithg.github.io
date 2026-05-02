@@ -1,0 +1,101 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Eval drift: when your bench stops measuring what you care about"
+description: "An eval bench can pass with flying colors while production quality declines. The gap is called eval drift, and it's the most common silent failure in LLM ops."
+publishDate: "2026-05-01"
+pillar: evals
+slug: eval-drift
+---
+
+Six months in, a team I was advising had a problem they couldn't articulate. Their eval bench showed pass rates in the high 90s. Production user satisfaction scores were dropping. Support tickets about model output quality were ticking up. The metrics disagreed with each other.
+
+This is **eval drift**: the gap between what your bench measures and what your users actually experience. It's the most common silent failure in LLM ops because nothing breaks. The bench keeps passing. The users keep complaining. The team keeps looking at the wrong number.
+
+This essay is about how eval drift happens, how to detect it, and how to keep your bench in sync with reality.
+
+## How eval drift happens
+
+Three independent mechanisms. Most teams suffer from all three simultaneously.
+
+**Mechanism 1: distribution drift.** The user behavior the bench was modeled on is no longer the user behavior happening in production. Maybe the marketing campaign brought in a different demographic. Maybe a new feature changed how people use the product. Maybe the model's improvements changed what users ask for help with. The bench is testing yesterday's questions; users are asking today's questions.
+
+**Mechanism 2: rubric drift.** The criteria the bench checks for are no longer the criteria you actually care about. Maybe you used to care about response length but now care more about factual accuracy. The rubric items haven't been updated. The bench is testing what mattered six months ago.
+
+**Mechanism 3: model adaptation.** The model has been upgraded. Behaviors that used to be problems are no longer problems (the bench cases pass trivially). New behaviors that *are* problems aren't covered (the bench has no cases for them). The bench is solving the previous version of the problem.
+
+Each mechanism is invisible if you only look at aggregate pass rates. The pass rate looks fine because the bench is measuring the wrong thing.
+
+## How to detect eval drift
+
+Three signals to watch for.
+
+**Signal 1: bench pass rate diverges from production quality metric.** The bench says 95%. The user satisfaction score says 70%. The two should track each other. If they don't, the bench is measuring the wrong thing.
+
+This requires you to *have* a production quality metric independent of the bench. Could be CSAT, could be human-reviewer agreement on sampled production traces, could be a thumbs-up/thumbs-down rate on responses. Whatever it is, it has to be derivable from production reality, not from the synthetic bench.
+
+**Signal 2: bench pass rate has been stable for too long.** If your bench has been at 92-95% for the last six months across multiple prompt and model changes, that's suspicious. Real product quality fluctuates. A bench that doesn't fluctuate has lost its discriminative power. It's reporting "everything is fine" because it's no longer testing the things that vary.
+
+**Signal 3: failed bench cases don't surprise anyone.** The handful of cases that fail are the same handful that have always failed, and the team knows them by heart. The bench isn't surfacing new information. It's a dashboard that confirms what you already know.
+
+## Continuous re-grounding
+
+The fix for eval drift is **continuous re-grounding**: regularly forcing the bench to come back into contact with production reality.
+
+Three practices.
+
+**Practice 1: monthly production sampling.** Every month, sample 50-100 production interactions. For each, ask: would my bench have caught this if it failed? If not, the bench has a gap. Add a case that covers the gap.
+
+This is the most important practice. It catches distribution drift at the source. The bench is always within a month of current production behavior because you keep updating it from current production behavior.
+
+**Practice 2: quarterly rubric review.** Every quarter, review the rubric items. For each item, ask: do we still care about this? Is there something we now care about that's not on the rubric? Update the rubric. Re-grade the bench against the updated rubric.
+
+This catches rubric drift. The rubric stays in sync with what quality actually means to the team and the product.
+
+**Practice 3: per-upgrade bench audit.** Every model upgrade, run the bench on the old and new model. Look at which cases changed pass status. Cases that newly pass: candidates for retirement (the model fixed them). Cases that newly fail: critical to investigate (the model regressed). Failures the bench *didn't* catch: where is the bench blind?
+
+This catches model adaptation. The bench gets pruned of solved problems and gains coverage of new ones.
+
+## The user-experience anchor
+
+The single most powerful anti-drift tool: **a metric derived from user experience that you can compare bench pass rate against**.
+
+Examples:
+
+- Thumbs up/down on responses, aggregated weekly
+- Customer satisfaction surveys
+- Human-reviewer agreement on sampled production traces (a bit expensive but very high signal)
+- Conversion or engagement metrics tied to AI-generated content
+
+When the user-experience metric and the bench pass rate disagree, the bench is wrong. Investigate the divergence. Add cases that bring the bench into alignment with user reality.
+
+The metric is your ground truth. The bench is a proxy. When the proxy disagrees with the truth, fix the proxy.
+
+## What "fixing the bench" looks like
+
+When you detect drift, the fix usually goes like this:
+
+1. Sample production traffic where the experience metric was bad
+2. Look at the actual responses the model produced
+3. For each, identify what was wrong (a rubric item that's missing? a category of input the bench doesn't cover?)
+4. Add cases that capture the failure
+5. Add or update rubric items that capture the criterion
+6. Re-run the bench. Pass rate should now be lower (because the new cases fail or the new rubric items fail).
+7. Improve the prompt to bring pass rate back up. Verify the user-experience metric improves in lockstep.
+
+This loop is the core of keeping the bench grounded. Without it, the bench drifts. With it, the bench stays in sync.
+
+## Why this is hard
+
+Eval drift is hard to catch because *nothing breaks*. The bench keeps running. The numbers keep coming out. There's no error message that says "your bench has lost touch with reality." The drift is silent.
+
+The team has to actively look for it. The discipline is doing the monthly sampling, the quarterly rubric review, the per-upgrade audit, the user-metric comparison. None of these is technically hard. They're easy to skip because they don't have a forcing function.
+
+The teams that do them are the teams whose evals stay meaningful. The teams that don't are the teams who eventually notice users are unhappy and don't know why their bench didn't catch it.
+
+## The take
+
+Your bench is not a fixed reference. It's a snapshot of what you cared about when you built it. Reality moves. The bench has to move with it.
+
+Build the discipline of monthly sampling, quarterly rubric review, and per-upgrade audit. Anchor it with a user-experience metric you can compare against. Fix the bench when it diverges from reality.
+
+Eval drift is the failure mode that turns disciplined teams into vibes teams without anyone noticing. Keep the bench grounded. The pass rate will mean what you think it means.

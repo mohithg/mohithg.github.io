@@ -1,0 +1,122 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Eval datasets that hold up over time"
+description: "Most eval datasets rot. The cases drift, the rubrics get stale, the bench becomes a museum piece. Here's how to build one that stays useful for years."
+publishDate: "2026-04-29"
+pillar: evals
+slug: eval-datasets-that-hold-up
+---
+
+The first version of an eval dataset is exciting. You sit down, write thirty cases, run them, see a pass rate. The team feels disciplined. Then six months pass. The product evolved. The model upgraded. The cases haven't been touched. Half of them no longer reflect how the system is used. The other half pass trivially and tell you nothing.
+
+This is the entropy that turns eval datasets into museum pieces. It happens to almost every team. The teams whose datasets stay useful for years have a few practices in common.
+
+This essay is about those practices.
+
+## The decay problem
+
+Eval datasets decay in three ways.
+
+**Distribution drift.** Real users started asking different questions. Your bench is still asking the questions from six months ago. Pass rate on the bench is high; pass rate in production is dropping.
+
+**Solved-case rot.** Cases that the model used to fail now pass trivially. They no longer differentiate between prompt versions. They consume eval budget without providing signal.
+
+**Rubric drift.** The rubric items the cases were checking against are no longer the actual quality bar. You raised the standard. The cases haven't been updated.
+
+A bench full of decayed cases looks like an eval bench but isn't. It runs, returns numbers, and tells you nothing useful. The team trusts the numbers because they're numbers. The product ships regressions.
+
+## Practice 1: tag every case with provenance
+
+Each case in the bench should know:
+
+- **When it was added.** Date of creation.
+- **Why it was added.** A failure mode in production? An adversarial test? A happy-path representative?
+- **The source.** Real user input (anonymized) or synthetic.
+- **The owner.** Who added it, who is responsible for keeping it relevant.
+
+This metadata feels like overhead until you have 500 cases. Then it's how you decide which cases to retire.
+
+A case from 18 months ago, added in response to a bug that has since been fixed and re-validated, that now passes 100% of the time across all model versions: probably retire it. A case from last week, added because a user complained, currently borderline-passing: keep it.
+
+Without provenance, you can't tell the difference. You either keep everything (bench rot) or aggressively prune (lose institutional memory).
+
+## Practice 2: regularly refresh from production
+
+The bench should be a sample of what production looks like, with adversarial cases layered on top. Production changes. The bench should track.
+
+Concretely: every month or quarter, sample N production interactions. For each, check whether a similar case is already in the bench. If not, add it. If yes, but production version is more interesting (more current, more challenging), update the bench case.
+
+This is how you keep distribution drift from accumulating. The bench drifts toward production naturally because you keep refreshing from production.
+
+## Practice 3: measure case discrimination
+
+A case earns its place on the bench by *discriminating* between prompt versions. If every prompt version passes a case, the case isn't telling you anything new.
+
+Track per-case pass history over time. A case that passes 100% of the time across the last 50 prompt versions is no longer a useful test. Either retire it or make it harder.
+
+A case that fluctuates between 60% and 90% pass rate across prompt versions is doing real work. Keep it, treat it as load-bearing.
+
+This is rarely tracked because it requires logging per-case results, not just aggregate pass rates. Worth the investment once your bench gets past 100 cases.
+
+## Practice 4: separate "must pass" from "nice to pass"
+
+Not all cases are equal. Some are critical (financial advisor recommending a specific stock when it shouldn't = lawsuit risk). Some are aspirational (we'd like the response to mention the engine's confidence level when relevant).
+
+Tag each case with a severity. Block merges on regressions in critical cases. Track aspirational cases as a quality dashboard but don't gate on them.
+
+This prevents the failure mode where a single low-severity regression blocks a critical fix from shipping. It also prevents the opposite failure where critical regressions slip through because they were averaged in with aspirational ones.
+
+## Practice 5: rotate the synthetic cases
+
+For adversarial / synthetic cases, write new ones periodically. The model's failure modes change. The cases that probe those failures should change too.
+
+A practical rhythm: each model upgrade, each major prompt rewrite, each new feature surface, write 5-10 new adversarial cases targeting failure modes that didn't exist before. Retire 5-10 that no longer apply.
+
+This keeps the synthetic portion of the bench current. Without rotation, your synthetic cases are testing failure modes that were relevant to GPT-4o-2024 and have nothing to do with the current model.
+
+## Practice 6: version the bench itself
+
+When you change the bench (add cases, remove cases, change rubrics), version the change. Tag the bench version in your eval results.
+
+Why: when the pass rate drops, you need to know whether the prompt got worse or the bench got harder. If the bench version changed in the same window as the pass rate change, you can't tell. If the bench is versioned and you only see the drop after a prompt change with the bench held constant, you know the prompt is the culprit.
+
+Bench versioning also lets you re-run old prompt versions against the current bench, which is useful for reasoning about quality trends.
+
+## Practice 7: triage shadow-eval failures into the bench
+
+Your shadow eval will surface real production failures. When it does, the failure becomes a candidate bench case.
+
+Triage queue: shadow flag → engineer reviews → if it's a real failure mode worth catching in CI, add a case → close the loop.
+
+Without this discipline, the shadow eval and the synthetic bench drift apart. The shadow keeps surfacing the same kinds of failures because nothing is feeding the synthetic bench. With the discipline, the synthetic bench grows to cover what shadow has caught, and the shadow becomes the long tail of unanticipated failures.
+
+## What the bench looks like after a year
+
+If you do the above, after a year your bench has roughly:
+
+- 30% real-production-derived cases (refreshed from shadow eval)
+- 40% historical regression cases (with provenance, severity-tagged, periodically pruned)
+- 20% adversarial / synthetic cases (rotated as model and feature surface evolve)
+- 10% happy-path representative cases (mostly stable; the easy ones)
+
+It's around 500-1500 cases (depending on product complexity). It runs in 15-45 minutes (deep eval; CI is a fast subset). The pass rate, when tracked over time, accurately reflects product quality.
+
+This is the bench that earns its keep. It evolves with the product and stays current with the model and the user base.
+
+## What the rotting bench looks like
+
+By contrast, the bench you don't curate looks like:
+
+- A few hundred cases, none tagged with provenance
+- 80% pass rate across all prompt versions for the last six months (no discrimination)
+- Adversarial cases written 18 months ago, all targeting model behaviors that no longer apply
+- No connection to production traffic
+- Nobody is sure why specific cases are in the bench
+
+The team still runs it, still trusts the pass rate, still makes go/no-go decisions on it. The pass rate stays high. Production quality slowly degrades. Nobody connects the dots.
+
+## The discipline
+
+A bench is a living thing. Keep it alive with light, regular curation: monthly refreshes from production, quarterly retirement of decayed cases, ongoing addition of new failure modes. The total time investment is small, maybe a few hours a month. The payoff is an eval signal you can actually trust years from now, not just months.
+
+The bench's job is to tell you the truth about your product's quality. Make sure the truth it tells is current.

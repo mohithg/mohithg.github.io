@@ -1,0 +1,114 @@
+---
+layout: ../../layouts/Writing.astro
+title: "LLM-as-judge: what actually works in 2026"
+description: "Using one LLM to grade another LLM's output is the most over-deployed and under-evaluated eval pattern in production. Here's when it works, when it fails, and how to use it well."
+publishDate: "2026-04-26"
+pillar: evals
+slug: llm-as-judge-what-works
+---
+
+LLM-as-judge is the eval technique everyone reaches for first and few teams use well. The idea is simple: ask a separate LLM call to evaluate whether a response meets your quality bar. The implementation is also simple. The problem is that the simple version often produces evaluation scores that look meaningful but aren't.
+
+This essay is about the actual mechanics of getting LLM-as-judge to be reliable, drawing on patterns I've used in production and patterns I've seen fail.
+
+## The thing LLM-as-judge gets wrong by default
+
+Out of the box, an LLM judge is biased. Specifically:
+
+- It rates longer responses higher than shorter responses, regardless of correctness
+- It rates responses that "look authoritative" higher than uncertain-sounding ones
+- It rates responses that match its own writing style higher than ones that don't
+- It strongly anchors to the first response when comparing two
+
+These biases are well-documented in the LLM eval literature, and they are large enough to swamp the actual signal you're trying to measure. If you ask "is this response good?" the judge tells you "is this response long and confident?"
+
+A naive LLM-as-judge eval will report that all your responses are great. They won't be.
+
+## What separates good LLM-as-judge from bad
+
+Three differences.
+
+**Specificity of the rubric.** A bad judge prompt asks "is this response good?" A good judge prompt asks something like "does this response (a) cite the engine's risk score correctly, (b) avoid making predictive claims about specific stocks, (c) stay under 200 words?" Each criterion is a yes/no. The judge's job is checking criteria, not making aesthetic judgments.
+
+**Reference-based vs. reference-free.** A reference-based judge sees the input, the actual output, *and* a known-good reference output. It checks whether the actual matches the reference on key dimensions. A reference-free judge sees only the input and the actual. Reference-based is dramatically more reliable because the judge has a concrete bar to compare against.
+
+**Pairwise vs. pointwise.** Asking the judge "is this response good on a 1-5 scale" gives noisy, inconsistent scores. Asking "of these two responses, which is better at X" produces much more reliable signal. If you need a quality measure over time, run pairwise comparisons against a fixed baseline and track win rate.
+
+## A judge prompt template that works
+
+```
+You are evaluating an AI assistant's response. The user asked:
+
+{user_input}
+
+The reference answer is:
+
+{reference_output}
+
+The actual response is:
+
+{actual_output}
+
+Check the actual response against these criteria. For each criterion,
+answer YES, NO, or PARTIAL.
+
+1. Does it correctly state the engine's risk score (or note it
+   is unavailable)?
+2. Does it avoid recommending specific trades?
+3. Does it use the standard risk disclaimer language?
+4. Is it under 200 words?
+
+Answer in JSON: {"c1": ..., "c2": ..., "c3": ..., "c4": ...}
+```
+
+The criteria are concrete. The judge has a reference. The output is structured. You can aggregate the JSON across many cases and get a reliable per-criterion pass rate.
+
+## What LLM-as-judge is good for
+
+Three use cases where it consistently works.
+
+**Constraint checking.** "Did the response include the disclaimer?" "Did it avoid mentioning competitor names?" "Did it stay under the word limit?" These are specific, structural, and don't require aesthetic judgment.
+
+**Pairwise quality comparison.** "Is response A or response B better at explaining the user's portfolio risk?" Useful when you're comparing two prompt versions or two models.
+
+**Triage and clustering.** "What category of failure does this response represent?" "Is this response a hallucination, a refusal, a tone issue, or correct?" Gives you a quick way to bucket production failures.
+
+## What LLM-as-judge is bad for
+
+Three use cases where it consistently fails.
+
+**Absolute quality scores.** "Rate this response 1-5 on overall quality." The number will be unreliable. Different runs will give different scores. The number won't track human judgment.
+
+**Detecting subtle factual errors.** If the judge doesn't already know the right answer, it can't tell you the response is wrong. If it does know, you didn't need the LLM in the first place.
+
+**Evaluating its own output.** Self-evaluation has obvious bias. Cross-evaluation (a different model judges) is better but still not as reliable as reference-based checks.
+
+## How to validate the judge
+
+A judge prompt is itself a prompt. You should evaluate it.
+
+Take 30-50 cases where you know the right answer. Have the judge score them. Have a human score them. Compare. If the agreement is below 80%, the judge prompt needs work.
+
+Then iterate: change the criteria, change the rubric, add reference outputs, switch from pointwise to pairwise. Re-run. Get the agreement above 90% before you trust the judge to evaluate at scale.
+
+Most teams skip this step entirely. They build the judge, run it on their bench, get a score, and trust it. The score has no relationship to actual quality. They optimize the prompt to make the judge happy. The judge is happy. Users are not.
+
+## Cost considerations
+
+LLM-as-judge calls cost money. Running them on every CI is expensive at scale.
+
+A practical pattern: run the cheap structural checks on every PR. Run the LLM-as-judge calls on a sampled subset (say, 50 cases) on every PR, and on the full bench nightly. Use the cheaper checks for fast feedback, the LLM checks for thorough validation.
+
+You can also distill: use a strong model to judge during eval-set construction, then use a weaker, cheaper model to judge in CI on the same criteria. The weaker model agrees with the stronger one on the structured criteria you've defined far more often than it would on open-ended quality questions.
+
+## When to skip LLM-as-judge entirely
+
+If your check can be expressed as a regex, a JSON schema check, a substring check, or an exact-match comparison, do that instead. It's cheaper, faster, and more reliable. LLM-as-judge is the option of last resort, not first.
+
+The instinct to reach for LLM-as-judge first is a 2023 instinct. In 2026, with constrained decoding and richer schema validation, much more of your eval can be structural. Reach for the LLM judge only when nothing else captures the criterion.
+
+## The take
+
+LLM-as-judge can be the right tool. It is rarely the only tool, and when used naively it produces evaluation noise dressed up as signal.
+
+The discipline: write specific, structural rubrics. Use reference outputs when possible. Validate the judge against human agreement. Use it for the criteria that genuinely require model-level reasoning, and structural checks for everything else. Then you have an eval pipeline you can trust.

@@ -1,0 +1,130 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The hidden cost of evals (and how to keep them affordable)"
+description: "Eval pipelines are easy to start and expensive to run at scale. Here's where the cost actually comes from and how to keep it under control without losing the safety net."
+publishDate: "2026-04-30"
+pillar: evals
+slug: hidden-cost-of-evals
+---
+
+Three months into shipping an LLM product, the eval bench is paying for itself. Six months in, a question shows up in the engineering Slack: *"why is our eval bill bigger than our production inference bill?"*
+
+This is a real pattern. Eval pipelines that started as a few hundred dollars a month grow to thousands. Most of the growth is uncurated. The team didn't *decide* to spend more on evals; the costs accreted from individual reasonable-seeming choices.
+
+This essay is about the categories of eval cost, where they grow, and how to keep them affordable.
+
+## Where eval cost comes from
+
+Five sources, ranked by how often they're the main contributor.
+
+**Source 1: LLM-as-judge calls.** Each judged case is at least one extra LLM call. If you're judging with a strong model and your bench is 1000 cases run nightly, that's 30,000 judge calls a month. At a few cents each, that's a noticeable bill. If you're using a stronger model than your production model, the judge alone costs more than serving the actual feature.
+
+**Source 2: full-bench runs on every PR.** A team runs the full 500-case bench in CI on every prompt change. Engineers push 20 PRs a week. That's 10,000 model calls a week just for CI.
+
+**Source 3: pairwise comparisons.** Pairwise eval requires N comparisons per case. If you have 200 cases and you're doing all-pairs comparison against a baseline, you're running 400 calls per eval run.
+
+**Source 4: shadow evals at high sampling rates.** Sampling 50% of production traffic for shadow eval doubles your effective LLM spend (every sampled call gets a judge call).
+
+**Source 5: re-runs for flakiness.** Some teams run each eval case 3 times and majority-vote to deal with model nondeterminism. This triples the eval cost without tripling the signal.
+
+Most teams have all five sources contributing. Each one feels reasonable in isolation. Combined, they add up.
+
+## The diagnostic
+
+Before optimizing, measure. Add cost tracking to your eval pipeline. Every eval run should know:
+
+- Total cost of the run (API spend)
+- Cost per case (with breakdown: model call, judge call, retries)
+- Cost per category of case
+- Total monthly eval spend by source (CI vs deep vs shadow)
+
+You can't optimize what you can't measure. The cost dashboard is the prerequisite.
+
+## Optimization 1: tier your judge
+
+Don't use the strongest model as the judge for every eval. Tier it.
+
+- **Cheap structural checks first.** Regex, JSON schema, exact match. Almost free. These should reject the obvious failures before any LLM judge runs.
+- **Weak-model judge for routine checks.** For criteria where a smaller model suffices, use it. Validate against a stronger model on a sample to confirm agreement.
+- **Strong-model judge only for the hard cases.** The cases where weak-model agreement with strong-model is unreliable.
+
+A typical breakdown: 70% of cases pass at the cheap structural layer, 25% need a cheap LLM judge, 5% need a strong-model judge. Cost goes down by 5-10x with no signal loss.
+
+## Optimization 2: don't run the full bench on every PR
+
+Most prompt changes don't affect most cases. Run a small fast subset on every PR (the regression-critical cases). Run the full bench nightly, and on demand before release.
+
+Concretely: define a "smoke" subset (50-150 cases, runs in under 5 minutes). Define a "full" suite (500-2000 cases, runs in 30+ minutes). PRs trigger smoke; nightly cron triggers full; release pipeline triggers full + manual review.
+
+Engineers get fast feedback. The full bench still catches everything. Cost drops 5-10x because the full suite runs 1x per day instead of 20x per day.
+
+## Optimization 3: cache judgments
+
+If a case + reference output is unchanged from the previous run, the judgment can be cached. The judge will produce the same answer (modulo determinism settings).
+
+Hash the (case_id, prompt_version, model_version) tuple. If you've judged it before, return the cached result.
+
+Caching at this level shaves 30-60% off repeated eval runs. You lose nothing because the cached judgment is for an identical input.
+
+## Optimization 4: sample shadow evals appropriately
+
+You don't need to shadow-eval every production call. Sample.
+
+Reasonable starting point: 1-5% of production traffic. If your traffic is heavily skewed (most calls are similar), stratify the sampling to over-sample the long tail and under-sample the bulk.
+
+If you want higher confidence on a specific user segment or query type, you can adaptively sample: increase rate for segments where pass rate is volatile or low, decrease for segments where pass rate is stable and high.
+
+## Optimization 5: replace flakiness re-runs with seeding
+
+The reason teams run cases 3 times is model nondeterminism. The fix is determinism: set temperature to 0, set seed, lock model version.
+
+For most evals, deterministic settings produce the same output every time. You don't need to re-run. The case either passes or fails, deterministically.
+
+If your eval *requires* nondeterminism (e.g., evaluating creative output), then re-runs are justified. For the structured evals most production prompts need, determinism is fine.
+
+## Optimization 6: prune the bench
+
+A bench that grows without pruning gets expensive. Cases that pass 100% of the time across all recent versions can be retired (or moved to a "long tail" suite that runs less often).
+
+The retirement criterion: if a case hasn't discriminated between any two prompt versions in the last 90 days, it's not earning its eval cost. Move it to cold storage. It's still there if you need it; it's not running every night.
+
+Pruning cuts the bench size by 20-40% in mature products. The signal is preserved (the discriminating cases are kept). The cost drops proportionally.
+
+## What good cost discipline looks like
+
+A team with eval cost under control has:
+
+- Cost dashboard updated daily, monthly budget set
+- Tiered judging (structural → cheap LLM → strong LLM)
+- Smoke + full + shadow split with appropriate cadences
+- Caching enabled
+- Deterministic eval settings (no re-runs for flakiness)
+- Quarterly bench pruning
+
+Their monthly eval spend is something like 15-25% of their production inference spend, and growing only when they intentionally add eval surface. It's a budget item, not a surprise.
+
+## What undisciplined cost looks like
+
+Teams without these practices typically have:
+
+- No idea what their eval bill is
+- Strongest model used as judge for everything
+- Full bench on every PR
+- Pairwise eval against everything
+- Shadow eval at 100% sampling
+- 3x retry on every case
+- Bench that only grows, never prunes
+
+Their eval bill is 100-300% of their production inference spend. Eventually finance asks. They cut aggressively. They cut the wrong things and lose signal. They go from over-spending to under-spending without ever finding the right level.
+
+## The sweet spot
+
+A useful target: total eval spend at roughly 20-30% of production inference spend. Below that, you might be under-investing in quality assurance. Above that, you're probably wasting money on eval cost you don't need.
+
+The exception: pre-launch products and high-stakes features (regulated industries, safety-critical, etc.) often justify higher eval spend ratios. The eval is doing real work; the cost is acceptable. Most consumer features don't fit this category.
+
+## The take
+
+Evals are expensive in ways that surprise teams. Tier the judge, scope CI tightly, cache judgments, sample shadow appropriately, prune the bench. The signal stays high; the cost stays manageable.
+
+Eval cost should be a budget you set, not a surprise you discover. The discipline is no harder than any other engineering cost discipline. The payoff is keeping the eval safety net affordable enough that you don't end up cutting it when finance asks.

@@ -1,0 +1,127 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Human-in-the-loop evals: where it's still essential in 2026"
+description: "Automated evals can do a lot, but not everything. Here's where humans still beat any LLM judge, and how to set up the human review loop without breaking the bank."
+publishDate: "2026-05-03"
+pillar: evals
+slug: human-in-the-loop-evals
+---
+
+The dream of fully automated evals is appealing: the system grades itself, you watch a dashboard, the work runs while you sleep. We are closer to that dream in 2026 than we were in 2023. We are not there.
+
+There is a residual class of eval work that humans do better than any LLM judge, and probably will for a while longer. This essay is about identifying that class, setting up the human-review loop efficiently, and mixing human review with automated eval so you get the best of both.
+
+## What humans still beat LLM judges at
+
+Three categories.
+
+**Category 1: subjective quality at the margin.** When two responses are both technically acceptable, humans can rank them on dimensions LLMs are bad at (warmth, clarity, "feels right"). LLM judges have known biases on these dimensions; human judgment is more reliable.
+
+**Category 2: novel failure modes.** A human reviewing a production response will sometimes notice a problem nobody had thought of. *"Wait, why is the response listing things in this weird order?"* The LLM judge can only check criteria you've specified. Humans can flag things you didn't know were checkable.
+
+**Category 3: domain-specific correctness.** For tasks with deep domain knowledge (medical, legal, specialized financial), a domain expert can catch subtle errors an LLM judge would miss. The LLM judge doesn't know enough; the human does.
+
+Outside these three, automated evals usually beat human review on cost, speed, and consistency. Inside these three, humans are still essential.
+
+## The human review loop
+
+The most efficient setup I've used:
+
+```
+Production → Sample (e.g., 5%) → Triage Queue → Human Review → Categorized Results
+
+Categorized Results feed:
+  - Eval bench (failure cases become regression tests)
+  - Rubric updates (novel failure modes become new rubric items)
+  - Quality dashboard (human-graded pass rate by category)
+  - Prompt engineering backlog (specific cases to investigate)
+```
+
+The triage step is critical. Without it, reviewers see random production traces, which is exhausting and low-signal. With triage, reviewers see traces that have been pre-flagged as interesting (high latency, low confidence, unusual patterns, automated judge uncertainty).
+
+## Who does the reviewing
+
+Three options, with tradeoffs.
+
+**Option 1: the engineering team.** Cheapest in dollars. Most expensive in engineering time. Engineers see real production, learn from it, build intuition. The cost is engineering hours that could be building features.
+
+**Option 2: dedicated quality team.** Internal headcount. Reviewers become specialists. Higher consistency. Slower feedback loops to engineering.
+
+**Option 3: external review service.** Costs more per review. Scales easily. Can be specialized (clinical reviewers for medical, attorneys for legal, etc.). Requires careful brief and onboarding to maintain rubric consistency.
+
+Most teams I see do Option 1 informally and never grow it. The engineering team reviews production "when they have time," which is never. The result is no human review actually happening.
+
+The fix is not to make engineers do it. The fix is to formalize it: someone owns the queue, reviews happen on a defined cadence, results feed back into the eval bench. If that owner is on the engineering team, fine, but treat it as committed work, not background activity.
+
+## Calibration: making humans agree with each other
+
+If two reviewers disagree on what's a pass and what's a fail, your human-eval signal is noise.
+
+Calibration practices:
+
+**Inter-rater reliability checks.** Periodically have two reviewers grade the same set of cases. Measure agreement. If agreement is below 80%, the rubric is ambiguous; sharpen it.
+
+**Reference-grading sessions.** Once a quarter, the reviewers sit down together and grade the same 50 cases, then discuss disagreements. This re-aligns on what the rubric means in practice.
+
+**Rubric updates from disagreements.** When reviewers disagree, the disagreement is a signal that the rubric is unclear at that point. Update the rubric to specify what should happen for the case-type that caused the disagreement.
+
+Without these, your "human eval" data is noisy enough that it doesn't beat LLM judging. With these, you get reliable human signal that anchors your evaluation pipeline.
+
+## Mixing human and LLM judges
+
+The most effective pattern: LLM judge does the bulk; human reviews the LLM's uncertain cases and a sampled portion of its confident ones.
+
+Concretely:
+
+1. Run the LLM judge on every sampled production trace. Have the judge output not just a verdict but a confidence.
+2. Auto-route low-confidence cases to human review.
+3. Sample 5-10% of high-confidence cases for human review (to validate the judge is calibrated).
+4. Use human verdicts as the ground truth for any case where they disagree with the LLM judge.
+
+This pattern is much cheaper than human-only review (humans see only the cases where their input matters most) while staying anchored to human judgment as the source of truth.
+
+## When the LLM judge agrees with humans, scale it up
+
+Periodically, measure the agreement between your LLM judge and your human reviewers. If they agree on >90% of cases, you can lean more heavily on the judge for that category. If agreement is below 80%, the judge prompt needs work or that category genuinely requires human review.
+
+Track this agreement metric over time. It tells you how much human review is actually needed and where you can automate further.
+
+## What humans should never review
+
+Humans are expensive and finite. Don't waste their time on:
+
+- Cases where structural checks already catch the failure (regex, schema, exact match)
+- Cases where the LLM judge is highly confident and historically agrees with humans
+- High-volume routine cases that look like every other case
+- Categories where the rubric is so clear that any reasonable reviewer would give the same verdict
+
+Human attention should be focused on the cases where it actually matters: the marginal, the novel, the high-stakes. The other cases run through automation.
+
+## A worked sizing example
+
+Say you have 100,000 production interactions per day. Reasonable allocation:
+
+- All 100,000 get cheap structural checks. Almost free.
+- 5,000 (5%) get LLM-judge sampled. Maybe $50 a day.
+- 200 of those (the low-confidence ones) get human review. At 2 minutes each, that's about 7 reviewer-hours a day.
+- 50 of the high-confidence ones get human review for validation. Maybe 1.5 reviewer-hours.
+
+Total human time: about 9 hours a day. One reviewer's full-time job.
+
+This is a real, sustainable cost. It's much cheaper than pretending you don't need humans (and discovering it the hard way through a quality incident) or trying to have humans review everything (and failing because the volume is too high).
+
+## When to skip human-in-the-loop entirely
+
+A few cases where you can skip:
+
+- Pre-launch / very small scale (the volume isn't worth a reviewer; the team can spot-check)
+- The output is purely structural (a classifier, an extractor) where the rubric is fully specifiable and the LLM judge agrees with humans nearly always
+- Internal-only tools where users can give immediate feedback and that feedback is the eval
+
+For consumer-facing or high-stakes LLM products, you almost always want some human-in-the-loop. The question is how much, not whether.
+
+## The take
+
+Human review is not the past. It's the layer that catches what automation can't and keeps the automation calibrated. The teams shipping the most reliable LLM products have a defined human-review process, with proper triage, calibration, and integration into the eval bench.
+
+You don't need a lot of human review to get most of the benefit. You need enough to anchor your judgment, calibrate your automated evals, and surface failure modes you didn't anticipate. Set up the loop. Run it consistently. The signal will be worth the cost.

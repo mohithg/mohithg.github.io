@@ -1,0 +1,120 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The minimum viable eval bench (and why most teams skip it)"
+description: "Most LLM teams ship without a real eval bench. The reason isn't that benches are hard. It's that the first one feels too small to matter. Here's the smallest useful one."
+publishDate: "2026-04-25"
+pillar: evals
+slug: minimum-viable-eval-bench
+---
+
+The most common reason teams ship LLM features without an eval bench is not that they don't believe in evals. It's that the *first* eval bench feels too small to matter.
+
+Twenty examples? That's a sample size of nothing. You need hundreds. So instead of writing the twenty, the team writes none, and ships on vibes.
+
+This is the wrong instinct. The minimum viable eval bench is *much* smaller than people think. The point is not statistical confidence. The point is to catch obvious regressions and to give you a structured way to think about what "good" means.
+
+## What MVP eval looks like
+
+10 to 30 cases. Each case has:
+
+1. **An input.** What the user (or upstream system) sends to your prompt.
+2. **A reference output OR a check function.** Either an exact expected output, or a function that returns true/false based on whether the actual output is acceptable.
+3. **A label for what this case is testing.** "Handles missing data", "doesn't hallucinate ticker symbols", "uses the correct disclaimer."
+
+Run all cases against the current prompt. Get a pass/fail per case. Track the pass rate over time.
+
+That's it. That is the bench. You can build it in an afternoon. It will catch regressions you would otherwise discover through user complaints.
+
+## Why pass/fail beats nuanced scoring
+
+The temptation is to build a sophisticated rubric: each case scored 1-5 on multiple dimensions. The result is a number that sort of moves around as you change prompts, and nobody can remember what the scale meant.
+
+Pass/fail is brutal and clear. The case either passes or it doesn't. The acceptance criteria are stated upfront. Aggregating pass rates across cases is straightforward.
+
+If you find yourself wanting nuance, ask whether the case is too broad. Often the right move is to split a "scored 3/5 on tone" case into three pass/fail cases that test specific tonal failures.
+
+You can add scoring later if you genuinely need it. Most teams never need it.
+
+## Where the cases come from
+
+Three sources, in order of value.
+
+**Real production failures.** A user reported a wrong answer. The exact input becomes a case. The corrected output becomes the reference. This is the highest-value case type because it represents an actual failure mode you've seen.
+
+**Adversarial cases you imagine.** Edge cases the model probably gets wrong. Empty input, extreme input, ambiguous input, input that contradicts the system prompt. These prevent classes of failure rather than specific ones.
+
+**Happy-path representative cases.** A handful of typical user inputs to make sure you don't break the mainline behavior while fixing edges.
+
+The ratio I aim for: 60% real failures, 30% adversarial, 10% happy-path. Most teams I see have the inverse ratio, which is why their bench tells them everything is fine right up until production users hit a real edge case.
+
+## Where the checks come from
+
+Three styles, increasing in difficulty.
+
+**Exact-match checks.** The output must match a reference string exactly. Works for classification, structured outputs, short answers.
+
+**Regex or structural checks.** The output must contain certain substrings, follow a JSON schema, mention specific facts, never mention forbidden things. Works for most production cases.
+
+**LLM-as-judge checks.** A separate LLM call evaluates whether the output meets a rubric. Use this only when the first two won't work, which is rarer than people think.
+
+Start with the cheaper checks. Move to LLM-as-judge only when you can't structurally express the criterion.
+
+## How to actually run it
+
+The simplest pipeline:
+
+```python
+def run_bench(prompt_version):
+    cases = load_cases()
+    results = []
+    for case in cases:
+        actual = llm.invoke(prompt_version, case.input)
+        passed = case.check(actual)
+        results.append({"case": case.id, "passed": passed, "actual": actual})
+    pass_rate = sum(r["passed"] for r in results) / len(results)
+    return pass_rate, results
+```
+
+Run it before merging any prompt change. Compare the new pass rate to the previous baseline. If it dropped, look at which cases regressed. Fix or revert.
+
+That is the whole loop. There is no magic. The discipline is just *running it every time*.
+
+## What MVP eval doesn't catch
+
+Be clear about the limits. A 30-case bench will not:
+
+- Tell you the absolute quality of the model's output (you need many more cases for that)
+- Catch subtle quality regressions that don't trip your specific checks
+- Replace human review of the actual output
+
+What it will catch: regressions in cases you've explicitly marked as important. That alone is worth the investment many times over.
+
+## Growing the bench
+
+The bench grows organically. Every production failure becomes a new case. Every prompt change that breaks something gets a regression case added.
+
+After six months, you'll have a few hundred cases. After a year, a thousand. The bench compounds: each case prevents a class of regression. The earlier you start, the more regressions you avoid.
+
+## Why teams don't do this
+
+Three reasons I see most often.
+
+1. *"Our use case is too creative for evals."* Usually false. There's almost always *some* check that captures *some* failure mode. Start there.
+2. *"We'll set up evals once we have time."* You won't. The right time was the day you shipped the prompt. The next-best time is now.
+3. *"The bench is too small to be statistically meaningful."* Statistical significance is not the goal. Catching regressions is the goal. A bench of 20 specific cases catches more regressions than a bench of 2000 random ones.
+
+## The cost-benefit
+
+The cost of an MVP eval bench: a few hours, plus a few minutes per prompt change.
+
+The benefit: every regression you catch in dev instead of production. Every "did this prompt change break X?" question you can answer in seconds instead of debugging in production.
+
+The ratio is so favorable that any team shipping LLM features without a bench is leaving value on the table. The bench doesn't have to be sophisticated. It just has to exist.
+
+## What to do tomorrow morning
+
+Open a file called `evals.py`. Write five cases. Each case is an input, a reference output (or a check), and a label. Run them against your current prompt. Note the pass rate.
+
+You now have an eval bench. Add cases as you find failures. Run the bench before every prompt change. Within a week, the bench will pay for itself the first time it catches a regression you would have shipped.
+
+The MVP version is small enough to feel pointless and powerful enough to be worth the investment many times over. Start small. Grow it as the product grows.

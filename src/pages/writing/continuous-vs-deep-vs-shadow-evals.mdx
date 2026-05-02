@@ -1,0 +1,134 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Three kinds of evals: continuous, deep, and shadow"
+description: "Most teams treat 'evals' as one thing. The teams shipping reliable AI products run three distinct eval loops at different cadences. Here's the breakdown."
+publishDate: "2026-04-28"
+pillar: evals
+slug: continuous-vs-deep-vs-shadow-evals
+---
+
+When teams say "we run evals," they usually mean one specific thing: a fixed bench they run in CI when prompts change. That bench is necessary. It is not enough.
+
+The teams shipping reliable LLM products in 2026 run three different eval loops, each at a different cadence, each catching a different category of problem. Conflating them leads to either over-investment in one (too many CI evals slowing you down) or gaps that let regressions through (no shadow evals, so production drift is invisible).
+
+This essay defines the three loops and explains when to use each.
+
+## Loop 1: continuous (CI evals)
+
+**Cadence:** every PR.
+**Size:** small (20-100 cases).
+**Purpose:** catch regressions in the cases you've explicitly marked as important.
+**Who runs it:** automated.
+
+This is the bench you run on every prompt change. It must be fast (under a few minutes) and cheap (under a few dollars per run). It checks the cases you can't afford to regress on.
+
+The composition is biased toward known failure modes you've already fixed. Each case is a regression test: "if this stops passing, we re-introduced a bug we previously fixed."
+
+The key tradeoff: this bench should be small enough that engineers actually run it before merging. If it takes 30 minutes, they'll skip it. Aim for 5 minutes max.
+
+## Loop 2: deep (release evals)
+
+**Cadence:** weekly, or before major releases.
+**Size:** large (500-5000 cases).
+**Purpose:** measure the absolute quality of the system, catch subtle regressions the CI bench misses.
+**Who runs it:** automated, but reviewed by humans.
+
+The deep eval is your full bench. Every case ever added. Run it weekly to track the long-term trend. Run it before every release to confirm no subtle quality drop.
+
+The deep eval is too expensive and slow for every PR. Running it weekly catches most regressions before they reach production. Running it pre-release catches the ones that snuck through CI.
+
+The output is a quality dashboard: pass rate per category over time. You're looking for trends, not individual case failures. If pass rate is stable or rising, ship. If it's dropping, investigate.
+
+## Loop 3: shadow (production evals)
+
+**Cadence:** continuous, real time.
+**Size:** sample of production traffic (1-10%).
+**Purpose:** detect quality drift in actual production usage that the synthetic benches miss.
+**Who runs it:** automated; sampled traces reviewed by humans.
+
+The shadow eval is the most underused of the three, and the highest-leverage. Take a sample of real production traffic. For each sampled interaction, run a quality check (LLM-as-judge or structured rules). Track the pass rate over time.
+
+This is the only eval that catches:
+
+- Distribution shift in user behavior (users started asking new kinds of questions)
+- Quality drift from upstream changes (a tool's response format changed and now the agent breaks)
+- Subtle regressions that didn't trip the synthetic bench but trip in real traffic
+- Quality variation across user segments (works well for power users, badly for new ones)
+
+The synthetic benches test what you *thought* would happen. The shadow eval tests what *actually* happens.
+
+## Why all three are needed
+
+Each loop catches problems the others miss.
+
+**CI alone:** fast feedback, but you only test what's in the bench. New failure modes in production are invisible until someone notices and adds a case. By the time the case exists, the failure has already shipped.
+
+**Deep alone:** thorough but slow. A regression introduced Monday won't be caught until the weekly run on Friday. Engineers get out of the habit of running it because it's expensive.
+
+**Shadow alone:** catches production reality, but doesn't help you decide whether to ship a change. By the time the shadow eval flags a regression, it's already in production.
+
+The combination: CI catches known regressions before merge, deep catches subtle regressions before release, shadow catches reality after release. Defense in depth.
+
+## A concrete setup
+
+Here's the eval pipeline I'd build for a serious LLM product:
+
+```
+Continuous (CI):
+  - Trigger: every PR that touches prompts or eval-affected code
+  - Suite: 50-100 fast structural checks, ~30s runtime
+  - Action: block merge if pass rate drops more than 2 points
+
+Deep (Release):
+  - Trigger: nightly + manual before release
+  - Suite: 1000+ cases including LLM-as-judge
+  - Action: dashboard alert if pass rate drops; block release if drop is large
+
+Shadow (Production):
+  - Trigger: continuous, sample 5% of traffic
+  - Suite: LLM-as-judge against production rubric
+  - Action: page if pass rate over rolling 1h window drops below threshold
+```
+
+This is more eval infrastructure than most teams have. It's also less than you'd think to build. The hard part is committing to all three. Once you do, the implementations are straightforward.
+
+## How they share data
+
+The three loops are not independent. The shadow eval is the source of new cases for the CI and deep benches.
+
+When the shadow eval flags a real-traffic case as failing, you should:
+
+1. Add the case to the deep bench (so future deep runs check it)
+2. If it represents a critical failure mode, also add it to CI (with a check fast enough not to slow CI)
+3. Investigate why the existing benches missed it (did the rubric not cover this? was the case type underrepresented?)
+
+The benches grow organically from real failures. Every shadow flag becomes a CI/deep regression test. Over time, the synthetic benches catch more and more of what production would have caught, and the shadow eval becomes the long tail of "things we hadn't anticipated."
+
+## Common mistakes
+
+**Mistake 1: only running CI.** Most teams. They have an eval bench, they run it on PRs, they ship when it passes. They have no idea what production quality actually looks like.
+
+**Mistake 2: deep eval as gate.** Some teams use the deep eval as their PR gate. Result: CI takes 45 minutes, engineers stop pushing, prompt iteration slows to a crawl. Move it to nightly + pre-release; keep CI fast.
+
+**Mistake 3: shadow eval without action.** Teams set up shadow evals, watch the dashboard occasionally, never act on the data. The shadow eval should have alerts and someone responsible for them. Otherwise it's just decoration.
+
+**Mistake 4: same cases in all three.** The three loops should test different things. CI tests known critical regressions; deep tests broad quality; shadow tests production reality. If they're all running the same 100 cases, you have one loop pretending to be three.
+
+## What changes when you have all three
+
+Once the three loops are running:
+
+- Prompt changes ship faster (CI is fast and trusted)
+- Quality regressions are caught earlier (deep catches what CI misses)
+- Production drift is visible (shadow catches what synthetic missed)
+- New failure modes have a clear pipeline to becoming bench cases (shadow → deep → CI)
+
+This is the eval maturity gap between teams that ship LLM features and teams that ship reliable LLM features. The first group has CI. The second group has all three.
+
+## The take
+
+"Evals" is not one thing. It's three loops at different cadences, each catching different problems, each feeding the others.
+
+Build CI first. It's the smallest investment with the highest immediate return. Add deep next. Add shadow as soon as you have production traffic worth sampling. The full pipeline catches more problems with less engineering effort than any one of the loops in isolation.
+
+The teams shipping the most reliable LLM products aren't running better evals. They're running the right evals, at the right cadences, on the right data.

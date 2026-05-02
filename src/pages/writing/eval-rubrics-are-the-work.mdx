@@ -1,0 +1,119 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The eval rubric is the work"
+description: "Most teams treat the eval rubric as paperwork. The teams shipping reliable LLM products treat the rubric as the actual product specification. Here's the difference."
+publishDate: "2026-04-27"
+pillar: evals
+slug: eval-rubrics-are-the-work
+---
+
+There's a particular conversation I have with engineering teams shipping LLM features that goes like this:
+
+> *Me:* What does "good" look like for this output?
+> *Them:* You know, helpful, accurate, well-written.
+> *Me:* If I gave you ten outputs, could you rank them?
+> *Them:* Probably, yeah.
+> *Me:* What would you be looking for?
+> *Them:* ...you know, helpful, accurate, well-written.
+
+The team can recognize good when they see it. They cannot articulate it. So the eval bench becomes vibes-based: someone reads the outputs, says "looks fine," and ships.
+
+The fix is not "more evals." The fix is **writing down the rubric**: the explicit criteria a response must meet, in a form specific enough that two engineers reading the same output will give the same verdict.
+
+Writing the rubric *is* most of the work. The eval implementation is mechanical once you have it.
+
+## What a rubric actually contains
+
+A rubric is a checklist. For each output, every item on the checklist gets a yes/no answer. The rubric items are:
+
+1. **Concrete.** "Mentions the user's exact risk score" not "is personalized."
+2. **Independently verifiable.** Two reviewers should agree on the answer.
+3. **Tied to a real failure mode.** The item exists because we've seen the model fail this check.
+4. **Yes/no, not 1-5.** Scaled scores invite vibes.
+
+A well-written rubric for a financial assistant might have items like:
+
+- Cites the engine's risk score, or notes when it's unavailable
+- Does not recommend specific stocks or trades
+- Includes the standard regulatory disclaimer
+- Stays under 200 words
+- Uses plain English, no jargon without definition
+- Does not contradict facts in the engine's analysis
+- Acknowledges uncertainty in any predictive claim
+
+Each item is a yes/no. An output passes if it satisfies all (or, if you're allowing partial credit, you weight them).
+
+## Why teams resist writing this
+
+The reason most teams don't have a rubric like this isn't laziness. It's that **writing the rubric forces decisions you've been avoiding**.
+
+*"Should we recommend specific stocks?"* The product team has been hand-waving about this for months. The rubric forces a yes or no.
+
+*"What disclaimer text exactly?"* Legal has been "working on it." The rubric makes the disclaimer text the spec.
+
+*"What does 'plain English' mean here?"* The rubric forces specificity: plain English means no terms from the jargon list, sentences under 25 words, etc.
+
+The rubric is *uncomfortable* in a way that vague quality talk is not. The discomfort is exactly the point. It surfaces decisions and forces resolution.
+
+## Rubric as product spec
+
+I've started thinking of the rubric as the product spec for an AI feature. The traditional spec ("user clicks button, sees portfolio summary") doesn't capture what the LLM should actually output. The rubric does.
+
+When you build a rubric this way:
+
+- The PM and engineer agree on what "shipped" means
+- New team members can be onboarded by reading the rubric
+- Disputes about output quality become disputes about specific rubric items
+- The rubric evolves with the product as understanding deepens
+
+This is the opposite of the "evals are QA's problem" mindset. The rubric is a product artifact, owned by whoever owns the feature.
+
+## How to write your first rubric
+
+Five-step process. Takes an afternoon for a typical feature.
+
+1. **Generate 30 example outputs.** Just run the prompt against representative inputs. Print the outputs.
+2. **Sort them: best, worst, in between.** Trust your gut. Don't try to be principled yet.
+3. **For each "worst" output, write down what's wrong with it.** Not "it's bad". What specifically is wrong. *"It mentioned a stock by name."* *"It said 'guaranteed.'"* *"It contradicted the engine's risk score."*
+4. **Each "what's wrong" becomes a rubric item.** Reverse it: "Does NOT mention specific stocks." "Does NOT use guarantee language." "Matches the engine's risk score."
+5. **For each rubric item, check the "best" outputs all pass it.** If a "best" output fails an item, the item is wrong, or the output isn't actually best. Resolve the contradiction.
+
+After this, you have an initial rubric. It will be incomplete. That's fine. Add items as you find new failure modes. The rubric grows with the product.
+
+## How rubrics evolve
+
+A rubric is not a spec written once. It's a living document. The triggers for updates:
+
+**A new failure mode in production.** The model did something nobody anticipated. Add a rubric item that catches it. Add a regression case to the bench.
+
+**A new product requirement.** Marketing wants the assistant to mention the new feature when relevant. Add a rubric item: "Mentions [new feature] when context X applies."
+
+**A model upgrade.** New model has different default behaviors. Some old rubric items might be unnecessary; some new failure modes appear. Audit and update.
+
+**A user complaint that doesn't fit existing items.** The user's complaint is a signal that your rubric has a gap. Add an item.
+
+The rubric should grow at roughly the rate the product grows. If your rubric hasn't changed in months, either your product is in maintenance mode or you've stopped noticing failures.
+
+## The biggest rubric trap
+
+The trap: making the rubric so strict that no real output passes everything.
+
+If 90% of your "good" outputs fail at least one rubric item, the rubric is mis-calibrated. It's testing for ideal outputs, not acceptable ones.
+
+The fix is to either (a) loosen the items to match what you actually accept, or (b) be honest that you have a high standard and most outputs need iteration. Both are valid. Don't carry around a rubric that you never expect to fully satisfy.
+
+## What this changes about how you ship
+
+Once the rubric exists:
+
+- A prompt change is "reviewed" by running it against the rubric on the bench. Pass rate goes up: ship. Pass rate goes down: don't.
+- A new feature has its rubric items defined before the prompt is written. The prompt is engineered to satisfy the rubric.
+- Quality regressions in production become "which rubric item is failing" instead of "the model is acting weird."
+
+The rubric is the bridge between "what we want the model to do" and "what the model actually does." Without it, you can't tell whether you're improving. With it, every change has a measurable answer.
+
+## The take
+
+Stop optimizing for vibes. Write the rubric. Make it specific enough that two reasonable engineers would agree on each item's verdict. Use it as the spec for the AI feature. Update it as the product evolves.
+
+Most of the value of evals is having the rubric. The bench is the implementation. The rubric is the work.
