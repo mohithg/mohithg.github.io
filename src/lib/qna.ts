@@ -42,7 +42,7 @@ export const QNA: readonly QnA[] = [
     questions: ['Tell me about the IntuitionAI acquisition.', 'How did the IntuitionAI/Domino story go?', 'Founding engineer story'],
     keywords: ['intuition', 'intuitionai', 'acquisition', 'domino', 'datalab', 'founding', 'monitoring', 'drift'],
     answer:
-      'Mohith was the **founding engineer at IntuitionAI** in 2017 — building model monitoring (drift, data-quality, prediction logging) before model monitoring was a category. The company was acquired by **Domino Data Lab in 2018**. He stayed at Domino for **three years**, working on their core platform: real-time systems, customer-facing on-call, and an architecture revamp of significant portions of the codebase using a strangler-fig pattern. The model-monitoring product is still part of Domino\'s story.',
+      'Mohith was the **founding engineer at [IntuitionAI](https://intuition.ai)** in 2017 — building model monitoring (drift, data-quality, prediction logging) before model monitoring was a category. The company was acquired by **Domino Data Lab in 2018**. He stayed at Domino for **three years**, working on their core platform: real-time systems, customer-facing on-call, and an architecture revamp of significant portions of the codebase using a strangler-fig pattern. The model-monitoring product is still part of Domino\'s story.',
     citations: [{ label: 'IntuitionAI → Domino case study', href: '/work/intuition-ai' }],
   },
   {

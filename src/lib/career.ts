@@ -50,6 +50,7 @@ export const CAREER: readonly CareerNode[] = [
     summary:
       'Built model monitoring before "model monitoring" was a category. Drift, data quality, eval. Acquired by Domino Data Lab in 2018.',
     tags: ['ML monitoring', 'Founding', 'Acquisition', 'Python', 'Real-time'],
+    href: 'https://intuition.ai',
     caseStudy: '/work/intuition-ai',
     flagship: true,
   },
