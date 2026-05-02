@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Send, Sparkles, X, ArrowUpRight } from 'lucide-react';
 import { match, fallbackText } from './match';
 import { SUGGESTED_QUESTIONS, QNA, type QnA } from '../../lib/qna';
@@ -130,31 +131,58 @@ export default function ChatWidget() {
   return (
     <>
       {/* Floating button */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Chat with my career"
-        className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-2/80 px-4 py-3 backdrop-blur-md transition-all hover:scale-105 hover:border-violet/40 hover:bg-ink-3/80 sm:bottom-7 sm:right-7"
-        style={{ display: open ? 'none' : undefined }}
-      >
-        <Sparkles className="h-4 w-4 text-violet-soft" />
-        <span className="hidden font-mono text-xs text-paper sm:inline">chat with my career</span>
-        <kbd className="hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-paper-dim sm:inline">⌘ /</kbd>
-      </button>
+      <AnimatePresence>
+        {!open && (
+          <motion.button
+            key="chat-fab"
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Chat with my career"
+            initial={{ opacity: 0, y: 12, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.85 }}
+            whileHover={{ scale: 1.05, transition: { type: 'spring', stiffness: 400, damping: 22 } }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+            className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-2/80 px-4 py-3 backdrop-blur-md transition-colors hover:border-violet/40 hover:bg-ink-3/80 sm:bottom-7 sm:right-7"
+          >
+            <motion.span
+              animate={{ rotate: [0, 12, -8, 0] }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
+            >
+              <Sparkles className="h-4 w-4 text-violet-soft" />
+            </motion.span>
+            <span className="hidden font-mono text-xs text-paper sm:inline">chat with my career</span>
+            <kbd className="hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-paper-dim sm:inline">⌘ /</kbd>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Panel */}
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm"
-            onClick={() => setOpen(false)}
-            aria-hidden="true"
-          />
-          <aside
-            role="dialog"
-            aria-label="Chat with my career"
-            className="fixed bottom-0 right-0 z-50 flex h-[min(640px,90dvh)] w-full max-w-md flex-col overflow-hidden border-white/10 bg-ink-2 shadow-2xl sm:bottom-5 sm:right-5 sm:rounded-2xl sm:border"
-          >
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              key="chat-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm"
+              onClick={() => setOpen(false)}
+              aria-hidden="true"
+            />
+            <motion.aside
+              key="chat-panel"
+              role="dialog"
+              aria-label="Chat with my career"
+              initial={{ opacity: 0, y: 32, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.94 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.8 }}
+              style={{ transformOrigin: 'bottom right' }}
+              className="fixed bottom-0 right-0 z-50 flex h-[min(640px,90dvh)] w-full max-w-md flex-col overflow-hidden border-white/10 bg-ink-2 shadow-2xl sm:bottom-5 sm:right-5 sm:rounded-2xl sm:border"
+            >
             {/* Header */}
             <header className="relative isolate flex items-center justify-between border-b border-white/10 px-4 py-3">
               <div className="pointer-events-none absolute inset-0 -z-10 opacity-50">
@@ -183,7 +211,13 @@ export default function ChatWidget() {
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
               {msgs.map((m) => (
-                <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <motion.div
+                  key={m.id}
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+                  className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
                   <div
                     className={
                       m.role === 'user'
@@ -227,7 +261,7 @@ export default function ChatWidget() {
                       </div>
                     )}
                   </div>
-                </div>
+                </motion.div>
               ))}
 
               {msgs.length === 1 && (
@@ -277,9 +311,10 @@ export default function ChatWidget() {
                 no API keys, no costs · matches against a curated answer bank
               </p>
             </form>
-          </aside>
-        </>
-      )}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

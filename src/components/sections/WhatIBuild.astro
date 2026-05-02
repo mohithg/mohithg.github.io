@@ -1,6 +1,7 @@
 ---
 import { BUILD_SURFACES } from '../../lib/build';
 import { Sparkles, Workflow, Zap, Layers3, Database, Cpu } from 'lucide-react';
+import SpringCard from '../motion/SpringCard.tsx';
 
 const iconNodeMap = {
   sparkles: Sparkles,
@@ -30,18 +31,13 @@ const iconNodeMap = {
         BUILD_SURFACES.map((s, i) => {
           const Icon = iconNodeMap[s.iconName];
           return (
-            <article
-              data-reveal
-              data-glow
-              style={`--i: ${i}; --glow-color: var(--color-violet)`}
-              class="group relative bg-ink-2/60 p-7 transition-colors hover:bg-ink-3/60"
-            >
+            <SpringCard client:load index={i} accent="violet" lift={false} className="group relative bg-ink-2/60 p-7 transition-colors hover:bg-ink-3/60">
               <div class="flex items-center gap-3">
                 <span class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-ink-3/60 transition-transform group-hover:scale-110 group-hover:border-violet/40">
                   <Icon className="h-4 w-4 text-violet-soft transition-transform group-hover:rotate-6" />
                 </span>
                 <span class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">
-                  surface_{String(i + 1).padStart(2, '0')}
+                  /{s.id}
                 </span>
               </div>
               <h3 class="mt-5 font-display text-xl font-semibold tracking-tight">{s.title}</h3>
@@ -54,7 +50,7 @@ const iconNodeMap = {
                   </li>
                 ))}
               </ul>
-            </article>
+            </SpringCard>
           );
         })
       }

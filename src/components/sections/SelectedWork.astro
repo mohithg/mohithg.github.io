@@ -42,12 +42,13 @@ const meta: Record<string, { tagline: string; metric: string; metricLabel: strin
       {
         FLAGSHIPS.map((node, i) => {
           const m = meta[node.id]!;
+          const slug = node.caseStudy?.replace('/work/', '') ?? node.id;
           return (
             <WorkCard
               client:load
               href={node.caseStudy ?? '#'}
               index={i}
-              workIndex={i + 1}
+              slug={slug}
               total={FLAGSHIPS.length}
               accent={m.accent}
               metric={m.metric}

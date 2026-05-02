@@ -11,7 +11,7 @@ type Props = {
   accent: Accent;
   metric: string;
   metricLabel: string;
-  workIndex: number;
+  slug: string;
   start: string;
   end: string;
   role: string;
@@ -68,7 +68,7 @@ export default function WorkCard(props: Props): ReactNode {
       <div className="grid gap-8 sm:grid-cols-12 sm:items-start">
         <div className="sm:col-span-3">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-paper-muted">
-            /work/{String(props.workIndex).padStart(2, '0')}
+            /work/{props.slug}
           </p>
           <p className={`mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl ${accentText[accent]}`}>
             {props.metric}

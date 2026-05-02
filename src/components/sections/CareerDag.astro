@@ -3,14 +3,17 @@ import { CAREER, CAREER_EDGES } from '../../lib/career';
 
 // Layout: assign x,y by hand for a pleasing DAG.
 // Coordinate space is a 1200x600 viewBox.
+// Order is reverse-chronological (present on the LEFT) so that on mobile
+// — where the SVG horizontally scrolls — the user sees the current role
+// first, then swipes right to walk back through history.
 const POSITIONS: Record<string, { x: number; y: number }> = {
-  athena:           { x: 80,   y: 300 },
-  codebrahma:       { x: 280,  y: 300 },
-  rippling:         { x: 480,  y: 160 },
-  navya:            { x: 480,  y: 440 },
-  'intuition-ai':   { x: 700,  y: 300 },
-  domino:           { x: 900,  y: 300 },
-  globalpredictions:{ x: 1100, y: 300 },
+  globalpredictions:{ x: 100,  y: 300 },
+  domino:           { x: 320,  y: 300 },
+  'intuition-ai':   { x: 540,  y: 300 },
+  navya:            { x: 740,  y: 440 },
+  rippling:         { x: 740,  y: 160 },
+  codebrahma:       { x: 940,  y: 300 },
+  athena:           { x: 1120, y: 300 },
 };
 
 const yearLabel = (n: typeof CAREER[number]) =>
@@ -52,7 +55,7 @@ const yearLabel = (n: typeof CAREER[number]) =>
             <p class="hidden font-mono text-[11px] text-paper-muted sm:block">v11.{new Date().getFullYear() - 2014}</p>
           </div>
 
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto" data-dag-scroll>
             <svg viewBox="0 0 1200 600" class="min-w-[900px] w-full max-w-none" role="img" aria-label="Career timeline as a directed acyclic graph">
               <defs>
                 <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -134,10 +137,10 @@ const yearLabel = (n: typeof CAREER[number]) =>
 
           <!-- Legend -->
           <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/5 pt-4 font-mono text-[11px] text-paper-muted">
-            <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-mint"></span> running</span>
+            <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-mint"></span> running · today</span>
             <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-violet"></span> flagship</span>
             <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-paper-muted"></span> chapter</span>
-            <span class="ml-auto hidden sm:inline">animated edges = direction of time →</span>
+            <span class="ml-auto hidden sm:inline">← upstream tasks (the path that led here)</span>
           </div>
         </div>
       </div>
@@ -159,3 +162,21 @@ const yearLabel = (n: typeof CAREER[number]) =>
     animate { display: none; }
   }
 </style>
+
+<script>
+  // On narrow viewports, the DAG SVG scrolls horizontally. Start scrolled
+  // to the LEFT (Global Predictions = current) so visitors see the present
+  // first. The reverse-chronological layout means swiping right = going
+  // back in time, which is intuitive.
+  function init() {
+    document.querySelectorAll<HTMLElement>('[data-dag-scroll]').forEach((el) => {
+      el.scrollLeft = 0;
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+  document.addEventListener('astro:page-load', init);
+</script>
