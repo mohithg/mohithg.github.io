@@ -1,0 +1,102 @@
+---
+layout: ../../layouts/Work.astro
+title: PortfolioPilot
+tagline: First engineer on an AI financial advisor that now competes with the big banks. Five years in; still shipping the parts that decide whether the AI is right.
+role: Founding / First Engineer · Global Predictions, Inc.
+start: "2021-06"
+end: "present"
+accent: mint
+metrics:
+  - { value: "First", label: "engineer on the team" }
+  - { value: "5y", label: "and counting" }
+  - { value: "Plugins → GPTs → Agents", label: "AI surfaces, end-to-end" }
+description: PortfolioPilot case study — how I built and still own the AI advisor stack as the first engineer at Global Predictions.
+---
+
+import Owned from "../../components/work/Owned.astro";
+import HardProblem from "../../components/work/HardProblem.astro";
+import Architecture from "../../components/work/Architecture.astro";
+import NextWork from "../../components/work/NextWork.astro";
+
+## The setup
+
+In June 2021, I joined Global Predictions as the **first engineer on the team**. The product hypothesis was sharp: an AI financial advisor that would do for retail investors what a private wealth manager does for the wealthy — read your full portfolio, understand your goals, and tell you what to do, every day, in plain language. The team was a handful of finance and ML PhDs. There was no codebase yet. There was no product.
+
+Five years later, [PortfolioPilot.com](https://portfoliopilot.com) advises hundreds of thousands of investors on tens of billions of dollars of household wealth. There are mobile apps, an iOS-first investment-management product, a public API, GPTs, and an in-product AI advisor that talks to users every day. I have shipped or co-shipped basically every surface that touches the AI.
+
+I'm still here. I'm still the person who decides — and writes — the things that decide whether the AI is right.
+
+<Owned items={[
+  "Bootstrapped the entire codebase — Python services, a TypeScript monorepo, the data ingestion DAGs, the deployment pipeline.",
+  "Designed and built the financial-data ingestion layer: dozens of vendor and broker integrations, normalized into one canonical model.",
+  "Built the recommendation engine that pairs portfolio analysis with personalized actions — the surface users see daily.",
+  "Shipped one of the first wave of <strong>ChatGPT plugins</strong> for portfolio Q&A in early 2023; migrated to <strong>GPTs</strong>; then built our own agent runtime as the platform evolved.",
+  "Owned the eval / guardrail layer: every model and prompt change ships through a test bench that catches bad financial advice <em>before</em> it reaches a user.",
+  "Built the real-time advice streaming UI — tool-calling agents, stepwise reasoning visible, citations to source data.",
+  "Production infra: AWS, Kubernetes, Postgres, Celery, Redis, observability, costs."
+]} />
+
+<Architecture
+  title="PortfolioPilot — AI advisor stack"
+  width={1100}
+  height={520}
+  nodes={[
+    { id: "user", label: "User · Web / iOS / GPT", layer: "edge", x: 130, y: 90, owned: "built", note: "react · swift · gpt store" },
+    { id: "api", label: "Public API", layer: "app", x: 130, y: 250, owned: "built", note: "fastapi" },
+    { id: "agent", label: "Agent Runtime", layer: "ai", x: 380, y: 90, owned: "built", note: "tool-calling · streaming" },
+    { id: "advisor", label: "AI Advisor", layer: "ai", x: 380, y: 250, owned: "built", note: "the daily advice surface" },
+    { id: "evals", label: "Eval & Guardrails", layer: "ai", x: 380, y: 410, owned: "built", note: "every prompt, every model" },
+    { id: "rec", label: "Recommendation Engine", layer: "app", x: 640, y: 170, owned: "built", note: "personalized actions" },
+    { id: "ingest", label: "Data Ingestion DAGs", layer: "data", x: 640, y: 330, owned: "built", note: "celery · idempotent" },
+    { id: "models", label: "Quant / ML Models", layer: "ai", x: 880, y: 90, owned: "shaped", note: "team-built; I ship them" },
+    { id: "warehouse", label: "Postgres + Warehouse", layer: "data", x: 880, y: 250, owned: "owned", note: "schema · partitions" },
+    { id: "vendors", label: "Brokers · Market Data", layer: "data", x: 880, y: 410, owned: "shaped", note: "vendor SDKs" },
+  ]}
+  edges={[
+    { from: "user", to: "api" },
+    { from: "user", to: "agent" },
+    { from: "api", to: "advisor" },
+    { from: "agent", to: "advisor", label: "tools" },
+    { from: "advisor", to: "evals", label: "every change" },
+    { from: "advisor", to: "rec" },
+    { from: "rec", to: "models" },
+    { from: "rec", to: "warehouse" },
+    { from: "ingest", to: "warehouse" },
+    { from: "ingest", to: "vendors", dashed: true },
+  ]}
+/>
+
+## The early ChatGPT plugins moment
+
+In early 2023, OpenAI announced ChatGPT plugins — a way for ChatGPT to call your API and answer questions over your data. We saw what was happening before most teams did and shipped the PortfolioPilot plugin in the first wave. Users could open ChatGPT and ask *"how is my portfolio doing?"* and get a real, personalized answer with charts.
+
+When OpenAI deprecated plugins in favor of GPTs, we migrated. When GPTs gave way to the broader agent ecosystem, we built our own runtime — the same prompts and tool definitions, but on infra we control, with observability and evals we can trust. The prompts have evolved through three model generations now. The tools haven't, much: I designed them to be agent-runtime-agnostic from day one because I expected the substrate to keep shifting.
+
+<HardProblem title="How do you ship AI financial advice without occasionally telling someone to put their retirement in dogecoin?">
+
+Financial advice is a domain where being **wrong** has consequences ordinary AI products don't carry. A chatbot that hallucinates a recipe is annoying. A chatbot that hallucinates a tax-loss harvest recommendation can lose a user thousands of dollars and get the company sued. So the eval layer is the most important code I write at PortfolioPilot. It's also the layer most teams skip.
+
+The constraint: every prompt change, every model upgrade, every new tool — all of it needs to be evaluated against a corpus of *real* portfolio scenarios with known-correct answers, *and* against a corpus of adversarial scenarios designed to elicit bad advice. The tradeoff: real evals are slow and expensive; fake evals are fast but useless. We pay for the real thing.
+
+The system I built runs in three modes. **Continuous evals** run on every PR — a small, fast battery that catches obvious regressions in under a minute. **Deep evals** run on every model bump and every prompt-template change — hundreds of scenarios graded by an LLM judge with a structured rubric, then *spot-checked by humans* on the disagreements. **Production evals** run in shadow mode against real (anonymized) traffic, so we catch drift the offline tests miss.
+
+The hard part wasn't the eval framework. The hard part was the **rubric**. *What does it mean for financial advice to be correct?* "Don't tell them to put it in dogecoin" is easy. "Don't recommend a tax-loss harvest in a state where the wash-sale rule applies differently" is the kind of edge case the rubric exists to catch — and the kind of thing you only learn by reading every transcript where the AI was wrong, distilling the failure mode into a rule, and adding it to the bench.
+
+I write the rubrics. I also write the cases that try to break them. The eval system is the closest thing PortfolioPilot has to a *brand promise*, and it lives in code I own.
+
+</HardProblem>
+
+## Outcome
+
+PortfolioPilot today is the AI surface millions have first encountered AI advice through. It's been featured in major financial press, has live integrations with most of the brokerages a US investor would use, and in 2025 became the first AI advisor that the big banks treat as a real competitor rather than a curiosity.
+
+I'm still here. I'm still writing the parts that decide whether the AI is right.
+
+## What I'd do differently
+
+I'd build the eval layer **first**, not after the first time the AI told a user something dumb. Hindsight: every team I've watched ship AI features has had the same six-month epiphany. If you're starting an AI product today and you're reading this, the answer is *evals before features*.
+
+<NextWork
+  prev={{ href: "/", title: "Home" }}
+  next={{ href: "/work/intuition-ai", title: "IntuitionAI → Domino" }}
+/>

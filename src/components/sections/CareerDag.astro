@@ -1,0 +1,161 @@
+---
+import { CAREER, CAREER_EDGES } from '../../lib/career';
+
+// Layout: assign x,y by hand for a pleasing DAG.
+// Coordinate space is a 1200x600 viewBox.
+const POSITIONS: Record<string, { x: number; y: number }> = {
+  athena:           { x: 80,   y: 300 },
+  codebrahma:       { x: 280,  y: 300 },
+  rippling:         { x: 480,  y: 160 },
+  navya:            { x: 480,  y: 440 },
+  'intuition-ai':   { x: 700,  y: 300 },
+  domino:           { x: 900,  y: 300 },
+  globalpredictions:{ x: 1100, y: 300 },
+};
+
+const yearLabel = (n: typeof CAREER[number]) =>
+  `${n.start.split('-')[0]}–${n.end === 'present' ? 'now' : n.end.split('-')[0]}`;
+---
+
+<section id="career" class="relative overflow-hidden border-t border-white/5 py-24 sm:py-32">
+  <div class="mx-auto max-w-6xl px-5 sm:px-8">
+    <header class="mb-12 max-w-3xl">
+      <p class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ career.dag</p>
+      <h2 class="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl text-balance">
+        Eleven years, rendered as a <span class="gradient-text">directed acyclic graph</span>.
+      </h2>
+      <p class="mt-5 text-lg text-paper-dim text-pretty">
+        It's how I think about systems — and, it turns out, how my career has run too.
+        Hover any node for the receipts.
+      </p>
+    </header>
+
+    <div class="relative">
+      <!-- Glow -->
+      <div class="pointer-events-none absolute inset-0 -z-10">
+        <div class="mesh-bg absolute -inset-20 opacity-30"></div>
+      </div>
+
+      <!-- Frame -->
+      <div class="rounded-2xl border border-white/5 bg-ink-2/40 p-2 backdrop-blur-sm sm:p-4">
+        <div class="rounded-xl bg-ink-3/40 p-4 sm:p-6">
+          <!-- Header bar like an Airflow DAG view -->
+          <div class="mb-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="h-2.5 w-2.5 rounded-full bg-pink/70"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-mint/70"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-violet/70"></span>
+            </div>
+            <p class="font-mono text-[11px] text-paper-muted">
+              <span class="text-paper-dim">dag_id</span>=mohith_g · <span class="text-paper-dim">schedule</span>=daily · <span class="text-mint">running</span>
+            </p>
+            <p class="hidden font-mono text-[11px] text-paper-muted sm:block">v11.{new Date().getFullYear() - 2014}</p>
+          </div>
+
+          <div class="overflow-x-auto">
+            <svg viewBox="0 0 1200 600" class="min-w-[900px] w-full max-w-none" role="img" aria-label="Career timeline as a directed acyclic graph">
+              <defs>
+                <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.3"/>
+                  <stop offset="50%" stop-color="#7C5CFF" stop-opacity="0.7"/>
+                  <stop offset="100%" stop-color="#00E5A0" stop-opacity="0.7"/>
+                </linearGradient>
+                <radialGradient id="node-glow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.4"/>
+                  <stop offset="100%" stop-color="#7C5CFF" stop-opacity="0"/>
+                </radialGradient>
+                <radialGradient id="node-glow-mint" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#00E5A0" stop-opacity="0.5"/>
+                  <stop offset="100%" stop-color="#00E5A0" stop-opacity="0"/>
+                </radialGradient>
+                <pattern id="dotgrid" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+                  <circle cx="1" cy="1" r="0.8" fill="#FFFFFF" fill-opacity="0.06"/>
+                </pattern>
+              </defs>
+
+              <!-- Background dot grid -->
+              <rect x="0" y="0" width="1200" height="600" fill="url(#dotgrid)"/>
+
+              <!-- Edges -->
+              {CAREER_EDGES.map(({ from, to }) => {
+                const a = POSITIONS[from]!;
+                const b = POSITIONS[to]!;
+                const cx = (a.x + b.x) / 2;
+                return (
+                  <g>
+                    <path
+                      d={`M ${a.x} ${a.y} C ${cx} ${a.y}, ${cx} ${b.y}, ${b.x} ${b.y}`}
+                      stroke="url(#edge-gradient)"
+                      stroke-width="1.5"
+                      fill="none"
+                      stroke-dasharray="4 6"
+                      opacity="0.85"
+                    >
+                      <animate attributeName="stroke-dashoffset" values="0;-100" dur="6s" repeatCount="indefinite" />
+                    </path>
+                  </g>
+                );
+              })}
+
+              <!-- Nodes -->
+              {CAREER.map((node) => {
+                const pos = POSITIONS[node.id]!;
+                const isCurrent = node.end === 'present';
+                const isFlagship = !!node.flagship;
+                const fill = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#1A1A24';
+                const stroke = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#2A2A38';
+                return (
+                  <g class="dag-node group" data-node-id={node.id} style={`--x: ${pos.x}; --y: ${pos.y};`}>
+                    {(isFlagship || isCurrent) && (
+                      <circle cx={pos.x} cy={pos.y} r="44" fill={isCurrent ? 'url(#node-glow-mint)' : 'url(#node-glow)'} class="opacity-60" />
+                    )}
+                    <a href={node.caseStudy ?? `#career-${node.id}`} class="cursor-pointer">
+                      <rect
+                        x={pos.x - 88}
+                        y={pos.y - 26}
+                        width="176"
+                        height="52"
+                        rx="12"
+                        fill={isCurrent || isFlagship ? '#0F0F18' : '#0A0A0F'}
+                        stroke={stroke}
+                        stroke-opacity={isCurrent || isFlagship ? '0.9' : '0.4'}
+                        stroke-width="1"
+                        class="transition-all"
+                      />
+                      <circle cx={pos.x - 72} cy={pos.y - 8} r="3" fill={fill} />
+                      <text x={pos.x - 60} y={pos.y - 4} font-family="Geist Mono, monospace" font-size="11" fill="#9B9B9B">{yearLabel(node)}</text>
+                      <text x={pos.x - 60} y={pos.y + 14} font-family="Geist Sans, sans-serif" font-size="13" font-weight="600" fill="#F5F5F0">{node.company.split(' · ')[0]}</text>
+                    </a>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          <!-- Legend -->
+          <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/5 pt-4 font-mono text-[11px] text-paper-muted">
+            <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-mint"></span> running</span>
+            <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-violet"></span> flagship</span>
+            <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-paper-muted"></span> chapter</span>
+            <span class="ml-auto hidden sm:inline">animated edges = direction of time →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .dag-node rect {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 200ms var(--ease-out-soft, ease-out);
+  }
+  .dag-node:hover rect {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 6px 20px rgba(124, 92, 255, 0.4));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    animate { display: none; }
+  }
+</style>

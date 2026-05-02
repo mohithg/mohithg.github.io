@@ -1,0 +1,63 @@
+---
+import { ArrowUpRight, Mail, Sparkles } from 'lucide-react';
+import { SITE } from '../../lib/site';
+---
+
+<section id="contact" class="relative isolate overflow-hidden border-t border-white/5 py-32 sm:py-40">
+  <!-- Background mesh -->
+  <div class="pointer-events-none absolute inset-0 -z-10 opacity-60">
+    <div class="mesh-bg absolute -inset-40 [animation:var(--animate-mesh)]"></div>
+  </div>
+  <div class="grid-bg pointer-events-none absolute inset-0 -z-10 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]"></div>
+
+  <div class="mx-auto max-w-4xl px-5 text-center sm:px-8">
+    <p class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ talk to me</p>
+    <h2 class="mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">
+      Building something that needs <span class="gradient-text">a founding engineer</span>?
+    </h2>
+    <p class="mx-auto mt-8 max-w-2xl text-lg text-paper-dim text-pretty">
+      I'm open to founding-engineer or first-AI-engineer roles at AI-forward seed/Series A teams.
+      Also happy to talk shop about evals, agent stacks, or how to ship LLM features that don't embarrass you.
+    </p>
+
+    <div class="mt-12 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+      <a
+        href={`mailto:${SITE.email}?subject=Founding%20engineer%20opportunity`}
+        class="group inline-flex items-center justify-center gap-2 rounded-full bg-paper px-6 py-3.5 font-medium text-ink transition-transform hover:scale-[1.02]"
+      >
+        <Mail className="h-4 w-4" />
+        {SITE.email}
+        <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </a>
+      <button
+        type="button"
+        data-chat-trigger
+        class="group inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-ink-2/60 px-6 py-3.5 font-medium text-paper backdrop-blur-md transition-colors hover:border-violet/40 hover:bg-ink-3/60"
+      >
+        <Sparkles className="h-4 w-4 text-violet-soft" />
+        Chat with my career
+      </button>
+    </div>
+
+    <ul class="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+      {
+        [
+          { l: 'GitHub', h: SITE.github },
+          { l: 'LinkedIn', h: SITE.linkedin },
+          { l: 'Codepen', h: SITE.codepen },
+          { l: 'Blog', h: SITE.blog },
+        ].map((s) => (
+          <li>
+            <a
+              href={s.h}
+              class="group flex items-center justify-between rounded-full border border-white/10 px-4 py-2.5 font-mono text-xs text-paper-dim transition-colors hover:border-white/20 hover:text-paper"
+            >
+              {s.l.toLowerCase()}
+              <ArrowUpRight className="h-3 w-3 opacity-50 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100" />
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>

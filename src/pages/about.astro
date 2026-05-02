@@ -1,0 +1,147 @@
+---
+import Base from '../layouts/Base.astro';
+import { Image } from 'astro:assets';
+import headshot from '../assets/headshot.jpg';
+import { ArrowUpRight } from 'lucide-react';
+import { SITE } from '../lib/site';
+---
+
+<Base
+  title="About"
+  description="About Mohith G — an AI Product Engineer who ships full-stack products end-to-end. Currently first engineer at PortfolioPilot. Previously founding engineer at IntuitionAI (acquired by Domino Data Lab), Rippling."
+>
+  <article>
+    <header class="relative isolate overflow-hidden pt-32 pb-12 sm:pt-40 sm:pb-16">
+      <div class="pointer-events-none absolute inset-0 -z-10 opacity-50">
+        <div class="mesh-bg absolute -inset-40 [animation:var(--animate-mesh)]"></div>
+      </div>
+      <div class="grid-bg pointer-events-none absolute inset-0 -z-10 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]"></div>
+
+      <div class="mx-auto grid max-w-5xl gap-10 px-5 sm:px-8 lg:grid-cols-12 lg:items-start">
+        <div class="lg:col-span-8">
+          <p class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ about</p>
+          <h1 class="mt-3 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">
+            Hi, I'm <span class="gradient-text">Mohith</span>.
+          </h1>
+          <p class="mt-6 max-w-2xl text-xl text-paper-dim text-pretty">
+            I'm an AI Product Engineer. For eleven years I've shown up at startups — sometimes the first engineer, sometimes a founding engineer, sometimes just early — and shipped the entire product, top to bottom.
+          </p>
+        </div>
+
+        <div class="lg:col-span-4">
+          <div class="relative mx-auto max-w-xs lg:ml-auto">
+            <div class="absolute -inset-3 -z-10 rounded-3xl bg-gradient-to-br from-violet/30 via-mint/20 to-pink/20 blur-2xl"></div>
+            <div class="overflow-hidden rounded-2xl border border-white/10 bg-ink-2">
+              <Image
+                src={headshot}
+                alt="Mohith G"
+                widths={[280, 380, 480]}
+                sizes="(max-width: 1024px) 280px, 380px"
+                class="h-auto w-full object-cover saturate-110"
+                quality={85}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="mx-auto max-w-3xl px-5 pb-32 sm:px-8">
+      <div class="prose prose-invert max-w-none
+        prose-headings:font-display prose-headings:tracking-tight prose-headings:text-balance
+        prose-h2:mt-16 prose-h2:text-3xl prose-h2:font-semibold sm:prose-h2:text-4xl
+        prose-h3:mt-12 prose-h3:text-xl prose-h3:font-semibold
+        prose-p:text-paper-dim prose-p:text-pretty prose-p:leading-relaxed
+        prose-strong:text-paper prose-strong:font-semibold
+        prose-em:not-italic prose-em:text-mint
+        prose-a:text-paper prose-a:underline prose-a:decoration-violet/40 prose-a:underline-offset-4 hover:prose-a:decoration-violet
+        prose-li:text-paper-dim
+        prose-blockquote:not-italic prose-blockquote:border-l-violet/60 prose-blockquote:text-paper prose-blockquote:font-normal
+        ">
+
+        <h2>The short version</h2>
+
+        <p>
+          I'm a <strong>Product Engineer</strong> in the way that label means something today: a generalist who knows enough at every layer of the stack to make the call about what to build, not just how to build it.
+          I've been doing this professionally since 2014. Most of that time has been at venture-backed startups, several of them <a href="https://www.ycombinator.com">Y Combinator</a> companies, all of them either growing fast or trying to.
+        </p>
+
+        <p>
+          Today I'm the <em>first engineer</em> at <a href="https://portfoliopilot.com">PortfolioPilot</a>, where we're building one of the more ambitious AI products in financial services. Before that I was a founding engineer at <strong>IntuitionAI</strong> (which Domino Data Lab acquired), and I spent three years on Domino's core platform. Before that I spent seven months building early product surfaces for <a href="https://rippling.com">Rippling</a>, back when "production React" was a sentence that needed a footnote.
+        </p>
+
+        <h2>How I work</h2>
+
+        <p>
+          I have strong opinions about how to ship software. They're not unusual opinions — they're just not commonly applied with discipline. They come down to:
+        </p>
+
+        <h3>Ship the smallest thing that proves the next decision.</h3>
+        <p>
+          Most engineering effort wasted at startups is wasted on building too much before the next signal arrives. The hardest discipline in early-stage work is figuring out what would change your mind, and building only the thing that surfaces that signal. Then iterate.
+        </p>
+
+        <h3>Evals before features, in any AI product.</h3>
+        <p>
+          Every team I've watched ship AI features has had the same six-month epiphany: <em>we should have built the eval system first.</em> If you're starting an AI product today, build the eval bench before you ship the second prompt. <a href="/work/portfoliopilot">I wrote about this in the PortfolioPilot case study.</a>
+        </p>
+
+        <h3>Restraint is craft.</h3>
+        <p>
+          Frontend craft is not tricks. It's restraint. Backend craft is not patterns. It's restraint. The best code I've written and the best code I've reviewed is the code that <em>didn't</em> add the abstraction yet. I learned this the hard way, in a 2016 React codebase that should have shipped in half the time it did. <a href="/work/rippling">Story.</a>
+        </p>
+
+        <h3>The boundary between "design" and "engineering" is mostly imaginary.</h3>
+        <p>
+          I write design docs. I draw architecture diagrams. I prototype UI. I do code review. I write the prompts. I run the SQL. Treat the boundaries between these as friction to remove, not roles to defend.
+        </p>
+
+        <h2>The credentials</h2>
+
+        <p>
+          Computer Science gold medalist (batch topper) from CMR University. Eleven years professional experience across <a href="https://athenahealth.com">AthenaHealth</a>, <a href="https://codebrahma.com">Codebrahma</a>, <a href="https://rippling.com">Rippling</a>, Navya.Care, IntuitionAI, <a href="https://dominodatalab.com">Domino Data Lab</a>, and <a href="https://portfoliopilot.com">Global Predictions</a>. Open-source contributions across the npm ecosystem. The full timeline is on <a href="/">the home page</a>, drawn as a directed acyclic graph because I think in DAGs.
+        </p>
+
+        <h2>Off-hours</h2>
+
+        <p>
+          I live in Bengaluru. I read more books than I should. I'm into the kind of technical writing where someone shows you how a system actually works, not how it's marketed (Julia Evans, Dan Luu, Kent C. Dodds, Lilian Weng). I keep a <a href={SITE.blog}>blog</a> that I update when I have something useful to say and not before. I'm currently learning to make better espresso. I am not yet good at it.
+        </p>
+
+        <h2>If you're hiring</h2>
+
+        <p>
+          I'm open to <strong>founding-engineer</strong> or <strong>first-AI-engineer</strong> roles at AI-forward seed-to-Series-A teams. I'm also happy to talk shop about evals, agent stacks, or how to think about taking an AI feature from "it sometimes works" to "we'd ship this."
+        </p>
+
+        <p>
+          The fastest way to reach me is <a href={`mailto:${SITE.email}`}>email</a>. The most efficient way is to <strong>chat with my career</strong> — there's a button somewhere on this site for that.
+        </p>
+      </div>
+
+      <div class="mt-16 grid gap-3 border-t border-white/5 pt-10 sm:grid-cols-3">
+        <a href="/uses" class="group flex items-center justify-between rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4 transition-colors hover:bg-ink-3/40">
+          <span>
+            <span class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">/uses</span>
+            <span class="mt-1 block font-display text-lg font-semibold tracking-tight">tools & hardware</span>
+          </span>
+          <ArrowUpRight className="h-4 w-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-paper" />
+        </a>
+        <a href="/now" class="group flex items-center justify-between rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4 transition-colors hover:bg-ink-3/40">
+          <span>
+            <span class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">/now</span>
+            <span class="mt-1 block font-display text-lg font-semibold tracking-tight">what i'm doing</span>
+          </span>
+          <ArrowUpRight className="h-4 w-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-paper" />
+        </a>
+        <a href={SITE.blog} class="group flex items-center justify-between rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4 transition-colors hover:bg-ink-3/40">
+          <span>
+            <span class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">/blog</span>
+            <span class="mt-1 block font-display text-lg font-semibold tracking-tight">writing</span>
+          </span>
+          <ArrowUpRight className="h-4 w-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-paper" />
+        </a>
+      </div>
+    </div>
+  </article>
+</Base>

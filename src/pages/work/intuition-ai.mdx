@@ -1,0 +1,100 @@
+---
+layout: ../../layouts/Work.astro
+title: "IntuitionAI → Domino Data Lab"
+tagline: Founding engineer of a model-monitoring company built before model-monitoring was a category. Acquired. Then three years revamping a platform that runs ML at Fortune-500 scale.
+role: Founding Engineer (IntuitionAI) · Senior Engineer (Domino Data Lab)
+start: "2017-08"
+end: "2021-06"
+accent: violet
+metrics:
+  - { value: "Acquired", label: "by Domino Data Lab, 2018" }
+  - { value: "3y", label: "post-acquisition at Domino" }
+  - { value: "Core platform", label: "real-time + architecture revamp" }
+description: IntuitionAI / Domino Data Lab case study — founding-engineer story, model monitoring before it was a category, and three years revamping a Fortune-500 ML platform.
+---
+
+import Owned from "../../components/work/Owned.astro";
+import HardProblem from "../../components/work/HardProblem.astro";
+import Architecture from "../../components/work/Architecture.astro";
+import NextWork from "../../components/work/NextWork.astro";
+
+## The setup
+
+In 2017, I left a full-stack engineering job at [Navya.Care](#) to build a company. **IntuitionAI** was a small team — a couple of founders, an ML scientist, and me — and the bet was a simple one that turned out to be early. *Companies are deploying machine learning models to production. They have no idea what those models are doing once they ship.*
+
+Today, every MLOps platform has a model-monitoring product. In 2017, almost none did. We built one of the first. Less than a year later, it was acquired by Domino Data Lab.
+
+I joined Domino as part of the acquisition and stayed for three years. What started as integrating one acquired product into a larger platform became a deep tour through the **core** of how Domino works: data engineering, real-time systems, an architecture revamp of significant parts of the stack, and a lot of late nights making other people's ML reliable.
+
+<Owned items={[
+  "<strong>At IntuitionAI:</strong> built the model monitoring service from scratch — drift detection, data-quality checks, prediction logging, alerting.",
+  "Stood up the entire stack solo for the first six months: ingestion, storage, the dashboard, the alerting, the customer-facing SDK.",
+  "Owned the integration into Domino's platform after acquisition — both the technical migration and the product re-shaping.",
+  "<strong>At Domino:</strong> joined the core platform team. Worked on the parts of Domino that the rest of Domino is built on.",
+  "Built and shipped real-time systems — streaming evaluation, live model performance, the bits where latency matters.",
+  "Led an architecture revamp of significant portions of the codebase: cleaning up tech debt that had accumulated through hyper-growth, introducing modern patterns, breaking things into services that should've been services years earlier.",
+  "Across both companies: production incident response, customer-facing on-call, and the unsexy work of making an enterprise platform actually work for enterprises."
+]} />
+
+<Architecture
+  title="IntuitionAI model monitoring (pre-acquisition)"
+  width={1000}
+  height={420}
+  nodes={[
+    { id: "client", label: "Customer's Model", layer: "edge", x: 120, y: 80, owned: "shaped", note: "instrumented via SDK" },
+    { id: "sdk", label: "IntuitionAI SDK", layer: "app", x: 120, y: 220, owned: "built", note: "python · ~3kloc" },
+    { id: "ingest", label: "Prediction Ingest", layer: "data", x: 380, y: 80, owned: "built", note: "high-throughput · idempotent" },
+    { id: "drift", label: "Drift / DQ Engine", layer: "ai", x: 380, y: 220, owned: "built", note: "windowed · streaming" },
+    { id: "alert", label: "Alerting", layer: "app", x: 380, y: 360, owned: "built", note: "rules · slack · pagerduty" },
+    { id: "store", label: "Time-series Store", layer: "data", x: 660, y: 80, owned: "built" },
+    { id: "ref", label: "Reference Datasets", layer: "data", x: 660, y: 220, owned: "built" },
+    { id: "ui", label: "Dashboard", layer: "edge", x: 660, y: 360, owned: "built", note: "react" },
+    { id: "saas", label: "Multi-tenant SaaS", layer: "infra", x: 900, y: 220, owned: "built", note: "k8s · aws" },
+  ]}
+  edges={[
+    { from: "client", to: "sdk", dashed: true },
+    { from: "sdk", to: "ingest" },
+    { from: "ingest", to: "drift", label: "stream" },
+    { from: "ingest", to: "store" },
+    { from: "drift", to: "ref" },
+    { from: "drift", to: "alert" },
+    { from: "alert", to: "ui" },
+    { from: "store", to: "ui" },
+    { from: "ui", to: "saas" },
+  ]}
+/>
+
+## The acquisition
+
+In mid-2018, Domino approached us. They had a Fortune-500 customer base that ran ML in production at scale. They had a platform that helped data scientists *build* models. They didn't have model monitoring. We did.
+
+The acquisition closed quickly. The integration took longer — most of the next year. Engineering acquisitions look clean from the outside; up close, they are a hundred small judgment calls about which parts of the acquired thing to **preserve**, which parts to **rebuild** to fit the new platform, and which parts to **throw away** because the assumptions baked into them no longer hold. I made a lot of those calls. Some were right. Some I'd make differently now.
+
+The product that emerged became part of Domino's monitoring story for the next several years. The work that came after — three years on Domino's core platform — taught me more about distributed systems and enterprise software than the rest of my career combined.
+
+<HardProblem title="Re-architecting a fast-growing platform without breaking the customers paying you to make it work.">
+
+Domino had been growing fast for years before I arrived. The codebase showed it: services that should have been services were modules that imported each other. Tech debt had accumulated in the way it always does — every individual decision was reasonable at the time, but the sum was a system that was harder to change than it should be.
+
+The architecture revamp wasn't a rewrite — rewrites are how startups die. It was a **strangler-fig pattern**, slow and surgical, applied to several core subsystems over more than a year. We picked one boundary at a time, drew a clean interface across it, ported the cleanest path through that boundary first, then let the new thing grow at the expense of the old. Customers never saw it. Engineering velocity inside the boundary went up — measurably — within a quarter of each strangler completing.
+
+The hardest part wasn't the technical work. It was the **constant negotiation with deadlines**. Every quarter, the company needed new customer-facing features. Every quarter, the architecture work was at risk of being the thing that got cut. The lesson — which I carry into every senior role since — is that you have to *bake the cleanup into the feature work*. Not "we'll refactor next sprint." *This* feature is delivered through *this* boundary; the refactor and the feature ship together; if the refactor doesn't ship, neither does the feature.
+
+It's slower in the short term. It's the only thing that works in the long term.
+
+</HardProblem>
+
+## Outcome
+
+IntuitionAI was a successful exit. The model monitoring product is still part of Domino's story. The architecture work I did at Domino is still load-bearing in their platform.
+
+I left in mid-2021 not because anything was wrong, but because the LLM revolution was about to start and I wanted to be back at company-zero. I joined Global Predictions a few weeks later as their first engineer. The rest is a separate case study.
+
+## What I learned
+
+If you join a company through an acquisition, **the first six months decide everything**. The decisions you make about how the acquired thing fits in — what gets kept, what gets folded in, what gets thrown out — are easier to make in the first six months than ever again. Don't punt those decisions. Make them deliberately, write them down, and revisit them when the data tells you to.
+
+<NextWork
+  prev={{ href: "/work/portfoliopilot", title: "PortfolioPilot" }}
+  next={{ href: "/work/rippling", title: "Rippling" }}
+/>

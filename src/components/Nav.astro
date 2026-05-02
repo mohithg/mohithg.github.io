@@ -1,0 +1,62 @@
+---
+import Logo from './Logo.astro';
+import { NAV } from '../lib/site';
+
+const path = Astro.url.pathname;
+---
+
+<header class="fixed inset-x-0 top-0 z-40">
+  <div class="mx-auto max-w-6xl px-5 pt-5 sm:px-8">
+    <div class="glass flex items-center justify-between rounded-full px-3 py-2 sm:px-4">
+      <a href="/" class="group flex items-center gap-2.5" aria-label="Home">
+        <Logo size={28} />
+        <span class="hidden font-mono text-[13px] tracking-tight text-paper-dim transition-colors group-hover:text-paper sm:block">
+          mohithg.com
+        </span>
+      </a>
+
+      <nav class="hidden items-center gap-1 text-sm sm:flex">
+        {
+          NAV.slice(1).map((item) => {
+            // Hash-only nav (#work) is active on home and any /work/* page.
+            // Everything else is active on exact match or descendant route.
+            const isWorkLink = item.href.startsWith('/#') || item.href.startsWith('#');
+            const active = isWorkLink
+              ? path === '/' || path.startsWith('/work/')
+              : path === item.href || path.startsWith(item.href + '/');
+            return (
+              <a
+                href={item.href}
+                class:list={[
+                  'rounded-full px-3 py-1.5 font-mono text-[13px] transition-colors',
+                  active ? 'text-paper bg-white/5' : 'text-paper-dim hover:text-paper',
+                ]}
+              >
+                {item.label.toLowerCase()}
+              </a>
+            );
+          })
+        }
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          data-cmd-k-trigger
+          aria-label="Open command palette"
+          class="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 font-mono text-[12px] text-paper-dim transition-colors hover:border-white/20 hover:text-paper sm:inline-flex"
+        >
+          <span aria-hidden="true">search</span>
+          <kbd class="rounded border border-white/10 bg-white/5 px-1.5 py-px text-[10px]">⌘K</kbd>
+        </button>
+        <a
+          href="/#contact"
+          class="inline-flex items-center gap-1.5 rounded-full bg-paper px-3.5 py-1.5 font-mono text-[12px] font-medium text-ink transition-transform hover:scale-105"
+        >
+          hire me
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</header>

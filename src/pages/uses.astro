@@ -1,0 +1,115 @@
+---
+import Base from '../layouts/Base.astro';
+
+type Item = { name: string; note?: string; href?: string };
+type Section = { title: string; items: Item[] };
+
+const SECTIONS: Section[] = [
+  {
+    title: 'editor & terminal',
+    items: [
+      { name: 'Cursor', note: 'main editor; Claude in the loop' },
+      { name: 'Claude Code', note: 'how this site got rebuilt, in one session' },
+      { name: 'Neovim', note: 'for the times I want to feel something' },
+      { name: 'Ghostty', note: 'fast terminal; ditched iTerm' },
+      { name: 'Zsh + Starship', note: 'minimal prompt, no plugin manager drama' },
+      { name: 'tmux', note: 'when I need persistence' },
+    ],
+  },
+  {
+    title: 'languages & frameworks',
+    items: [
+      { name: 'Python', note: 'FastAPI, Django, Celery — daily' },
+      { name: 'TypeScript', note: 'React, Astro, Next when warranted' },
+      { name: 'SQL', note: 'mostly Postgres; partitioning is undervalued' },
+      { name: 'Bash', note: 'because everything is bash, eventually' },
+    ],
+  },
+  {
+    title: 'ai stack',
+    items: [
+      { name: 'Claude (Anthropic)', note: 'primary daily model' },
+      { name: 'OpenAI', note: 'plumbed in for fallback + tool-call comparisons' },
+      { name: 'pgvector / Postgres', note: 'embeddings, kept simple' },
+      { name: 'Custom eval bench', note: 'every prompt change, every model bump' },
+    ],
+  },
+  {
+    title: 'infra',
+    items: [
+      { name: 'AWS', note: 'where most of the production stuff lives' },
+      { name: 'Cloudflare', note: 'DNS, Workers, Pages — including this site' },
+      { name: 'Kubernetes', note: 'when warranted; not when not' },
+      { name: 'Docker', note: 'containerizing things since the bad old days' },
+      { name: 'Postgres', note: 'the only database I trust by default' },
+      { name: 'Redis', note: 'caching, queues, the usual' },
+    ],
+  },
+  {
+    title: 'hardware',
+    items: [
+      { name: 'MacBook Pro 16" M-series', note: 'the work machine' },
+      { name: 'LG 27" 4K external', note: 'enough screen, not too much' },
+      { name: 'Keychron Q1', note: 'switches: Gateron Brown' },
+      { name: 'AirPods Pro', note: 'transparency mode is underrated' },
+    ],
+  },
+  {
+    title: 'browser & productivity',
+    items: [
+      { name: 'Arc / Chrome', note: 'split-view tabs are the killer feature' },
+      { name: 'Raycast', note: 'launcher, clipboard, snippets' },
+      { name: '1Password', note: 'shared vaults with the team' },
+      { name: 'Linear', note: 'tracking with taste' },
+      { name: 'Notion', note: 'docs + tables + the occasional database' },
+    ],
+  },
+  {
+    title: 'reading',
+    items: [
+      { name: 'Lilian Weng', note: 'best LLM systems writing on the internet', href: 'https://lilianweng.github.io' },
+      { name: 'Simon Willison', note: 'the daily diary of "what does this LLM actually do"', href: 'https://simonwillison.net' },
+      { name: 'Julia Evans', note: 'the gold standard for "how does this work"', href: 'https://jvns.ca' },
+      { name: 'Dan Luu', note: 'the gold standard for "what is actually true"', href: 'https://danluu.com' },
+    ],
+  },
+];
+---
+
+<Base title="Uses" description="The tools, hardware, and stack I actually use day-to-day.">
+  <article class="pt-32 pb-32 sm:pt-40">
+    <div class="mx-auto max-w-3xl px-5 sm:px-8">
+      <p class="font-mono text-xs uppercase tracking-[0.3em] text-pink">/ uses</p>
+      <h1 class="mt-3 font-display text-5xl font-semibold tracking-tight sm:text-6xl text-balance">
+        What I use.
+      </h1>
+      <p class="mt-5 max-w-2xl text-lg text-paper-dim text-pretty">
+        Updated whenever I notice it's stale. Following the <a href="https://uses.tech" class="underline decoration-violet/40 underline-offset-4 hover:decoration-violet">/uses</a> convention.
+      </p>
+
+      <div class="mt-16 space-y-12">
+        {
+          SECTIONS.map((s) => (
+            <section>
+              <h2 class="font-mono text-xs uppercase tracking-[0.3em] text-paper-muted">/ {s.title}</h2>
+              <ul class="mt-4 divide-y divide-white/5 rounded-xl border border-white/5 bg-ink-2/30">
+                {s.items.map((it) => (
+                  <li class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-5 py-3">
+                    <span class="font-display font-semibold tracking-tight">
+                      {it.href ? (
+                        <a href={it.href} class="underline decoration-white/10 underline-offset-4 hover:decoration-violet">
+                          {it.name}
+                        </a>
+                      ) : it.name}
+                    </span>
+                    {it.note && <span class="text-sm text-paper-dim text-pretty">{it.note}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        }
+      </div>
+    </div>
+  </article>
+</Base>

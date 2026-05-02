@@ -1,0 +1,52 @@
+---
+import Base from '../layouts/Base.astro';
+import { ArrowRight } from 'lucide-react';
+---
+
+<Base title="404" description="Page not found." noindex>
+  <section class="relative isolate flex min-h-[100dvh] items-center overflow-hidden">
+    <div class="pointer-events-none absolute inset-0 -z-10 opacity-50">
+      <div class="mesh-bg absolute -inset-40 [animation:var(--animate-mesh)]"></div>
+    </div>
+    <div class="grid-bg pointer-events-none absolute inset-0 -z-10 opacity-30 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]"></div>
+
+    <div class="mx-auto max-w-3xl px-5 sm:px-8">
+      <p class="font-mono text-xs uppercase tracking-[0.3em] text-pink">/ 404</p>
+
+      <pre class="mt-6 font-mono text-[10px] leading-tight text-paper-muted sm:text-xs">{`
+   ┌─────────────┐         ┌─────────────┐
+   │  expected   │ ──────▶ │   actual    │
+   │  /something │         │  /nowhere   │
+   └─────────────┘         └─────────────┘
+        ✓ found                ✗ missing
+`}</pre>
+
+      <h1 class="mt-8 font-display text-6xl font-semibold tracking-tight sm:text-7xl lg:text-8xl text-balance">
+        That node isn't <span class="gradient-text">in the DAG</span>.
+      </h1>
+      <p class="mt-6 max-w-xl text-lg text-paper-dim text-pretty">
+        I checked the upstream tasks. Nothing depends on this URL. Either I retired it, or it never existed.
+      </p>
+
+      <div class="mt-10 flex flex-wrap items-center gap-3">
+        <a href="/" class="group inline-flex items-center gap-2 rounded-full bg-paper px-6 py-3 font-medium text-ink transition-transform hover:scale-[1.02]">
+          back to /
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        </a>
+        <a href="/#work" class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-2/60 px-6 py-3 font-mono text-sm text-paper-dim backdrop-blur-md transition-colors hover:border-white/20 hover:text-paper">
+          /work
+        </a>
+        <a href="/about" class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-2/60 px-6 py-3 font-mono text-sm text-paper-dim backdrop-blur-md transition-colors hover:border-white/20 hover:text-paper">
+          /about
+        </a>
+        <a href="/uses" class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-2/60 px-6 py-3 font-mono text-sm text-paper-dim backdrop-blur-md transition-colors hover:border-white/20 hover:text-paper">
+          /uses
+        </a>
+      </div>
+
+      <p class="mt-12 font-mono text-[11px] text-paper-muted">
+        <span class="text-mint">tip:</span> hit <kbd class="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px]">⌘K</kbd> to search the site.
+      </p>
+    </div>
+  </section>
+</Base>

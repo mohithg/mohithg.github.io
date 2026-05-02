@@ -1,0 +1,14 @@
+---
+type Props = {
+  value: string;
+  label: string;
+  accent?: 'violet' | 'mint' | 'pink' | 'paper';
+};
+const { value, label, accent = 'paper' } = Astro.props;
+const accentClass = accent === 'mint' ? 'text-mint' : accent === 'violet' ? 'text-violet-soft' : accent === 'pink' ? 'text-pink' : 'text-paper';
+---
+
+<div class="rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4">
+  <p class:list={['font-display text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl', accentClass]}>{value}</p>
+  <p class="mt-1 font-mono text-[10px] uppercase tracking-widest text-paper-muted">{label}</p>
+</div>

@@ -1,0 +1,141 @@
+---
+// A small architecture diagram component: nodes + connections, with mine/existing badging.
+// Renders inline SVG with labels.
+type Node = {
+  id: string;
+  label: string;
+  layer: 'edge' | 'app' | 'data' | 'ai' | 'infra';
+  owned?: 'built' | 'owned' | 'shaped' | 'inherited';
+  note?: string;
+  x: number;
+  y: number;
+};
+type Edge = { from: string; to: string; label?: string; dashed?: boolean };
+type Props = {
+  title: string;
+  nodes: readonly Node[];
+  edges: readonly Edge[];
+  width?: number;
+  height?: number;
+};
+
+const { title, nodes, edges, width = 1000, height = 520 } = Astro.props;
+
+const layerColor: Record<Node['layer'], string> = {
+  edge: '#FF5C8A',
+  app: '#7C5CFF',
+  data: '#00E5A0',
+  ai: '#A088FF',
+  infra: '#9B9B9B',
+};
+
+const layerLabel: Record<Node['layer'], string> = {
+  edge: 'edge',
+  app: 'app',
+  data: 'data',
+  ai: 'ai',
+  infra: 'infra',
+};
+
+const ownedBadge: Record<NonNullable<Node['owned']>, { color: string; label: string }> = {
+  built: { color: '#00E5A0', label: '★ built' },
+  owned: { color: '#7C5CFF', label: '◆ owned' },
+  shaped: { color: '#A088FF', label: '◇ shaped' },
+  inherited: { color: '#6E6E76', label: '○ inherited' },
+};
+
+const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n]));
+---
+
+<figure class="my-12">
+  <figcaption class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+    <h3 class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ architecture</h3>
+    <p class="font-display text-lg font-semibold tracking-tight">{title}</p>
+  </figcaption>
+
+  <div class="overflow-hidden rounded-2xl border border-white/10 bg-ink-2/40 p-2 sm:p-4">
+    <div class="rounded-xl bg-ink-3/40 p-3 sm:p-5">
+      <div class="overflow-x-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} class="min-w-[760px] w-full max-w-none" role="img" aria-label={title}>
+          <defs>
+            <pattern id={`arch-grid-${title.replace(/\s/g, '')}`} x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="0.7" fill="#FFFFFF" fill-opacity="0.05" />
+            </pattern>
+            <marker id={`arrow-${title.replace(/\s/g, '')}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 Z" fill="#7C5CFF" />
+            </marker>
+          </defs>
+          <rect x="0" y="0" width={width} height={height} fill={`url(#arch-grid-${title.replace(/\s/g, '')})`} />
+
+          {edges.map((e) => {
+            const a = nodeMap[e.from]!;
+            const b = nodeMap[e.to]!;
+            const cx = (a.x + b.x) / 2;
+            return (
+              <g>
+                <path
+                  d={`M ${a.x} ${a.y} C ${cx} ${a.y}, ${cx} ${b.y}, ${b.x} ${b.y}`}
+                  stroke="#7C5CFF"
+                  stroke-opacity="0.5"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-dasharray={e.dashed ? '4 6' : 'none'}
+                  marker-end={`url(#arrow-${title.replace(/\s/g, '')})`}
+                />
+                {e.label && (
+                  <text x={cx} y={(a.y + b.y) / 2 - 6} text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" fill="#9B9B9B">
+                    {e.label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {nodes.map((n) => (
+            <g class="arch-node">
+              <rect
+                x={n.x - 90}
+                y={n.y - 28}
+                width="180"
+                height="56"
+                rx="10"
+                fill="#0F0F18"
+                stroke={layerColor[n.layer]}
+                stroke-opacity={n.owned === 'built' ? '0.95' : n.owned === 'owned' ? '0.7' : '0.3'}
+                stroke-width="1"
+              />
+              <circle cx={n.x - 76} cy={n.y - 12} r="2.5" fill={layerColor[n.layer]} />
+              <text x={n.x - 68} y={n.y - 8} font-family="Geist Mono, monospace" font-size="9" fill="#6E6E76" letter-spacing="1">
+                {layerLabel[n.layer].toUpperCase()}
+              </text>
+              <text x={n.x - 68} y={n.y + 10} font-family="Geist Sans, sans-serif" font-size="13" font-weight="600" fill="#F5F5F0">
+                {n.label}
+              </text>
+              {n.owned && (
+                <g>
+                  <rect x={n.x + 22} y={n.y - 22} width="60" height="14" rx="3" fill={ownedBadge[n.owned].color} fill-opacity="0.15" stroke={ownedBadge[n.owned].color} stroke-opacity="0.4" stroke-width="0.5" />
+                  <text x={n.x + 52} y={n.y - 12} text-anchor="middle" font-family="Geist Mono, monospace" font-size="9" fill={ownedBadge[n.owned].color}>
+                    {ownedBadge[n.owned].label}
+                  </text>
+                </g>
+              )}
+              {n.note && (
+                <text x={n.x - 68} y={n.y + 22} font-family="Geist Mono, monospace" font-size="9" fill="#6E6E76">
+                  {n.note}
+                </text>
+              )}
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      <!-- Legend -->
+      <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/5 pt-4 font-mono text-[10px] text-paper-muted">
+        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-mint"></span> ★ built from scratch</span>
+        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-violet"></span> ◆ owned</span>
+        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-violet-soft"></span> ◇ shaped / refactored</span>
+        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-paper-muted"></span> ○ inherited / pre-existing</span>
+      </div>
+    </div>
+  </div>
+</figure>

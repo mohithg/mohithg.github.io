@@ -1,0 +1,57 @@
+---
+import Base from '../layouts/Base.astro';
+import Hero from '../components/sections/Hero.astro';
+import CareerDag from '../components/sections/CareerDag.astro';
+import SelectedWork from '../components/sections/SelectedWork.astro';
+import OtherChapters from '../components/sections/OtherChapters.astro';
+import WhatIBuild from '../components/sections/WhatIBuild.astro';
+import Press from '../components/sections/Press.astro';
+import Contact from '../components/sections/Contact.astro';
+import { SITE } from '../lib/site';
+
+const personJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: SITE.name,
+  url: SITE.url,
+  jobTitle: 'Product Engineer',
+  worksFor: {
+    '@type': 'Organization',
+    name: 'Global Predictions (PortfolioPilot)',
+    url: 'https://portfoliopilot.com',
+  },
+  alumniOf: [
+    { '@type': 'Organization', name: 'Domino Data Lab', url: 'https://dominodatalab.com' },
+    { '@type': 'Organization', name: 'IntuitionAI' },
+    { '@type': 'Organization', name: 'Rippling', url: 'https://rippling.com' },
+    { '@type': 'Organization', name: 'AthenaHealth', url: 'https://athenahealth.com' },
+  ],
+  email: `mailto:${SITE.email}`,
+  sameAs: [SITE.github, SITE.linkedin, SITE.codepen, SITE.blog, SITE.twitter],
+  knowsAbout: [
+    'Artificial Intelligence',
+    'Large Language Models',
+    'Full-stack engineering',
+    'React',
+    'Python',
+    'TypeScript',
+    'Distributed systems',
+    'Real-time systems',
+    'Kubernetes',
+    'AWS',
+    'Eval systems',
+    'Model monitoring',
+  ],
+  description: SITE.description,
+};
+---
+
+<Base jsonLd={personJsonLd}>
+  <Hero />
+  <CareerDag />
+  <SelectedWork />
+  <OtherChapters />
+  <WhatIBuild />
+  <Press />
+  <Contact />
+</Base>

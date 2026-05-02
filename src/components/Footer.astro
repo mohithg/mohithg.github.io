@@ -1,0 +1,61 @@
+---
+import Logo from './Logo.astro';
+import { SITE } from '../lib/site';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="relative z-10 border-t border-white/5 bg-ink px-5 pb-10 pt-20 sm:px-8">
+  <div class="mx-auto max-w-6xl">
+    <div class="grid gap-12 sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <a href="/" class="inline-flex items-center gap-2.5" aria-label="Home">
+          <Logo size={32} />
+          <span class="font-mono text-sm tracking-tight text-paper">mohith g</span>
+        </a>
+        <p class="mt-4 max-w-xs text-sm text-paper-dim">
+          {SITE.longTagline}
+        </p>
+      </div>
+
+      <div>
+        <h3 class="font-mono text-xs uppercase tracking-widest text-paper-muted">Site</h3>
+        <ul class="mt-4 space-y-2 text-sm">
+          <li><a href="/" class="text-paper-dim hover:text-paper transition-colors">Home</a></li>
+          <li><a href="/about" class="text-paper-dim hover:text-paper transition-colors">About</a></li>
+          <li><a href="/uses" class="text-paper-dim hover:text-paper transition-colors">Uses</a></li>
+          <li><a href="/now" class="text-paper-dim hover:text-paper transition-colors">Now</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="font-mono text-xs uppercase tracking-widest text-paper-muted">Work</h3>
+        <ul class="mt-4 space-y-2 text-sm">
+          <li><a href="/work/portfoliopilot" class="text-paper-dim hover:text-paper transition-colors">PortfolioPilot</a></li>
+          <li><a href="/work/intuition-ai" class="text-paper-dim hover:text-paper transition-colors">IntuitionAI → Domino</a></li>
+          <li><a href="/work/rippling" class="text-paper-dim hover:text-paper transition-colors">Rippling</a></li>
+          <li><a href={SITE.blog} class="text-paper-dim hover:text-paper transition-colors">Blog ↗</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="font-mono text-xs uppercase tracking-widest text-paper-muted">Elsewhere</h3>
+        <ul class="mt-4 space-y-2 text-sm">
+          <li><a href={SITE.github} class="text-paper-dim hover:text-paper transition-colors">GitHub ↗</a></li>
+          <li><a href={SITE.linkedin} class="text-paper-dim hover:text-paper transition-colors">LinkedIn ↗</a></li>
+          <li><a href={SITE.codepen} class="text-paper-dim hover:text-paper transition-colors">Codepen ↗</a></li>
+          <li><a href={`mailto:${SITE.email}`} class="text-paper-dim hover:text-paper transition-colors">Email ↗</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-16 flex flex-col items-start gap-3 border-t border-white/5 pt-8 text-xs text-paper-muted sm:flex-row sm:items-center sm:justify-between">
+      <p class="font-mono">© {year} {SITE.name}. {SITE.location}.</p>
+      <p class="font-mono">
+        Built with <a href="https://astro.build" class="underline decoration-white/20 underline-offset-4 hover:text-paper hover:decoration-violet-soft">Astro</a>
+        on <a href="https://pages.cloudflare.com" class="underline decoration-white/20 underline-offset-4 hover:text-paper hover:decoration-mint">Cloudflare</a>.
+        <a href={SITE.github + '/mohithg.github.io'} class="underline decoration-white/20 underline-offset-4 hover:text-paper">Source ↗</a>
+      </p>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,21 @@
+---
+type Props = {
+  items: readonly string[];
+  title?: string;
+};
+const { items, title = 'What I owned' } = Astro.props;
+---
+
+<section class="my-12">
+  <h3 class="font-mono text-xs uppercase tracking-[0.3em] text-violet-soft">/ {title.toLowerCase()}</h3>
+  <ul class="mt-5 grid gap-2 sm:grid-cols-2">
+    {
+      items.map((item) => (
+        <li class="flex items-start gap-3 rounded-lg border border-white/5 bg-ink-2/30 px-4 py-3 text-paper-dim text-pretty">
+          <span class="mt-2 h-1 w-1 shrink-0 rounded-full bg-mint"></span>
+          <span set:html={item} />
+        </li>
+      ))
+    }
+  </ul>
+</section>

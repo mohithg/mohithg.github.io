@@ -1,0 +1,72 @@
+---
+layout: ../../layouts/Work.astro
+title: Rippling
+tagline: Production React in 2016 — when production React was rare. Built early product surfaces for Parker Conrad's next company. The work that earned a tweet from Dan Abramov.
+role: React Engineer · via Codebrahma
+start: "2016-02"
+end: "2016-09"
+accent: pink
+metrics:
+  - { value: "2016", label: "production React when production React was rare" }
+  - { value: "@dan_abramov", label: "tweeted about the work" }
+  - { value: "$13B+", label: "valuation Rippling reached" }
+description: Rippling case study — early React frontend work for Parker Conrad's next company, the era that earned a tweet from Dan Abramov.
+---
+
+import Owned from "../../components/work/Owned.astro";
+import HardProblem from "../../components/work/HardProblem.astro";
+import NextWork from "../../components/work/NextWork.astro";
+
+## The setup
+
+In early 2016, **React was 2.5 years old** and "production React" was a phrase that mostly meant *"yes we have a React app, but it's the marketing site."* The patterns weren't settled. There was no Create React App. Redux was a few months old. Hooks were three years away. Anyone shipping non-trivial React in production was learning by writing.
+
+I was at [Codebrahma](https://codebrahma.com), a React-first dev shop in Bengaluru that was getting a reputation for taking on ambitious React work other shops wouldn't. One of those engagements was Parker Conrad's next company — a stealthy YC-backed startup whose name was just **"Rippling"**. They needed engineers who could ship complex product UI in React, fast, with senior judgment. We sent a small team. I was on it.
+
+For seven months I built early product surfaces of what is now a $13B+ company.
+
+<Owned items={[
+  "Built complex product UI for early Rippling — multi-step flows, large data tables, the kind of administrative interfaces HR/IT software lives or dies by.",
+  "Worked directly with the founding team on architectural decisions in the frontend — component patterns, state management, data fetching — that have outlasted the React era they were chosen in.",
+  "Authored reusable components that later teams extended for years.",
+  "<strong>Earned a tweet from Dan Abramov</strong> about the production React work coming out of Codebrahma during this period — at a time when senior React tweets were the closest thing the ecosystem had to peer review.",
+  "Practiced the discipline of <em>shipping fast for an early-stage YC company</em> while writing code that wouldn't embarrass anyone six months later. (Mostly.)"
+]} />
+
+## The era
+
+It's hard to convey now how unsettled React was in 2016. There was no consensus on:
+
+- **State management** — Redux had just won the mindshare race against Flux variants, but the patterns for *when* to lift state into Redux versus keeping it local were still being worked out, in real time, by people writing blog posts as they figured it out.
+- **Data fetching** — React Query and SWR were three years away. Apollo was new. Most teams were rolling their own thunks-and-promises pattern.
+- **Component architecture** — render props were just emerging. HOCs were the dominant pattern. Hooks didn't exist.
+- **Build tooling** — webpack 1, Babel 5, no Create React App. You configured your own toolchain.
+
+What separated the teams that shipped good React in this era from the ones that didn't was **judgment** — picking the right patterns from the right examples and committing to them, instead of mixing five half-implemented styles. The work that came out of Codebrahma in this period got attention because we picked well, committed, and shipped.
+
+<HardProblem title="Building enterprise-density UI in 2016 React without painting yourself into a corner.">
+
+The dirty secret of HR/IT software is that the UI is *dense*. Every screen has thirty fields, six entity relationships, and three modes (view / edit / bulk-edit). Building this in 2016 React was a minefield because the patterns that work for it — colocating data with components, smart caching, optimistic updates, normalized client state — either didn't exist as named patterns yet or existed only as competing libraries with different opinions.
+
+The thing that worked for me was **boring discipline**. Pick a *small* set of patterns. Use them everywhere. Resist the urge to "try the new one." When a complex form needs a new pattern, pause and ask whether the existing patterns can stretch to fit. They usually can. Then write a tiny abstraction that the rest of the team can copy-paste, document the abstraction in code that already uses it, and *do not* publish a generic library to npm before you have at least three real internal users of the pattern.
+
+Almost all the React-in-2016 codebases I've encountered since were doomed by violating this discipline — by being clever in twelve different ways instead of being clear in one consistent way. The Rippling work I touched was not. That's why the components I wrote outlasted me.
+
+The Dan Abramov tweet was a moment, but the lesson was the years that followed. **Frontend craft isn't tricks. It's restraint.**
+
+</HardProblem>
+
+## Outcome
+
+Rippling went on to become one of the largest YC outcomes of its generation — north of $13B in valuation. Codebrahma shipped a lot more React work after this period; its reputation in the React-shop world was sealed. I, personally, used the lessons of seven months at Rippling for *every* React codebase I've touched since — including the PortfolioPilot frontend a half-decade later.
+
+The tweet from Dan Abramov is still a moment I'm proud of. Not because of the celebrity — but because in 2016, that was the closest thing the React community had to a senior reviewer telling you the work was good.
+
+## What I learned
+
+Frontend craft is invisible when it works. Senior engineers at later companies didn't know I had this experience until I told them. Then suddenly they understood why my opinions on state management were so quiet and so confident. **Calm certainty in this craft comes from having shipped the wrong patterns before.**
+
+<NextWork
+  prev={{ href: "/work/intuition-ai", title: "IntuitionAI → Domino" }}
+  next={{ href: "/", title: "Home" }}
+/>
