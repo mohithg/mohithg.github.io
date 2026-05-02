@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Send, Sparkles, X, ArrowUpRight } from 'lucide-react';
-import { match, fallback } from './match';
-import { SUGGESTED_QUESTIONS, QNA } from '../../lib/qna';
+import { match, fallbackText } from './match';
+import { SUGGESTED_QUESTIONS, QNA, type QnA } from '../../lib/qna';
 
 type Msg =
   | { id: string; role: 'user'; text: string }
-  | { id: string; role: 'assistant'; text: string; citations?: { label: string; href: string }[]; streaming?: boolean };
+  | {
+      id: string;
+      role: 'assistant';
+      text: string;
+      citations?: { label: string; href: string }[];
+      streaming?: boolean;
+      suggestions?: { id: string; label: string }[];
+    };
 
 const greet: Msg = {
   id: 'greet',
@@ -84,26 +91,40 @@ export default function ChatWidget() {
     setInput('');
     setBusy(true);
 
-    const matched = match(trimmed);
-    const answer = matched ? matched.answer : fallback();
-    const citations = matched?.citations;
+    const result = match(trimmed);
+    const isHit = result.kind === 'hit';
+    const answer = isHit ? result.qna.answer : fallbackText();
+    const citations = isHit ? result.qna.citations : undefined;
+    const suggestions: { id: string; label: string }[] = isHit
+      ? result.alternatives.map((q) => ({ id: q.id, label: q.questions[0] }))
+      : result.suggestions.map((q) => ({ id: q.id, label: q.questions[0] }));
 
     // simulate streaming
     const tokens = answer.split(/(\s+)/);
     let acc = '';
     for (const tok of tokens) {
       acc += tok;
-      await new Promise((r) => setTimeout(r, 12 + Math.random() * 18));
+      await new Promise((r) => setTimeout(r, 10 + Math.random() * 14));
       setMsgs((m) => m.map((msg) => (msg.id === placeholder.id ? { ...msg, text: acc } : msg)));
     }
     setMsgs((m) =>
       m.map((msg): Msg =>
         msg.id === placeholder.id && msg.role === 'assistant'
-          ? { ...msg, streaming: false, citations: citations ? [...citations] : undefined }
+          ? {
+              ...msg,
+              streaming: false,
+              citations: citations ? [...citations] : undefined,
+              suggestions,
+            }
           : msg
       )
     );
     setBusy(false);
+  }
+
+  function askById(id: string) {
+    const qna = QNA.find((q) => q.id === id);
+    if (qna) ask(qna.questions[0]);
   }
 
   return (
@@ -185,6 +206,23 @@ export default function ChatWidget() {
                             {c.label}
                             <ArrowUpRight className="h-2.5 w-2.5" />
                           </a>
+                        ))}
+                      </div>
+                    )}
+                    {m.role === 'assistant' && !m.streaming && m.suggestions && m.suggestions.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-1.5 border-t border-white/5 pt-2.5">
+                        <p className="font-mono text-[9px] uppercase tracking-widest text-paper-muted">
+                          {m.citations && m.citations.length ? 'related' : 'try one of these'}
+                        </p>
+                        {m.suggestions.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => askById(s.id)}
+                            className="rounded-md border border-white/5 bg-white/[0.02] px-2.5 py-1.5 text-left text-xs text-paper-dim transition-colors hover:border-violet/30 hover:bg-violet/5 hover:text-paper"
+                          >
+                            {s.label}
+                          </button>
                         ))}
                       </div>
                     )}

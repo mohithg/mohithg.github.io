@@ -1,5 +1,6 @@
 import { QNA, type QnA } from '../../lib/qna';
 
+// stopwords that should never count toward a match
 const STOPWORDS = new Set([
   'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
   'do', 'does', 'did', 'doing', 'have', 'has', 'had', 'having',
@@ -11,9 +12,14 @@ const STOPWORDS = new Set([
   'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
   'my', 'your', 'his', 'its', 'our', 'their',
   'this', 'that', 'these', 'those',
-  'what', 'when', 'where', 'who', 'whom', 'which', 'why', 'how',
-  'tell', 'explain', 'describe',
-  'mohith', 'mohiths',
+  'what', 'when', 'where', 'who', 'whom', 'which', 'why', 'how', 'whose',
+  'tell', 'explain', 'describe', 'show', 'give', 'know',
+  'much', 'many', 'lot', 'lots',
+  'just', 'really', 'very', 'also', 'too',
+  'mohith', 'mohiths', 'his', 'mr',
+  'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might',
+  'something', 'anything', 'someone', 'anyone',
+  'thing', 'things', 'kind',
 ]);
 
 function tokenize(text: string): string[] {
@@ -21,36 +27,57 @@ function tokenize(text: string): string[] {
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((t) => t && !STOPWORDS.has(t));
+    .filter((t) => t.length > 1 && !STOPWORDS.has(t));
 }
 
-export function match(query: string): QnA | null {
-  const tokens = tokenize(query);
-  if (!tokens.length) return null;
-
-  let best: { score: number; qna: QnA | null } = { score: 0, qna: null };
-
-  for (const qna of QNA) {
-    let score = 0;
-    const haystack = new Set([
-      ...qna.keywords.map((k) => k.toLowerCase()),
-      ...qna.questions.flatMap((q) => tokenize(q)),
-    ]);
-    for (const t of tokens) {
-      if (qna.keywords.includes(t)) score += 3;
-      else if (haystack.has(t)) score += 2;
-      else if ([...haystack].some((k) => k.includes(t) || t.includes(k))) score += 1;
-    }
-    if (score > best.score) best = { score, qna };
+function score(qna: QnA, tokens: readonly string[]): number {
+  if (!tokens.length) return 0;
+  // Build a normalized search corpus per QnA
+  const haystack = new Set([
+    ...qna.keywords.map((k) => k.toLowerCase()),
+    ...qna.questions.flatMap((q) => tokenize(q)),
+    ...tokenize(qna.answer),
+  ]);
+  const haystackList = [...haystack];
+  let s = 0;
+  for (const t of tokens) {
+    if (qna.keywords.includes(t)) s += 4;
+    else if (haystack.has(t)) s += 2.5;
+    else if (haystackList.some((k) => k === t || k.startsWith(t) || t.startsWith(k))) s += 1.5;
+    else if (haystackList.some((k) => k.includes(t) || (t.length >= 4 && t.includes(k.slice(0, 4))))) s += 0.75;
   }
-
-  return best.score >= 2 ? best.qna : null;
+  return s;
 }
 
-export function fallback(): string {
+export type MatchResult =
+  | { kind: 'hit'; qna: QnA; alternatives: readonly QnA[] }
+  | { kind: 'miss'; suggestions: readonly QnA[] };
+
+export function match(query: string): MatchResult {
+  const tokens = tokenize(query);
+  const ranked = QNA
+    .map((qna) => ({ qna, s: score(qna, tokens) }))
+    .filter((r) => r.s > 0)
+    .sort((a, b) => b.s - a.s);
+
+  if (ranked.length === 0 || ranked[0].s < 1.5) {
+    // No clear match — surface the three highest-recall topics as suggestions
+    return {
+      kind: 'miss',
+      suggestions: QNA.slice(0, 3).map((q) => q),
+    };
+  }
+  return {
+    kind: 'hit',
+    qna: ranked[0].qna,
+    alternatives: ranked.slice(1, 4).map((r) => r.qna),
+  };
+}
+
+export function fallbackText(): string {
   return [
-    "I don't have a specific answer for that — this chat runs against a curated answer bank, not a live LLM (yet — that's coming).",
+    "I don't have that one in my answer bank yet — this v1 chat matches a curated set of questions instead of running a live LLM (cost reasons; live LLM is on the roadmap).",
     '',
-    'Try one of the suggested questions, or **email mohithgm@gmail.com** for anything specific.',
+    "Here's what I *can* answer:",
   ].join('\n');
 }

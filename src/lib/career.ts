@@ -102,6 +102,7 @@ export const CAREER: readonly CareerNode[] = [
     summary:
       'First job out of college. Healthcare software at scale — learned what real engineering rigor looks like.',
     tags: ['Healthcare', 'Java'],
+    href: 'https://www.athenahealth.com/',
   },
 ];
 

@@ -1,6 +1,6 @@
 ---
-import { ArrowUpRight } from 'lucide-react';
 import { FLAGSHIPS } from '../../lib/career';
+import WorkCard from './WorkCard.tsx';
 
 const meta: Record<string, { tagline: string; metric: string; metricLabel: string; accent: 'violet' | 'mint' | 'pink' }> = {
   globalpredictions: {
@@ -42,75 +42,24 @@ const meta: Record<string, { tagline: string; metric: string; metricLabel: strin
       {
         FLAGSHIPS.map((node, i) => {
           const m = meta[node.id]!;
-          const accentClass = m.accent === 'mint' ? 'text-mint' : m.accent === 'violet' ? 'text-violet-soft' : 'text-pink';
-          const borderClass = m.accent === 'mint' ? 'hover:border-mint/40' : m.accent === 'violet' ? 'hover:border-violet/40' : 'hover:border-pink/40';
-          const glowVar = m.accent === 'mint' ? 'var(--color-mint)' : m.accent === 'violet' ? 'var(--color-violet)' : 'var(--color-pink)';
           return (
-            <a
-              href={node.caseStudy}
-              data-reveal
-              data-reveal-scale
-              data-glow
-              style={`--i: ${i}; --glow-color: ${glowVar}`}
-              class:list={[
-                'group relative block overflow-hidden rounded-2xl border border-white/5 bg-ink-2/40 p-8 transition-all hover:bg-ink-3/40 hover:-translate-y-1 hover:shadow-2xl sm:p-12',
-                borderClass,
-              ]}
-            >
-              <div class="grid gap-8 sm:grid-cols-12 sm:items-start">
-                <!-- Index + metric -->
-                <div class="sm:col-span-3">
-                  <p class="font-mono text-xs uppercase tracking-[0.3em] text-paper-muted">
-                    /work/{String(i + 1).padStart(2, '0')}
-                  </p>
-                  <p class:list={['mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl', accentClass]}>
-                    {m.metric}
-                  </p>
-                  <p class="mt-2 font-mono text-[11px] uppercase tracking-widest text-paper-muted">
-                    {m.metricLabel}
-                  </p>
-                </div>
-
-                <!-- Body -->
-                <div class="sm:col-span-9">
-                  <div class="flex items-center gap-3 font-mono text-[11px] text-paper-muted">
-                    <span>{node.start.split('-')[0]}–{node.end === 'present' ? 'now' : node.end.split('-')[0]}</span>
-                    <span class="opacity-30">·</span>
-                    <span>{node.role}</span>
-                  </div>
-                  <h3 class="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl text-balance">
-                    {node.company.split(' · ')[0]}
-                  </h3>
-                  <p class="mt-4 max-w-2xl text-lg text-paper-dim text-pretty">
-                    {m.tagline}
-                  </p>
-                  <p class="mt-3 max-w-2xl text-paper-dim text-pretty">
-                    {node.summary}
-                  </p>
-                  <div class="mt-6 flex flex-wrap gap-2">
-                    {node.tags.slice(0, 5).map((t) => (
-                      <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-paper-dim">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                  <div class="mt-8 inline-flex items-center gap-1.5 font-mono text-sm text-paper transition-transform group-hover:translate-x-1">
-                    Read the case study
-                    <ArrowUpRight className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Hover glow -->
-              <div class="pointer-events-none absolute -inset-px -z-10 rounded-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-                <div
-                  class:list={[
-                    'absolute inset-0 rounded-2xl blur-2xl',
-                    m.accent === 'mint' ? 'bg-mint/10' : m.accent === 'violet' ? 'bg-violet/10' : 'bg-pink/10',
-                  ]}
-                ></div>
-              </div>
-            </a>
+            <WorkCard
+              client:load
+              href={node.caseStudy ?? '#'}
+              index={i}
+              workIndex={i + 1}
+              total={FLAGSHIPS.length}
+              accent={m.accent}
+              metric={m.metric}
+              metricLabel={m.metricLabel}
+              start={node.start}
+              end={node.end}
+              role={node.role}
+              company={node.company.split(' · ')[0]!}
+              tagline={m.tagline}
+              summary={node.summary}
+              tags={node.tags}
+            />
           );
         })
       }

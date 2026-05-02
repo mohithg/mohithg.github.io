@@ -1,5 +1,6 @@
 ---
 import { ArrowRight, ArrowUpRight, Sparkles } from 'lucide-react';
+import HeroBackground from './HeroBackground.tsx';
 
 const COMPANIES = [
   'AthenaHealth',
@@ -15,24 +16,7 @@ const marquee = [...COMPANIES, ...COMPANIES];
 ---
 
 <section class="relative isolate overflow-hidden pt-32 pb-24 sm:pt-40 sm:pb-32 lg:min-h-[100dvh] lg:flex lg:items-center">
-  <!-- Mesh gradient backdrop -->
-  <div class="pointer-events-none absolute inset-0 -z-10">
-    <div class="mesh-bg absolute -inset-40 opacity-70 [animation:var(--animate-mesh)]"></div>
-  </div>
-
-  <!-- Grid -->
-  <div class="grid-bg pointer-events-none absolute inset-0 -z-10 opacity-30 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]"></div>
-
-  <!-- Floating particles -->
-  <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-    <span class="absolute left-[12%] top-[28%] h-1 w-1 rounded-full bg-violet" style="animation: float 6s ease-in-out infinite;"></span>
-    <span class="absolute right-[18%] top-[20%] h-1.5 w-1.5 rounded-full bg-mint" style="animation: float 8s ease-in-out infinite 1s;"></span>
-    <span class="absolute left-[22%] bottom-[18%] h-1 w-1 rounded-full bg-pink" style="animation: float 7s ease-in-out infinite 0.5s;"></span>
-    <span class="absolute right-[12%] bottom-[28%] h-1.5 w-1.5 rounded-full bg-violet-soft" style="animation: float 9s ease-in-out infinite 2s;"></span>
-    <span class="absolute left-[42%] top-[12%] h-1 w-1 rounded-full bg-mint" style="animation: float 10s ease-in-out infinite 0.8s;"></span>
-    <span class="absolute right-[35%] top-[55%] h-1 w-1 rounded-full bg-violet/70" style="animation: float 12s ease-in-out infinite 1.2s;"></span>
-    <span class="absolute left-[60%] bottom-[10%] h-0.5 w-0.5 rounded-full bg-mint/80" style="animation: float 11s ease-in-out infinite 0.3s;"></span>
-  </div>
+  <HeroBackground client:load />
 
   <div class="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
     <!-- Status badge -->
@@ -73,7 +57,7 @@ const marquee = [...COMPANIES, ...COMPANIES];
     <!-- Supporting line -->
     <p data-reveal style="--i: 10" class="mt-8 max-w-2xl text-lg leading-relaxed text-paper-dim text-pretty sm:text-xl">
       First engineer at <a href="https://portfoliopilot.com" class="text-paper underline decoration-violet/40 underline-offset-4 transition-colors hover:decoration-violet">PortfolioPilot</a>.
-      Previously founding engineer at <a href="https://intuition.ai" class="text-paper underline decoration-violet/40 underline-offset-4 transition-colors hover:decoration-violet">IntuitionAI</a> (acquired by <a href="https://dominodatalab.com" class="text-paper underline decoration-mint/40 underline-offset-4 transition-colors hover:decoration-mint">Domino Data Lab</a>), Rippling, AthenaHealth.
+      Previously founding engineer at <a href="https://intuition.ai" class="text-paper underline decoration-violet/40 underline-offset-4 transition-colors hover:decoration-violet">IntuitionAI</a> (acquired by <a href="https://dominodatalab.com" class="text-paper underline decoration-mint/40 underline-offset-4 transition-colors hover:decoration-mint">Domino Data Lab</a>), <a href="https://rippling.com" class="text-paper underline decoration-pink/40 underline-offset-4 transition-colors hover:decoration-pink">Rippling</a>, <a href="https://www.athenahealth.com/" class="text-paper underline decoration-violet/40 underline-offset-4 transition-colors hover:decoration-violet">AthenaHealth</a>.
       Built one of the first ChatGPT plugins; today shipping agent stacks in production.
     </p>
 
