@@ -1,0 +1,50 @@
+---
+layout: ../../layouts/Work.astro
+title: AthenaHealth
+tagline: First engineering job out of college. Learned the architecture of an entire enterprise healthcare codebase, and what US compliance looks like when it's baked into every line.
+role: Software Engineer · AthenaHealth
+start: "2015-01"
+end: "2015-08"
+accent: violet
+metrics:
+  - { value: "First", label: "job out of college" }
+  - { value: "Perl", label: "the substrate of US healthcare in 2015" }
+  - { value: "HIPAA", label: "compliance as the shape of the product" }
+description: How AthenaHealth taught me to read whole architectures, and what US healthcare compliance does to the shape of a software product.
+---
+
+import Owned from "../../components/work/Owned.astro";
+import NextWork from "../../components/work/NextWork.astro";
+
+## The setup
+
+This was my first engineering job out of college. I was 21. I'd graduated from Saveetha Engineering College (Anna University) as the gold medalist and batch topper. I walked into AthenaHealth's Chennai office in early 2015 thinking I had a reasonable idea of what software was. I was wrong. I had a good idea of what *programming* was. Software at the scale of running American doctors' offices was a different category, and the codebase that ran it was written in Perl.
+
+I stayed eight months. It was the most informative eight months of my career.
+
+## What I actually did there
+
+<Owned items={[
+  "Worked on tickets and small features in athenaClinicals (the EHR side). Nothing world-changing on its own; healthy contributions inside a system far older and more battle-tested than I was.",
+  "Built a reputation, fast, as the new hire who would actually <em>read the code</em> before asking. The kind of engineer who, when a question came up about why a particular billing rule existed, traced it back through five years of commits instead of pinging chat.",
+  "Spent the off-hours mapping the whole architecture in my head. Not just my corner. By month four I could give a five-minute talk on how athenaCollector and athenaClinicals connected, where the practice-management data ended and the clinical data began, and why the seams were drawn the way they were."
+]} />
+
+## What I actually learned
+
+Two things, both of which I've used every year since.
+
+**The whole architecture of an enterprise healthcare codebase.** AthenaHealth at the time ran a meaningful slice of US ambulatory care. The system had been accumulating capabilities since the early 2000s. Tracing the request path from *"a doctor logs in"* to *"a claim is submitted to the payer"* meant walking through layers I'd never seen in school: scheduling, charting, ordering, billing, claims clearinghouses, patient portals. Each one was its own system with its own constraints. The lesson, generalized: when you join a codebase, the fastest way to add real value is to spend the first month understanding the whole shape, not just the corner you'll work in. Most engineers don't do this. The ones who do compound for years.
+
+**What US healthcare compliance does to the shape of a product.** HIPAA. PHI handling. Audit trails as a first-class data structure. Consent flows that aren't UX afterthoughts but legally binding state machines. Compliance in a regulated domain is not a wrapper you add later. It *is* the product. The same lesson recurred ten years later when I started building an SEC-registered AI advisor at PortfolioPilot. Substitute SEC rules for HIPAA, but the shape is identical: the regulatory contract is part of the software contract.
+
+I left after eight months because Codebrahma offered me a chance to work on greenfield React. AthenaHealth had taught me what enterprise software looks like; Codebrahma was where I'd learn what early-stage software looks like. Both halves of that education matter. Most engineers I know got one or the other. I'm grateful I got both, in that order, before I had patterns I'd have been tempted to take for granted.
+
+## What carries forward
+
+Every codebase I've joined since, I read the whole shape first. Every regulated product I've shipped since, I've treated the regulation as a design constraint and not a checkbox. Both habits were trained at AthenaHealth, in eight months, by my first manager and the engineers around me who set the bar. I owe them.
+
+<NextWork
+  prev={{ href: "/", title: "Home" }}
+  next={{ href: "/work/codebrahma", title: "Codebrahma" }}
+/>

@@ -1,0 +1,57 @@
+---
+layout: ../../layouts/Work.astro
+title: Navya.Care
+tagline: Cancer second-opinion platform connecting Indian patients with oncologists at the world's top US institutions. The first product company I worked at directly. The product that taught me what correctness means when software touches healthcare.
+role: Full-stack Engineer · Navya.Care
+start: "2016-09"
+end: "2017-08"
+accent: mint
+metrics:
+  - { value: "Full-stack", label: "patient and clinician surfaces" }
+  - { value: "AWS Lambda", label: "team expert when Lambda was brand new" }
+  - { value: "Cancer", label: "the highest-stakes product I'd shipped" }
+description: Navya.Care case study. Cancer second-opinion platform, full-stack engineer, AWS Lambda when it was new, and the lessons in correctness that carry into every regulated product since.
+---
+
+import Owned from "../../components/work/Owned.astro";
+import NextWork from "../../components/work/NextWork.astro";
+
+## The setup
+
+After two years at Codebrahma shipping React for other people's products, I wanted to work *at* a product company. Not consult for one, not contract through one. Be on the team that owns the thing.
+
+[Navya](https://navyanetwork.com) was the company. The product: a cancer second-opinion platform connecting Indian patients with oncologists at top US institutions. A patient in Bangalore with a complicated diagnosis could, in days, have their case reviewed by a tumor board at MSK, Mayo, or Cleveland Clinic. The thing being shipped was a piece of medical infrastructure that previously did not exist in India. Specifically not for the seventy percent of Indian cancer patients who would never set foot inside an American hospital but for whom the difference between "the standard treatment in India" and "the standard treatment at a top US center" was sometimes life or death.
+
+That sentence is not marketing copy. It was the kind of thing you'd read in a case file we processed.
+
+<Owned items={[
+  "Built most of the patient-facing web surfaces (case submission, document upload, status, communications).",
+  "Built clinician-facing tooling for the medical operations team (chart preparation, case routing, the workflows that get an Indian patient's records into a form a US tumor board can review).",
+  "Owned the cross-border data pipeline. A HIPAA-shaped problem on the US side, an Indian healthcare data problem on the patient side. The data has to move and it has to move correctly.",
+  "Went deep on <strong>AWS Lambda</strong> at a time when Lambda was still considered exotic. Became the team's expert. The way I learned: read the Lambda docs cover to cover (they were short then), shipped half a dozen production functions before the rest of the team got comfortable with the model, and ended up being the person teammates pinged when something Lambda-shaped broke. A useful pattern that became my default for the rest of my career: when a new piece of infrastructure shows up that's clearly going to matter, I become the person on the team who actually understands it."
+]} />
+
+## The Lambda angle, in one paragraph
+
+AWS Lambda announced in late 2014 and was still considered exotic in 2016. Most teams were nervously running EC2 instances they didn't need. We bet on Lambda for the long-running document workflows because the alternative was paying for idle compute that ran our most expensive operations once or twice a day. The bet worked. By the time I left Navya, our document-handling pipeline ran for cents a day instead of dollars an hour. More importantly, I'd absorbed the serverless mental model deeply enough that every infra decision I've made since has had it as a credible option, including the ones where I've decided *not* to use it.
+
+## What this product taught me
+
+Working on cancer software changes how you think about correctness. There are bugs, and then there are bugs in software that affects what an oncologist tells a patient. The latter category is where I learned the difference between *"this is technically correct"* and *"this is correct in a way I'd defend in a deposition."*
+
+That mental model carries straight through to the financial-advisor work I do today. The substrate is different (cancer treatment vs. portfolio recommendations), but the discipline is the same. When the output of your software gets handed to a human being who is going to make a high-stakes decision based on it, the bar for correctness is not technical correctness. It's the bar of *would I defend this if it were my parent on the receiving end*. That's the bar I've held my own work to since Navya.
+
+## What carries forward
+
+Three things, more or less in the order I use them.
+
+**The infra-bet pattern.** When something genuinely new shows up, become the person on the team who understands it. Lambda then. LLMs and agents now. The pattern works because most teams default to either ignoring new infra or chasing it for hype reasons. Becoming the actual expert is a third option that compounds.
+
+**Cross-jurisdictional data.** Working across the India / US healthcare boundary at Navya was my first exposure to data flowing across regulatory regimes. Not the last. Substitute "patient health records" with "financial data and SEC compliance" and the architecture decisions look surprisingly similar.
+
+**The correctness bar.** *Would I defend this if it were my parent on the receiving end.* It's the bar I hold every product team I'm on to, gently, persistently, for the rest of my career.
+
+<NextWork
+  prev={{ href: "/work/rippling", title: "Rippling" }}
+  next={{ href: "/work/intuition-ai", title: "IntuitionAI → Domino" }}
+/>

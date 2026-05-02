@@ -1,0 +1,61 @@
+---
+layout: ../../layouts/Work.astro
+title: Codebrahma
+tagline: React-first dev shop in the early-React era. The first production React apps I ever shipped came out of here. Lendwell, Rippling, a Dan Abramov tweet, and the lessons that still shape my frontend taste a decade later.
+role: React Engineer · Codebrahma
+start: "2015-08"
+end: "2017-08"
+accent: pink
+metrics:
+  - { value: "Two years", label: "during the most useful period to be learning React" }
+  - { value: "Lendwell + Rippling", label: "two non-trivial production apps, back to back" }
+  - { value: "@dan_abramov", label: "tweeted about the work" }
+description: Codebrahma case study. The early-React era, where I shipped my first production React apps and learned why restraint is craft.
+---
+
+import Owned from "../../components/work/Owned.astro";
+import HardProblem from "../../components/work/HardProblem.astro";
+import NextWork from "../../components/work/NextWork.astro";
+
+## The setup
+
+After eight months at AthenaHealth I made a deliberate move: I joined Codebrahma, a small React-first dev shop in Bengaluru. The bet, two years before it was obvious to most of the consulting world: **React was going to eat the world**, and the shops that got good at production React early would have leverage that the rest of the industry would not have for years. The Codebrahma founders had already made the bet. I joined to learn.
+
+We were right. By 2016 we were shipping production React for clients with real product ambitions while most of the industry was still asking *"JSX inside HTML, isn't that backwards?"* By the end of 2016, a tweet from **Dan Abramov** (the creator of React, author of Redux) had made the work visible to the global community. By the time I left in mid-2017, Codebrahma was getting inbound from companies who specifically wanted *"the team Dan Abramov tweeted about."*
+
+I did about two years there. It was the most productive learning environment for a React engineer that has ever existed.
+
+<Owned items={[
+  "Shipped <strong>Lendwell</strong>, a US digital mortgage platform. My first major React-to-production project. Multi-step homeowner application flow, document handling, partner integrations across the broker / lender / settlement stack.",
+  "Shipped early product surfaces of <strong>Rippling</strong>, Parker Conrad's next company after Zenefits, now valued north of $13B. Year-and-a-bit engagement of complex HR / IT product UI in early-stage React.",
+  "Authored a handful of small npm libraries under the Codebrahma org. Small utilities, but small utilities you actually use are how you learn library design.",
+  "Earned, alongside the team, a tweet from <strong>Dan Abramov</strong> about the production React coming out of Codebrahma. In 2016 that was the closest thing the React community had to peer review.",
+  "Mentored newer engineers as I became the most experienced React person in the building, which, given the rate the team was hiring, happened embarrassingly fast."
+]} />
+
+## The era, in one paragraph
+
+2015 to 2017 was the most productive period to be learning React because nothing was settled yet. There was no Create React App. Webpack 1 still dominated. Redux was a few months old when I started and Mobx was its credible competitor. Render-props were emerging. Higher-order components were the dominant composition pattern. Hooks were three years away. Anyone shipping non-trivial React was learning by writing, then reading what they'd written six months later and learning again. The shops that lasted were the ones that picked clean patterns and committed to them. The shops that didn't accumulated codebases that could not be maintained by the people who wrote them.
+
+<HardProblem title="What separated the React shops that shipped from the ones that drowned in their own cleverness.">
+
+The dirty secret of early React was that it gave you so many degrees of freedom that bad teams shipped *interestingly* bad code. Render props. HOCs. Connect-wrapped containers. State machines, context, action creators, thunks, sagas, observable stores. You could compose six abstractions on top of every component and call it architecture. We saw codebases like that arrive on our desks for "rescue work" once a month.
+
+The teams that shipped picked a *small* set of patterns and refused to add a new one until the existing patterns had failed under real production weight. That sounds boring. It looked boring. It was boring on purpose. It was also the only thing that worked.
+
+I learned this by being one of the engineers who wrote the boring patterns at Codebrahma, and by watching what happened to teams that didn't. Almost every React-in-2016 codebase I've encountered since was doomed by violating this discipline, by being clever in twelve different ways instead of being clear in one consistent way. The Lendwell and Rippling work I touched was not. That's why those components outlasted me.
+
+The lesson generalizes past React. **Frontend craft isn't tricks. It's restraint.** I've been chasing that standard for a decade now and I find I get better at it slowly, the way one gets better at a martial art.
+
+</HardProblem>
+
+## What carries forward
+
+The Dan Abramov tweet is a moment I'm proud of, but the lasting outcome of Codebrahma isn't the tweet. It's the calm certainty I have about state management in any React codebase I touch. It's the speed I can ship a complex form flow with proper validation. It's the way I review junior engineers' frontend code, where I can usually point at a line and say *"this will be the thing that breaks in eight months"* with the kind of accuracy that only comes from having been the eight-month-later engineer cleaning up my own past mistakes.
+
+I owe Codebrahma the foundation. Most of what I do on the PortfolioPilot frontend today is just the same patterns I learned to trust in 2016, applied to a much harder product.
+
+<NextWork
+  prev={{ href: "/work/athena", title: "AthenaHealth" }}
+  next={{ href: "/work/rippling", title: "Rippling" }}
+/>

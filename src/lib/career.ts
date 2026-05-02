@@ -71,6 +71,7 @@ export const CAREER: readonly CareerNode[] = [
       'Cancer second-opinion platform connecting patients in India with oncologists at top US institutions. Shipped most of the patient and clinician surfaces. And went deep on AWS Lambda when it had just launched, becoming the team\'s expert.',
     tags: ['Healthcare', 'Full-stack', 'React', 'AWS Lambda', 'Node.js'],
     href: 'https://navyanetwork.com',
+    caseStudy: '/work/navya',
   },
   {
     id: 'rippling',
@@ -97,6 +98,7 @@ export const CAREER: readonly CareerNode[] = [
       'React dev shop. Shipped my first production React apps here (Lendwell, then Rippling). Got a tweet from Dan Abramov for the work.',
     tags: ['React', 'Open source'],
     href: 'https://codebrahma.com',
+    caseStudy: '/work/codebrahma',
   },
   {
     id: 'athena',
@@ -109,6 +111,7 @@ export const CAREER: readonly CareerNode[] = [
       'First job out of college. Healthcare software at scale, written in Perl. Learned what real engineering rigor looks like.',
     tags: ['Healthcare', 'Perl'],
     href: 'https://www.athenahealth.com/',
+    caseStudy: '/work/athena',
   },
 ];
 
