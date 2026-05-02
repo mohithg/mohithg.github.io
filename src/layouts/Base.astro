@@ -32,11 +32,8 @@ const {
 const fullTitle = title ? `${title}: ${SITE.name}` : `${SITE.name}: ${SITE.tagline}`;
 const url = canonical ?? new URL(Astro.url.pathname, SITE.url).toString();
 const ogUrl = new URL(image, SITE.url).toString();
-
-// Cloudflare Web Analytics. Set PUBLIC_CF_ANALYTICS_TOKEN in your
-// deployment env (or .env locally) to enable. Privacy-friendly, no
-// cookies, no consent banner needed in most jurisdictions.
-const cfAnalyticsToken = import.meta.env.PUBLIC_CF_ANALYTICS_TOKEN;
+// Note: no JS analytics beacon. The site is behind Cloudflare's orange
+// cloud, so Web Analytics runs in server-side mode (proxy log based).
 ---
 
 <!doctype html>
@@ -106,16 +103,5 @@ const cfAnalyticsToken = import.meta.env.PUBLIC_CF_ANALYTICS_TOKEN;
     <script>
       import '../scripts/animations.ts';
     </script>
-
-    {
-      cfAnalyticsToken && (
-        <script
-          is:inline
-          defer
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon={`{"token": "${cfAnalyticsToken}"}`}
-        />
-      )
-    }
   </body>
 </html>
