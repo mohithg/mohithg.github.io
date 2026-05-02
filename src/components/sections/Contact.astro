@@ -11,19 +11,20 @@ import { SITE } from '../../lib/site';
   <div class="grid-bg pointer-events-none absolute inset-0 -z-10 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]"></div>
 
   <div class="mx-auto max-w-4xl px-5 text-center sm:px-8">
-    <p class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ talk to me</p>
-    <h2 class="mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">
-      Building something that needs <span class="gradient-text">a founding engineer</span>?
+    <p data-reveal style="--i: 0" class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ talk to me</p>
+    <h2 data-reveal data-reveal-blur style="--i: 1" class="mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">
+      Building something that needs <span class="gradient-text-anim">a founding engineer</span>?
     </h2>
-    <p class="mx-auto mt-8 max-w-2xl text-lg text-paper-dim text-pretty">
+    <p data-reveal style="--i: 2" class="mx-auto mt-8 max-w-2xl text-lg text-paper-dim text-pretty">
       I'm open to founding-engineer or first-AI-engineer roles at AI-forward seed/Series A teams.
       Also happy to talk shop about evals, agent stacks, or how to ship LLM features that don't embarrass you.
     </p>
 
-    <div class="mt-12 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+    <div data-reveal style="--i: 3" class="mt-12 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
       <a
         href={`mailto:${SITE.email}?subject=Founding%20engineer%20opportunity`}
-        class="group inline-flex items-center justify-center gap-2 rounded-full bg-paper px-6 py-3.5 font-medium text-ink transition-transform hover:scale-[1.02]"
+        data-magnetic="0.2"
+        class="group relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-full bg-paper px-6 py-3.5 font-medium text-ink transition-colors"
       >
         <Mail className="h-4 w-4" />
         {SITE.email}
@@ -39,7 +40,7 @@ import { SITE } from '../../lib/site';
       </button>
     </div>
 
-    <ul class="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+    <ul data-reveal style="--i: 4" class="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
       {
         [
           { l: 'GitHub', h: SITE.github },

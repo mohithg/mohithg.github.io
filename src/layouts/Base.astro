@@ -71,6 +71,11 @@ const ogUrl = new URL(image, SITE.url).toString();
     }
 
     <ClientRouter fallback="swap" />
+
+    <!-- Add `js` class before paint so reveal-on-scroll only applies when JS is available -->
+    <script is:inline>
+      document.documentElement.classList.add('js');
+    </script>
   </head>
   <body class="bg-ink text-paper antialiased">
     <a
@@ -90,5 +95,9 @@ const ogUrl = new URL(image, SITE.url).toString();
 
     <ChatWidget client:idle />
     <CommandPalette client:idle />
+
+    <script>
+      import '../scripts/animations.ts';
+    </script>
   </body>
 </html>

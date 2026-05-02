@@ -19,18 +19,18 @@ import { SITE } from '../lib/site';
 
       <div class="mx-auto grid max-w-5xl gap-10 px-5 sm:px-8 lg:grid-cols-12 lg:items-start">
         <div class="lg:col-span-8">
-          <p class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ about</p>
-          <h1 class="mt-3 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">
-            Hi, I'm <span class="gradient-text">Mohith</span>.
+          <p data-reveal style="--i: 0" class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ about</p>
+          <h1 data-reveal data-reveal-blur style="--i: 1" class="mt-3 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">
+            Hi, I'm <span class="gradient-text-anim">Mohith</span>.
           </h1>
-          <p class="mt-6 max-w-2xl text-xl text-paper-dim text-pretty">
+          <p data-reveal style="--i: 2" class="mt-6 max-w-2xl text-xl text-paper-dim text-pretty">
             I'm an AI Product Engineer. For eleven years I've shown up at startups — sometimes the first engineer, sometimes a founding engineer, sometimes just early — and shipped the entire product, top to bottom.
           </p>
         </div>
 
         <div class="lg:col-span-4">
-          <div class="relative mx-auto max-w-xs lg:ml-auto">
-            <div class="absolute -inset-3 -z-10 rounded-3xl bg-gradient-to-br from-violet/30 via-mint/20 to-pink/20 blur-2xl"></div>
+          <div data-reveal data-reveal-scale style="--i: 1" class="relative mx-auto max-w-xs lg:ml-auto" data-tilt="5">
+            <div class="absolute -inset-3 -z-10 rounded-3xl bg-gradient-to-br from-violet/30 via-mint/20 to-pink/20 blur-2xl [animation:var(--animate-pulse-soft)]"></div>
             <div class="overflow-hidden rounded-2xl border border-white/10 bg-ink-2">
               <Image
                 src={headshot}

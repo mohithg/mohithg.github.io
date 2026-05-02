@@ -15,11 +15,11 @@ const iconNodeMap = {
 <section class="relative border-t border-white/5 py-24 sm:py-32">
   <div class="mx-auto max-w-6xl px-5 sm:px-8">
     <header class="mb-16 max-w-3xl">
-      <p class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ what i build</p>
-      <h2 class="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl text-balance">
+      <p data-reveal style="--i: 0" class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ what i build</p>
+      <h2 data-reveal style="--i: 1" class="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl text-balance">
         Six surfaces. <span class="text-paper-dim">All of them shipped, in production.</span>
       </h2>
-      <p class="mt-5 text-lg text-paper-dim text-pretty">
+      <p data-reveal style="--i: 2" class="mt-5 text-lg text-paper-dim text-pretty">
         I'm a Product Engineer. I don't get squeamish about which layer of the stack I'm in —
         the question is always <em class="not-italic text-paper">what does the product need next?</em>
       </p>
@@ -30,10 +30,15 @@ const iconNodeMap = {
         BUILD_SURFACES.map((s, i) => {
           const Icon = iconNodeMap[s.iconName];
           return (
-            <article class="group relative bg-ink-2/60 p-7 transition-colors hover:bg-ink-3/60">
+            <article
+              data-reveal
+              data-glow
+              style={`--i: ${i}; --glow-color: var(--color-violet)`}
+              class="group relative bg-ink-2/60 p-7 transition-colors hover:bg-ink-3/60"
+            >
               <div class="flex items-center gap-3">
-                <span class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-ink-3/60">
-                  <Icon className="h-4 w-4 text-violet-soft" />
+                <span class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-ink-3/60 transition-transform group-hover:scale-110 group-hover:border-violet/40">
+                  <Icon className="h-4 w-4 text-violet-soft transition-transform group-hover:rotate-6" />
                 </span>
                 <span class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">
                   surface_{String(i + 1).padStart(2, '0')}

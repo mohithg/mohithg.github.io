@@ -1,5 +1,17 @@
 ---
 import { ArrowRight, ArrowUpRight, Sparkles } from 'lucide-react';
+
+const COMPANIES = [
+  'AthenaHealth',
+  'Codebrahma',
+  'Rippling',
+  'Navya',
+  'IntuitionAI',
+  'Domino Data Lab',
+  'Global Predictions',
+  'PortfolioPilot',
+];
+const marquee = [...COMPANIES, ...COMPANIES];
 ---
 
 <section class="relative isolate overflow-hidden pt-32 pb-24 sm:pt-40 sm:pb-32 lg:min-h-[100dvh] lg:flex lg:items-center">
@@ -18,11 +30,18 @@ import { ArrowRight, ArrowUpRight, Sparkles } from 'lucide-react';
     <span class="absolute left-[22%] bottom-[18%] h-1 w-1 rounded-full bg-pink" style="animation: float 7s ease-in-out infinite 0.5s;"></span>
     <span class="absolute right-[12%] bottom-[28%] h-1.5 w-1.5 rounded-full bg-violet-soft" style="animation: float 9s ease-in-out infinite 2s;"></span>
     <span class="absolute left-[42%] top-[12%] h-1 w-1 rounded-full bg-mint" style="animation: float 10s ease-in-out infinite 0.8s;"></span>
+    <span class="absolute right-[35%] top-[55%] h-1 w-1 rounded-full bg-violet/70" style="animation: float 12s ease-in-out infinite 1.2s;"></span>
+    <span class="absolute left-[60%] bottom-[10%] h-0.5 w-0.5 rounded-full bg-mint/80" style="animation: float 11s ease-in-out infinite 0.3s;"></span>
   </div>
 
   <div class="relative mx-auto w-full max-w-6xl px-5 sm:px-8">
     <!-- Status badge -->
-    <a href="#contact" class="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-2/60 px-3 py-1.5 backdrop-blur-md transition-colors hover:border-mint/30 hover:bg-ink-3/60">
+    <a
+      data-reveal
+      style="--i: 0"
+      href="#contact"
+      class="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-2/60 px-3 py-1.5 backdrop-blur-md transition-colors hover:border-mint/30 hover:bg-ink-3/60"
+    >
       <span class="relative flex h-2 w-2">
         <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-75"></span>
         <span class="relative inline-flex h-2 w-2 rounded-full bg-mint"></span>
@@ -34,39 +53,50 @@ import { ArrowRight, ArrowUpRight, Sparkles } from 'lucide-react';
     </a>
 
     <!-- Eyebrow -->
-    <p class="mt-10 font-mono text-xs uppercase tracking-[0.3em] text-paper-muted">
+    <p data-reveal style="--i: 1" class="mt-10 font-mono text-xs uppercase tracking-[0.3em] text-paper-muted">
       Product Engineer · AI · 11 years
     </p>
 
-    <!-- Display headline -->
+    <!-- Display headline (word-by-word reveal via stagger) -->
     <h1 class="mt-5 max-w-5xl font-display text-[clamp(2.75rem,8vw,7rem)] font-semibold leading-[0.95] tracking-tight text-balance">
-      I ship <span class="gradient-text">AI products</span><br />
-      end&#8209;to&#8209;end &mdash;
-      <span class="text-paper-dim">from <span class="font-mono italic text-mint">DAGs</span> to <span class="font-mono italic text-violet-soft">UI</span>.</span>
+      <span class="inline-block" data-reveal data-reveal-blur style="--i: 2">I&nbsp;ship</span>
+      <span class="inline-block" data-reveal data-reveal-blur style="--i: 3"><span class="gradient-text-anim">AI&nbsp;products</span></span>
+      <br />
+      <span class="inline-block" data-reveal data-reveal-blur style="--i: 4">end&#8209;to&#8209;end</span>
+      <span class="inline-block" data-reveal data-reveal-blur style="--i: 5">&mdash;</span>
+      <span class="inline-block text-paper-dim" data-reveal data-reveal-blur style="--i: 6">from</span>
+      <span class="inline-block text-paper-dim" data-reveal data-reveal-blur style="--i: 7"><span class="font-mono italic text-mint">DAGs</span></span>
+      <span class="inline-block text-paper-dim" data-reveal data-reveal-blur style="--i: 8">to</span>
+      <span class="inline-block text-paper-dim" data-reveal data-reveal-blur style="--i: 9"><span class="font-mono italic text-violet-soft">UI</span>.</span>
     </h1>
 
     <!-- Supporting line -->
-    <p class="mt-8 max-w-2xl text-lg leading-relaxed text-paper-dim text-pretty sm:text-xl">
+    <p data-reveal style="--i: 10" class="mt-8 max-w-2xl text-lg leading-relaxed text-paper-dim text-pretty sm:text-xl">
       First engineer at <a href="https://portfoliopilot.com" class="text-paper underline decoration-violet/40 underline-offset-4 transition-colors hover:decoration-violet">PortfolioPilot</a>.
       Previously founding engineer at <a href="https://intuition.ai" class="text-paper underline decoration-violet/40 underline-offset-4 transition-colors hover:decoration-violet">IntuitionAI</a> (acquired by <a href="https://dominodatalab.com" class="text-paper underline decoration-mint/40 underline-offset-4 transition-colors hover:decoration-mint">Domino Data Lab</a>), Rippling, AthenaHealth.
       Built one of the first ChatGPT plugins; today shipping agent stacks in production.
     </p>
 
     <!-- CTAs -->
-    <div class="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+    <div data-reveal style="--i: 11" class="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
       <a
         href="#work"
-        class="group inline-flex items-center justify-center gap-2 rounded-full bg-paper px-6 py-3.5 font-medium text-ink transition-all hover:scale-[1.02] hover:bg-violet-soft"
+        data-magnetic="0.18"
+        class="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-paper px-6 py-3.5 font-medium text-ink transition-colors hover:bg-violet-soft"
       >
-        See the work
-        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        <span class="relative z-10 flex items-center gap-2">
+          See the work
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        </span>
+        <span class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full"></span>
       </a>
       <button
         type="button"
         data-chat-trigger
+        data-magnetic="0.15"
         class="group inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-ink-2/60 px-6 py-3.5 font-medium text-paper backdrop-blur-md transition-colors hover:border-violet/40 hover:bg-ink-3/60"
       >
-        <Sparkles className="h-4 w-4 text-violet-soft" />
+        <Sparkles className="h-4 w-4 text-violet-soft transition-transform group-hover:rotate-12 group-hover:scale-110" />
         Chat with my career
         <kbd class="ml-1 hidden rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-paper-dim sm:inline">⌘ /</kbd>
       </button>
@@ -75,24 +105,50 @@ import { ArrowRight, ArrowUpRight, Sparkles } from 'lucide-react';
         class="group inline-flex items-center justify-center gap-1.5 px-3 py-3.5 font-mono text-sm text-paper-dim transition-colors hover:text-paper"
       >
         résumé
-        <ArrowUpRight className="h-3.5 w-3.5" />
+        <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </a>
     </div>
 
-    <!-- Stats strip -->
-    <dl class="mt-16 grid grid-cols-2 gap-x-8 gap-y-6 border-t border-white/5 pt-8 sm:grid-cols-4">
-      {[
-        { k: '11+', v: 'years shipping' },
-        { k: '7', v: 'companies, mostly YC' },
-        { k: '1', v: 'startup acquired' },
-        { k: '∞', v: 'AI features in prod' },
-      ].map((s) => (
-        <div>
-          <dt class="font-display text-3xl font-semibold tracking-tight text-paper sm:text-4xl tabular-nums">{s.k}</dt>
-          <dd class="mt-1 font-mono text-[11px] uppercase tracking-widest text-paper-muted">{s.v}</dd>
-        </div>
-      ))}
+    <!-- Stats strip with count-up — fresh stagger because this is often below the fold -->
+    <dl data-reveal style="--i: 0" class="mt-16 grid grid-cols-2 gap-x-8 gap-y-6 border-t border-white/5 pt-8 sm:grid-cols-4">
+      <div>
+        <dt class="font-display text-3xl font-semibold tracking-tight text-paper sm:text-4xl tabular-nums">
+          <span data-count="11" data-count-suffix="+">0</span>
+        </dt>
+        <dd class="mt-1 font-mono text-[11px] uppercase tracking-widest text-paper-muted">years shipping</dd>
+      </div>
+      <div>
+        <dt class="font-display text-3xl font-semibold tracking-tight text-paper sm:text-4xl tabular-nums">
+          <span data-count="7">0</span>
+        </dt>
+        <dd class="mt-1 font-mono text-[11px] uppercase tracking-widest text-paper-muted">companies, mostly YC</dd>
+      </div>
+      <div>
+        <dt class="font-display text-3xl font-semibold tracking-tight text-paper sm:text-4xl tabular-nums">
+          <span data-count="1">0</span>
+        </dt>
+        <dd class="mt-1 font-mono text-[11px] uppercase tracking-widest text-paper-muted">startup acquired</dd>
+      </div>
+      <div>
+        <dt class="font-display text-3xl font-semibold tracking-tight text-paper sm:text-4xl tabular-nums">∞</dt>
+        <dd class="mt-1 font-mono text-[11px] uppercase tracking-widest text-paper-muted">AI features in prod</dd>
+      </div>
     </dl>
+
+    <!-- Marquee — companies he's shipped at -->
+    <div data-reveal style="--i: 1" class="marquee mt-12 border-t border-white/5 pt-6">
+      <p class="mb-3 font-mono text-[10px] uppercase tracking-[0.3em] text-paper-muted">/ shipped at</p>
+      <div class="marquee-track gap-12 font-display text-lg font-medium text-paper-muted">
+        {
+          marquee.map((c, i) => (
+            <span class="flex shrink-0 items-center gap-12 whitespace-nowrap">
+              <span class="transition-colors hover:text-paper">{c}</span>
+              <span class={i === marquee.length - 1 ? 'hidden' : 'h-1 w-1 rounded-full bg-violet/40'}></span>
+            </span>
+          ))
+        }
+      </div>
+    </div>
   </div>
 
   <!-- Scroll cue -->

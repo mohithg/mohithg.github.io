@@ -57,16 +57,16 @@ const breadcrumbJsonLd = {
           all work
         </a>
 
-        <p class:list={['mt-8 font-mono text-xs uppercase tracking-[0.3em]', accentText]}>
+        <p data-reveal style="--i: 0" class:list={['mt-8 font-mono text-xs uppercase tracking-[0.3em]', accentText]}>
           / case study · {start.split('-')[0]}–{end === 'present' ? 'now' : end.split('-')[0]}
         </p>
-        <h1 class="mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">{title}</h1>
-        <p class="mt-6 max-w-3xl text-xl text-paper-dim text-pretty">{tagline}</p>
-        <p class="mt-3 font-mono text-sm text-paper-muted">{role}</p>
+        <h1 data-reveal data-reveal-blur style="--i: 1" class="mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">{title}</h1>
+        <p data-reveal style="--i: 2" class="mt-6 max-w-3xl text-xl text-paper-dim text-pretty">{tagline}</p>
+        <p data-reveal style="--i: 3" class="mt-3 font-mono text-sm text-paper-muted">{role}</p>
 
         <dl class="mt-12 grid gap-3 sm:grid-cols-3">
-          {metrics.map((m) => (
-            <div class="rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4">
+          {metrics.map((m, i) => (
+            <div data-reveal data-reveal-scale style={`--i: ${4 + i}`} class="rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4 transition-colors hover:border-white/20 hover:bg-ink-2/60">
               <dt class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">{m.label}</dt>
               <dd class:list={['mt-2 font-display text-2xl font-semibold tracking-tight tabular-nums', accentText]}>{m.value}</dd>
             </div>

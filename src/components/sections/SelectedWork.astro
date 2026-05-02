@@ -28,12 +28,12 @@ const meta: Record<string, { tagline: string; metric: string; metricLabel: strin
   <div class="mx-auto max-w-6xl px-5 sm:px-8">
     <header class="mb-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
       <div class="max-w-2xl">
-        <p class="font-mono text-xs uppercase tracking-[0.3em] text-violet-soft">/ selected work</p>
-        <h2 class="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl text-balance">
+        <p data-reveal style="--i: 0" class="font-mono text-xs uppercase tracking-[0.3em] text-violet-soft">/ selected work</p>
+        <h2 data-reveal style="--i: 1" class="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl text-balance">
           Three case studies. <span class="text-paper-dim">No filler.</span>
         </h2>
       </div>
-      <p class="max-w-md text-paper-dim">
+      <p data-reveal style="--i: 2" class="max-w-md text-paper-dim">
         Each one walks through the setup, what I owned, the hard problem I solved, and the outcome.
       </p>
     </header>
@@ -44,11 +44,16 @@ const meta: Record<string, { tagline: string; metric: string; metricLabel: strin
           const m = meta[node.id]!;
           const accentClass = m.accent === 'mint' ? 'text-mint' : m.accent === 'violet' ? 'text-violet-soft' : 'text-pink';
           const borderClass = m.accent === 'mint' ? 'hover:border-mint/40' : m.accent === 'violet' ? 'hover:border-violet/40' : 'hover:border-pink/40';
+          const glowVar = m.accent === 'mint' ? 'var(--color-mint)' : m.accent === 'violet' ? 'var(--color-violet)' : 'var(--color-pink)';
           return (
             <a
               href={node.caseStudy}
+              data-reveal
+              data-reveal-scale
+              data-glow
+              style={`--i: ${i}; --glow-color: ${glowVar}`}
               class:list={[
-                'group relative block overflow-hidden rounded-2xl border border-white/5 bg-ink-2/40 p-8 transition-all hover:bg-ink-3/40 sm:p-12',
+                'group relative block overflow-hidden rounded-2xl border border-white/5 bg-ink-2/40 p-8 transition-all hover:bg-ink-3/40 hover:-translate-y-1 hover:shadow-2xl sm:p-12',
                 borderClass,
               ]}
             >
