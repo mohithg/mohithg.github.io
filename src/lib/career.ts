@@ -36,7 +36,7 @@ export const CAREER: readonly CareerNode[] = [
     location: 'Remote',
     summary:
       'Joined post-acquisition. Worked on Domino\'s core platform, built real-time systems, and led an architecture revamp of significant parts of the codebase.',
-    tags: ['Distributed systems', 'MLOps', 'Real-time', 'Scala', 'TypeScript', 'K8s'],
+    tags: ['Distributed systems', 'MLOps', 'Real-time', 'Scala', 'React', 'K8s'],
     href: 'https://dominodatalab.com',
     caseStudy: '/work/intuition-ai',
   },
@@ -48,8 +48,8 @@ export const CAREER: readonly CareerNode[] = [
     end: '2018-06',
     location: 'Bengaluru / Remote',
     summary:
-      'Built model monitoring before "model monitoring" was a category. Drift, data quality, eval. Acquired by Domino Data Lab in 2018.',
-    tags: ['ML monitoring', 'Founding', 'Acquisition', 'Python', 'Real-time'],
+      'Built model monitoring before "model monitoring" was a category. Complete system on Kafka, Python and React. Drift, data quality, eval. Acquired by Domino Data Lab in 2018.',
+    tags: ['ML monitoring', 'Founding', 'Kafka', 'Python', 'React', 'Real-time'],
     href: 'https://intuition.ai',
     caseStudy: '/work/intuition-ai',
     flagship: true,
@@ -62,8 +62,8 @@ export const CAREER: readonly CareerNode[] = [
     end: '2017-08',
     location: 'Bengaluru',
     summary:
-      'Cancer second-opinion platform connecting patients in India with oncologists at top US institutions. Shipped most of the patient and clinician surfaces.',
-    tags: ['Healthcare', 'Full-stack', 'React', 'Node.js'],
+      'Cancer second-opinion platform connecting patients in India with oncologists at top US institutions. Shipped most of the patient and clinician surfaces — and went deep on AWS Lambda when it had just launched, becoming the team\'s expert.',
+    tags: ['Healthcare', 'Full-stack', 'React', 'AWS Lambda', 'Node.js'],
     href: 'https://navyanetwork.com',
   },
   {
@@ -100,8 +100,8 @@ export const CAREER: readonly CareerNode[] = [
     end: '2015-08',
     location: 'Chennai',
     summary:
-      'First job out of college. Healthcare software at scale — learned what real engineering rigor looks like.',
-    tags: ['Healthcare', 'Java'],
+      'First job out of college. Healthcare software at scale — written in Perl. Learned what real engineering rigor looks like.',
+    tags: ['Healthcare', 'Perl'],
     href: 'https://www.athenahealth.com/',
   },
 ];

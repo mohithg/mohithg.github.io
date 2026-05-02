@@ -70,9 +70,9 @@ export const QNA: readonly QnA[] = [
   {
     id: 'languages',
     questions: ['What programming languages does he use?', 'What languages does he know?', 'Tech stack', 'What technologies'],
-    keywords: ['language', 'languages', 'programming', 'python', 'typescript', 'javascript', 'react', 'node', 'sql', 'postgres', 'java', 'tech', 'technology', 'technologies', 'framework', 'frameworks'],
+    keywords: ['language', 'languages', 'programming', 'python', 'typescript', 'javascript', 'react', 'node', 'sql', 'postgres', 'perl', 'scala', 'kafka', 'lambda', 'tech', 'technology', 'technologies', 'framework', 'frameworks'],
     answer:
-      'Daily: **Python** (FastAPI, Django, Celery), **TypeScript / React** (since 2015 — first React-to-prod earned a Dan Abramov tweet), **SQL** (mostly Postgres). Infra: **AWS, Kubernetes, Docker, Cloudflare**. AI: **Claude, OpenAI, pgvector, custom eval bench**. Has shipped Java (AthenaHealth), Scala (Domino), and a long tail of "what the job needs" languages. Full list on the [/uses](/uses) page.',
+      'Daily: **Python** (FastAPI, Django, Celery), **TypeScript / React** (since 2015 — first React-to-prod earned a Dan Abramov tweet), **SQL** (mostly Postgres). Infra: **AWS, Kubernetes, Docker, Cloudflare**. AI: **Claude, OpenAI, pgvector, custom eval bench**. Across his career has shipped **Perl** (AthenaHealth), **AWS Lambda** (Navya, when Lambda was brand new), **Kafka + Python + React** (IntuitionAI), and **Scala + React** (Domino). Full list on the [/uses](/uses) page.',
     citations: [{ label: '/uses', href: '/uses' }],
   },
   {

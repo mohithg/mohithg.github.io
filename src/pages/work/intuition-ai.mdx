@@ -27,10 +27,10 @@ Today, every MLOps platform has a model-monitoring product. In 2017, almost none
 I joined Domino as part of the acquisition and stayed for three years. What started as integrating one acquired product into a larger platform became a deep tour through the **core** of how Domino works: data engineering, real-time systems, an architecture revamp of significant parts of the stack, and a lot of late nights making other people's ML reliable.
 
 <Owned items={[
-  "<strong>At IntuitionAI:</strong> built the model monitoring service from scratch — drift detection, data-quality checks, prediction logging, alerting.",
-  "Stood up the entire stack solo for the first six months: ingestion, storage, the dashboard, the alerting, the customer-facing SDK.",
+  "<strong>At IntuitionAI:</strong> built the model monitoring service from scratch — a complete system on <em>Kafka, Python, and React</em>. Drift detection, data-quality checks, prediction logging, alerting.",
+  "Stood up the entire stack solo for the first six months: Kafka-backed ingestion, time-series storage, Python monitoring engine, React dashboard, customer-facing SDK.",
   "Owned the integration into Domino's platform after acquisition — both the technical migration and the product re-shaping.",
-  "<strong>At Domino:</strong> joined the core platform team. Worked on the parts of Domino that the rest of Domino is built on.",
+  "<strong>At Domino:</strong> joined the core platform team. <em>Scala backend, React frontend.</em> Worked on the parts of Domino that the rest of Domino is built on.",
   "Built and shipped real-time systems — streaming evaluation, live model performance, the bits where latency matters.",
   "Led an architecture revamp of significant portions of the codebase: cleaning up tech debt that had accumulated through hyper-growth, introducing modern patterns, breaking things into services that should've been services years earlier.",
   "Across both companies: production incident response, customer-facing on-call, and the unsexy work of making an enterprise platform actually work for enterprises."
@@ -43,8 +43,8 @@ I joined Domino as part of the acquisition and stayed for three years. What star
   nodes={[
     { id: "client", label: "Customer's Model", layer: "edge", x: 120, y: 80, owned: "shaped", note: "instrumented via SDK" },
     { id: "sdk", label: "IntuitionAI SDK", layer: "app", x: 120, y: 220, owned: "built", note: "python · ~3kloc" },
-    { id: "ingest", label: "Prediction Ingest", layer: "data", x: 380, y: 80, owned: "built", note: "high-throughput · idempotent" },
-    { id: "drift", label: "Drift / DQ Engine", layer: "ai", x: 380, y: 220, owned: "built", note: "windowed · streaming" },
+    { id: "ingest", label: "Kafka Ingest", layer: "data", x: 380, y: 80, owned: "built", note: "kafka · idempotent" },
+    { id: "drift", label: "Drift / DQ Engine", layer: "ai", x: 380, y: 220, owned: "built", note: "python · streaming" },
     { id: "alert", label: "Alerting", layer: "app", x: 380, y: 360, owned: "built", note: "rules · slack · pagerduty" },
     { id: "store", label: "Time-series Store", layer: "data", x: 660, y: 80, owned: "built" },
     { id: "ref", label: "Reference Datasets", layer: "data", x: 660, y: 220, owned: "built" },
