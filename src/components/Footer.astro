@@ -37,7 +37,9 @@ const year = new Date().getFullYear();
           <li><a href="/work/rippling" class="text-paper-dim hover:text-paper transition-colors">Rippling</a></li>
           <li><a href="/work/codebrahma" class="text-paper-dim hover:text-paper transition-colors">Codebrahma</a></li>
           <li><a href="/work/athena" class="text-paper-dim hover:text-paper transition-colors">AthenaHealth</a></li>
-          <li><a href={SITE.blog} class="text-paper-dim hover:text-paper transition-colors">Blog ↗</a></li>
+          {SITE.blogEnabled && (
+            <li><a href={SITE.blog} class="text-paper-dim hover:text-paper transition-colors">Blog ↗</a></li>
+          )}
         </ul>
       </div>
 

@@ -105,7 +105,7 @@ import { SITE } from '../lib/site';
         <h2>Off-hours</h2>
 
         <p>
-          I live in Bengaluru. I read more books than I should. I'm into the kind of technical writing where someone shows you how a system actually works, not how it's marketed (Julia Evans, Dan Luu, Kent C. Dodds, Lilian Weng). I keep a <a href={SITE.blog}>blog</a> that I update when I have something useful to say and not before. Off-hours, I tinker with Raspberry Pi: home automation, sensor rigs, the occasional embedded oddity. There's something grounding about a system that fits in your hand after a workweek spent in distributed cloud.
+          I live in Bengaluru. I read more books than I should. I'm into the kind of technical writing where someone shows you how a system actually works, not how it's marketed (Julia Evans, Dan Luu, Kent C. Dodds, Lilian Weng). Off-hours, I tinker with Raspberry Pi: home automation, sensor rigs, the occasional embedded oddity. There's something grounding about a system that fits in your hand after a workweek spent in distributed cloud.
         </p>
 
         <h2>If you're hiring</h2>
@@ -134,13 +134,15 @@ import { SITE } from '../lib/site';
           </span>
           <ArrowUpRight className="h-4 w-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-paper" />
         </a>
-        <a href={SITE.blog} class="group flex items-center justify-between rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4 transition-colors hover:bg-ink-3/40">
-          <span>
-            <span class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">/blog</span>
-            <span class="mt-1 block font-display text-lg font-semibold tracking-tight">writing</span>
-          </span>
-          <ArrowUpRight className="h-4 w-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-paper" />
-        </a>
+        {SITE.blogEnabled && (
+          <a href={SITE.blog} class="group flex items-center justify-between rounded-xl border border-white/10 bg-ink-2/40 px-5 py-4 transition-colors hover:bg-ink-3/40">
+            <span>
+              <span class="font-mono text-[10px] uppercase tracking-widest text-paper-muted">/blog</span>
+              <span class="mt-1 block font-display text-lg font-semibold tracking-tight">writing</span>
+            </span>
+            <ArrowUpRight className="h-4 w-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-paper" />
+          </a>
+        )}
       </div>
     </div>
   </article>

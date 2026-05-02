@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, ArrowRight, FileText, Mail, Linkedin, Sparkles, Home, User, Wrench, Hourglass, Newspaper, Code2, ExternalLink, BookOpen } from 'lucide-react';
+import { Search, ArrowRight, FileText, Mail, Linkedin, Sparkles, Home, User, Wrench, Hourglass, Code2, ExternalLink, BookOpen } from 'lucide-react';
+import { SITE } from '../../lib/site';
 
 type Cmd = {
   id: string;
@@ -55,7 +56,9 @@ function buildCommands(): Cmd[] {
     { id: 'gh', label: 'GitHub', group: 'social', icon: BookOpen, href: 'https://github.com/mohithg', external: true },
     { id: 'li', label: 'LinkedIn', group: 'social', icon: Linkedin, href: 'https://www.linkedin.com/in/mohithg', external: true },
     { id: 'cp', label: 'Codepen', group: 'social', icon: Code2, href: 'https://codepen.io/mohithg', external: true },
-    { id: 'blog', label: 'Blog', group: 'social', icon: Newspaper, href: 'https://blog.mohithg.com', external: true },
+    ...(SITE.blogEnabled
+      ? [{ id: 'blog', label: 'Blog', group: 'social' as const, icon: BookOpen, href: SITE.blog, external: true }]
+      : []),
   ];
 }
 

@@ -27,7 +27,7 @@ const personJsonLd = {
     { '@type': 'Organization', name: 'AthenaHealth', url: 'https://www.athenahealth.com/' },
   ],
   email: `mailto:${SITE.email}`,
-  sameAs: [SITE.github, SITE.linkedin, SITE.codepen, SITE.blog, SITE.twitter],
+  sameAs: [SITE.github, SITE.linkedin, SITE.codepen, SITE.twitter, ...(SITE.blogEnabled ? [SITE.blog] : [])],
   knowsAbout: [
     'Artificial Intelligence',
     'Large Language Models',

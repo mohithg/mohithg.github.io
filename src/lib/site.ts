@@ -5,6 +5,10 @@ export const SITE = {
   url: 'https://mohithg.com',
   email: 'mohithgm@gmail.com',
   blog: 'https://blog.mohithg.com',
+  /** Set to true once blog.mohithg.com is live again. Toggling this on
+   *  re-enables every blog reference across the site (Footer, Contact,
+   *  About, CommandPalette, Person JSON-LD sameAs). */
+  blogEnabled: false,
   github: 'https://github.com/mohithg',
   linkedin: 'https://www.linkedin.com/in/mohithg',
   codepen: 'https://codepen.io/mohithg',

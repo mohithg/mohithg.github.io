@@ -42,12 +42,12 @@ import { SITE } from '../../lib/site';
 
     <ul data-reveal style="--i: 4" class="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
       {
-        [
+        ([
           { l: 'GitHub', h: SITE.github },
           { l: 'LinkedIn', h: SITE.linkedin },
           { l: 'Codepen', h: SITE.codepen },
-          { l: 'Blog', h: SITE.blog },
-        ].map((s) => (
+          ...(SITE.blogEnabled ? [{ l: 'Blog', h: SITE.blog }] : []),
+        ]).map((s) => (
           <li>
             <a
               href={s.h}
