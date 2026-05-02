@@ -128,7 +128,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['react', 'frontend', 'ui', 'jsx', 'hooks', 'redux', 'next', 'nextjs', 'remix', 'astro', 'design', 'system', 'component', 'components'],
     answer:
-      '**React since 2015**. One of the early production-React engineers in India. I shipped my first React app to production at **Codebrahma**, which earned a **Dan Abramov tweet** in 2016. I built early product surfaces at **Rippling** (now $13B+) and the entire **PortfolioPilot** product UI as the first engineer there. Comfortable across the modern frontend stack: hooks, server components, Suspense, Tailwind, Astro Islands.',
+      '**React since 2015**. One of the early production-React engineers in India. My first React-to-production project at **Codebrahma** was **Lendwell** (a US digital mortgage platform), followed by early product surfaces at **Rippling** (now $13B+). The work earned a **Dan Abramov tweet** in 2016. Today I own the entire **PortfolioPilot** product UI as the first engineer there. Comfortable across the modern frontend stack: hooks, server components, Suspense, Tailwind, Astro Islands.',
     citations: [{ label: 'Rippling case study', href: '/work/rippling' }],
   },
   {

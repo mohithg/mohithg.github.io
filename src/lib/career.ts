@@ -94,7 +94,7 @@ export const CAREER: readonly CareerNode[] = [
     end: '2017-08',
     location: 'Bengaluru',
     summary:
-      'React dev shop. Shipped my first React app to production and got a tweet from Dan Abramov. Worked across early-stage clients including Rippling.',
+      'React dev shop. Shipped my first production React apps here (Lendwell, then Rippling). Got a tweet from Dan Abramov for the work.',
     tags: ['React', 'Open source'],
     href: 'https://codebrahma.com',
   },
