@@ -11,7 +11,7 @@ export const PRESS: readonly PressMoment[] = [
     year: 2016,
     title: 'Dan Abramov tweet',
     description:
-      'React\'s creator (and now Bluesky engineer) tweeted about a production React app I shipped at Codebrahma — back when shipping non-trivial React in production was still rare.',
+      'React\'s creator (and now Bluesky engineer) tweeted about a production React app I shipped at Codebrahma, back when shipping non-trivial React in production was still rare.',
     source: 'Twitter / X',
   },
   {
@@ -26,7 +26,7 @@ export const PRESS: readonly PressMoment[] = [
     year: 2023,
     title: 'Early ChatGPT plugins for PortfolioPilot',
     description:
-      'Built one of the first wave of ChatGPT plugins — financial-advice retrieval over PortfolioPilot data. Migrated to GPTs as the platform evolved, then to a full agent stack.',
+      'Built one of the first wave of ChatGPT plugins: financial-advice retrieval over PortfolioPilot data. Migrated to GPTs as the platform evolved, then to a full agent stack.',
     href: 'https://portfoliopilot.com',
     source: 'PortfolioPilot',
   },

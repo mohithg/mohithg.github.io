@@ -61,7 +61,7 @@ export function match(query: string): MatchResult {
     .sort((a, b) => b.s - a.s);
 
   if (ranked.length === 0 || ranked[0].s < 1.5) {
-    // No clear match — surface the three highest-recall topics as suggestions
+    // No clear match. Surface the three highest-recall topics as suggestions.
     return {
       kind: 'miss',
       suggestions: QNA.slice(0, 3).map((q) => q),
@@ -76,7 +76,7 @@ export function match(query: string): MatchResult {
 
 export function fallbackText(): string {
   return [
-    "I don't have that one in my answer bank yet — this v1 chat matches a curated set of questions instead of running a live LLM (cost reasons; live LLM is on the roadmap).",
+    "I don't have that one in my answer bank yet. This v1 chat matches a curated set of questions instead of running a live LLM (cost reasons; live LLM is on the roadmap).",
     '',
     "Here's what I *can* answer:",
   ].join('\n');

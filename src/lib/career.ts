@@ -21,7 +21,7 @@ export const CAREER: readonly CareerNode[] = [
     end: 'present',
     location: 'Remote',
     summary:
-      'First engineer on the team. Built the AI financial advisor end-to-end — SEC-registered, from the early ChatGPT-plugin era through GPTs through today\'s agent stack.',
+      'First engineer on the team. Built the AI financial advisor end-to-end. SEC-registered, from the early ChatGPT-plugin era through GPTs through today\'s agent stack.',
     tags: ['AI', 'SEC-registered', 'LLMs', 'Python', 'TypeScript', 'AWS', 'Eval', 'Real-time'],
     href: 'https://portfoliopilot.com',
     caseStudy: '/work/portfoliopilot',
@@ -62,7 +62,7 @@ export const CAREER: readonly CareerNode[] = [
     end: '2017-08',
     location: 'Bengaluru',
     summary:
-      'Cancer second-opinion platform connecting patients in India with oncologists at top US institutions. Shipped most of the patient and clinician surfaces — and went deep on AWS Lambda when it had just launched, becoming the team\'s expert.',
+      'Cancer second-opinion platform connecting patients in India with oncologists at top US institutions. Shipped most of the patient and clinician surfaces. And went deep on AWS Lambda when it had just launched, becoming the team\'s expert.',
     tags: ['Healthcare', 'Full-stack', 'React', 'AWS Lambda', 'Node.js'],
     href: 'https://navyanetwork.com',
   },
@@ -74,7 +74,7 @@ export const CAREER: readonly CareerNode[] = [
     end: '2016-09',
     location: 'San Francisco / Remote',
     summary:
-      'Built early product surfaces for Rippling — Parker Conrad\'s next company after Zenefits. Worked through Codebrahma, the React shop where I shipped my first React app to production.',
+      'Built early product surfaces for Rippling, Parker Conrad\'s next company after Zenefits. Worked through Codebrahma, the React shop where I shipped my first React app to production.',
     tags: ['React', 'YC', 'HRIS', 'Frontend craft'],
     href: 'https://rippling.com',
     caseStudy: '/work/rippling',
@@ -100,7 +100,7 @@ export const CAREER: readonly CareerNode[] = [
     end: '2015-08',
     location: 'Chennai',
     summary:
-      'First job out of college. Healthcare software at scale — written in Perl. Learned what real engineering rigor looks like.',
+      'First job out of college. Healthcare software at scale, written in Perl. Learned what real engineering rigor looks like.',
     tags: ['Healthcare', 'Perl'],
     href: 'https://www.athenahealth.com/',
   },

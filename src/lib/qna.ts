@@ -1,5 +1,5 @@
 // Curated Q&A corpus used by the "Chat with my career" widget.
-// Answers are written in **first person** — when a visitor opens the chat,
+// Answers are written in **first person**. When a visitor opens the chat,
 // they're effectively talking to me. The bot greets as a bot but the
 // answers themselves are mine.
 
@@ -14,7 +14,7 @@ export type QnA = {
 export const SUGGESTED_QUESTIONS = [
   'What did you ship at PortfolioPilot?',
   'Tell me about the IntuitionAI acquisition.',
-  'What\'s your strongest stack — frontend, backend, or AI?',
+  'What\'s your strongest stack: frontend, backend, or AI?',
   'Why should I hire you as a founding engineer?',
   'What\'s the Dan Abramov tweet story?',
   'How do you think about AI evals?',
@@ -31,7 +31,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['portfoliopilot', 'pilot', 'global', 'predictions', 'financial', 'advisor', 'first', 'engineer', 'ai', 'currently', 'today', 'now', 'job', 'role', 'sec'],
     answer:
-      'I\'m the **first engineer** at PortfolioPilot (Global Predictions), since June 2021. PortfolioPilot is an **SEC-registered AI financial advisor** — a real fiduciary, not a chatbot pretending. I bootstrapped the codebase, built the financial-data ingestion DAGs, the recommendation engine, and the AI advisor stack — including one of the **first wave of ChatGPT plugins** in 2023, the GPTs migration, and the custom agent runtime we run today. I own the **eval & guardrail layer** that catches bad financial advice before it ships.',
+      'I\'m the **first engineer** at PortfolioPilot (Global Predictions), since June 2021. PortfolioPilot is an **SEC-registered AI financial advisor**: a real fiduciary, not a chatbot pretending. I bootstrapped the codebase, built the financial-data ingestion DAGs, the recommendation engine, and the AI advisor stack. That includes one of the **first wave of ChatGPT plugins** in 2023, the GPTs migration, and the custom agent runtime we run today. I own the **eval & guardrail layer** that catches bad financial advice before it ships.',
     citations: [{ label: 'PortfolioPilot case study', href: '/work/portfoliopilot' }],
   },
   {
@@ -44,8 +44,8 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['eval', 'evals', 'evaluation', 'guardrail', 'guardrails', 'rubric', 'judge', 'shadow', 'production', 'rag', 'safety', 'correctness', 'hallucination', 'hallucinations'],
     answer:
-      '"**Evals before features** in any AI product." Every team I\'ve watched ship LLM features has had the same six-month epiphany — they should have built the eval bench *first*. At PortfolioPilot the eval system runs in three modes: **continuous** (every PR), **deep** (every prompt or model change, with an LLM judge plus human spot-checks), and **production shadow** (against anonymized real traffic). The hard part isn\'t the framework — it\'s the **rubric**, which I discover by reading every transcript where the AI was wrong and distilling failure modes into rules.',
-    citations: [{ label: 'See: PortfolioPilot — A hard problem, solved', href: '/work/portfoliopilot' }],
+      '"**Evals before features** in any AI product." Every team I\'ve watched ship LLM features has had the same six-month epiphany. They should have built the eval bench *first*. At PortfolioPilot the eval system runs in three modes: **continuous** (every PR), **deep** (every prompt or model change, with an LLM judge plus human spot-checks), and **production shadow** (against anonymized real traffic). The hard part isn\'t the framework. It\'s the **rubric**, which I discover by reading every transcript where the AI was wrong and distilling failure modes into rules.',
+    citations: [{ label: 'See: PortfolioPilot: a hard problem, solved', href: '/work/portfoliopilot' }],
   },
   {
     id: 'intuition-ai',
@@ -56,7 +56,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['intuition', 'intuitionai', 'acquisition', 'acquired', 'exit', 'domino', 'datalab', 'data', 'founding', 'monitoring', 'drift', 'mlops', 'ml', 'kafka'],
     answer:
-      'I was the **founding engineer at [IntuitionAI](https://intuition.ai)** in 2017 — building model monitoring (drift, data-quality, prediction logging) before model monitoring was a category. We shipped a complete system on **Kafka, Python, and React**. The company was acquired by **Domino Data Lab in 2018**. I stayed at Domino for **three years**, working on their core platform (**Scala backend, React frontend**): real-time systems, customer-facing on-call, and an architecture revamp of significant portions of the codebase using a strangler-fig pattern.',
+      'I was the **founding engineer at [IntuitionAI](https://intuition.ai)** in 2017, building model monitoring (drift, data-quality, prediction logging) before model monitoring was a category. We shipped a complete system on **Kafka, Python, and React**. The company was acquired by **Domino Data Lab in 2018**. I stayed at Domino for **three years**, working on their core platform (**Scala backend, React frontend**): real-time systems, customer-facing on-call, and an architecture revamp of significant portions of the codebase using a strangler-fig pattern.',
     citations: [{ label: 'IntuitionAI → Domino case study', href: '/work/intuition-ai' }],
   },
   {
@@ -68,7 +68,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['rippling', 'parker', 'conrad', 'codebrahma', 'react', '2016', 'yc', 'hr', 'hris', 'zenefits'],
     answer:
-      'In early 2016, through Codebrahma, I built early product surfaces for **Rippling** — Parker Conrad\'s next company after Zenefits, now valued at $13B+. Seven months shipping complex React UI when "production React" was still a sentence that needed a footnote. The work earned a **tweet from Dan Abramov** about the production React coming out of Codebrahma at the time, when senior React tweets were the closest thing the ecosystem had to peer review.',
+      'In early 2016, through Codebrahma, I built early product surfaces for **Rippling**, Parker Conrad\'s next company after Zenefits, now valued at $13B+. Seven months shipping complex React UI when "production React" was still a sentence that needed a footnote. The work earned a **tweet from Dan Abramov** about the production React coming out of Codebrahma at the time, when senior React tweets were the closest thing the ecosystem had to peer review.',
     citations: [{ label: 'Rippling case study', href: '/work/rippling' }],
   },
   {
@@ -79,20 +79,20 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['dan', 'abramov', 'tweet', 'tweeted', 'twitter', 'recognition', 'famous'],
     answer:
-      'In 2016, **Dan Abramov** (creator of React, Redux) tweeted about the production React work coming out of **Codebrahma** during the period I was there shipping Rippling. Production React was rare in 2016 — patterns weren\'t settled, hooks were three years away, Redux was a few months old. Anyone shipping non-trivial React was learning by writing. The Codebrahma work got attention because we picked the right patterns and committed to them.',
+      'In 2016, **Dan Abramov** (creator of React, Redux) tweeted about the production React work coming out of **Codebrahma** during the period I was there shipping Rippling. Production React was rare in 2016. Patterns weren\'t settled, hooks were three years away, Redux was a few months old. Anyone shipping non-trivial React was learning by writing. The Codebrahma work got attention because we picked the right patterns and committed to them.',
     citations: [{ label: 'See: Rippling case study', href: '/work/rippling' }],
   },
   {
     id: 'stack',
     questions: [
-      'What\'s your strongest stack — frontend, backend, or AI?',
+      'What\'s your strongest stack: frontend, backend, or AI?',
       'What\'s your best layer?',
       'specialty',
       'What do you specialize in',
     ],
     keywords: ['frontend', 'backend', 'fullstack', 'full-stack', 'stack', 'specialty', 'strongest', 'best', 'product', 'engineer', 'specialize', 'specialization', 'role'],
     answer:
-      'I\'m a **Product Engineer**, not a specialist — the question I\'m solving is always *"what does the product need next?"* not *"which layer am I in?"* I\'ve shipped at every layer: design → DAGs → frontend (React since 2015) → backend (Python, Node) → DB (Postgres) → infra (K8s, AWS) → AI (LLM agents, evals, RAG). My strongest signal is **judgment under ambiguity** — picking what to build, in what order, with which trade-offs, on a small team where there\'s no one to defer to.',
+      'I\'m a **Product Engineer**, not a specialist. The question I\'m solving is always *"what does the product need next?"* not *"which layer am I in?"* I\'ve shipped at every layer: design → DAGs → frontend (React since 2015) → backend (Python, Node) → DB (Postgres) → infra (K8s, AWS) → AI (LLM agents, evals, RAG). My strongest signal is **judgment under ambiguity**: picking what to build, in what order, with which trade-offs, on a small team where there\'s no one to defer to.',
   },
   {
     id: 'languages',
@@ -104,7 +104,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['language', 'languages', 'programming', 'python', 'typescript', 'javascript', 'react', 'node', 'sql', 'postgres', 'perl', 'scala', 'kafka', 'lambda', 'tech', 'technology', 'technologies', 'framework', 'frameworks'],
     answer:
-      'Daily: **Python** (FastAPI, Django, Celery), **TypeScript / React** (since 2015 — first React-to-prod earned a Dan Abramov tweet), **SQL** (mostly Postgres). Infra: **AWS, Kubernetes, Docker, Cloudflare**. AI: **Claude, OpenAI, pgvector, custom eval bench**. Across my career I\'ve also shipped **Perl** (AthenaHealth), **AWS Lambda** (Navya, when Lambda was brand new), **Kafka + Python + React** (IntuitionAI), and **Scala + React** (Domino). Full list on [/uses](/uses).',
+      'Daily: **Python** (FastAPI, Django, Celery), **TypeScript / React** (since 2015; first React-to-prod earned a Dan Abramov tweet), **SQL** (mostly Postgres). Infra: **AWS, Kubernetes, Docker, Cloudflare**. AI: **Claude, OpenAI, pgvector, custom eval bench**. Across my career I\'ve also shipped **Perl** (AthenaHealth), **AWS Lambda** (Navya, when Lambda was brand new), **Kafka + Python + React** (IntuitionAI), and **Scala + React** (Domino). Full list on [/uses](/uses).',
     citations: [{ label: '/uses', href: '/uses' }],
   },
   {
@@ -117,7 +117,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['ai', 'llm', 'gpt', 'plugin', 'plugins', 'agent', 'agents', 'rag', 'retrieval', 'chatgpt', 'openai', 'claude', 'anthropic', 'model', 'models', 'prompt', 'prompts'],
     answer:
-      'At PortfolioPilot: I built one of the **first ChatGPT plugins** (financial Q&A over portfolio data, early 2023), then the **GPTs migration**, then the **custom agent runtime** we run today (tool-calling, streaming UI, evals). Plus the in-product daily AI advisor and the recommendation engine. At IntuitionAI: model monitoring as a product — drift, data quality, prediction logging — productized for enterprise ML teams.',
+      'At PortfolioPilot: I built one of the **first ChatGPT plugins** (financial Q&A over portfolio data, early 2023), then the **GPTs migration**, then the **custom agent runtime** we run today (tool-calling, streaming UI, evals). Plus the in-product daily AI advisor and the recommendation engine. At IntuitionAI: model monitoring as a product (drift, data quality, prediction logging), productized for enterprise ML teams.',
     citations: [{ label: 'PortfolioPilot case study', href: '/work/portfoliopilot' }],
   },
   {
@@ -129,7 +129,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['react', 'frontend', 'ui', 'jsx', 'hooks', 'redux', 'next', 'nextjs', 'remix', 'astro', 'design', 'system', 'component', 'components'],
     answer:
-      '**React since 2015** — one of the early production-React engineers in India. I shipped my first React app to production at **Codebrahma**, which earned a **Dan Abramov tweet** in 2016. I built early product surfaces at **Rippling** (now $13B+) and the entire **PortfolioPilot** product UI as the first engineer there. Comfortable across the modern frontend stack: hooks, server components, Suspense, Tailwind, Astro Islands.',
+      '**React since 2015**. One of the early production-React engineers in India. I shipped my first React app to production at **Codebrahma**, which earned a **Dan Abramov tweet** in 2016. I built early product surfaces at **Rippling** (now $13B+) and the entire **PortfolioPilot** product UI as the first engineer there. Comfortable across the modern frontend stack: hooks, server components, Suspense, Tailwind, Astro Islands.',
     citations: [{ label: 'Rippling case study', href: '/work/rippling' }],
   },
   {
@@ -165,7 +165,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['hire', 'hiring', 'founding', 'fit', 'good', 'available', 'open', 'looking', 'recruit', 'job', 'position', 'opportunity'],
     answer:
-      'Three signals worth weighting: **(1)** I\'ve done it before — founding engineer at IntuitionAI through acquisition, first engineer at PortfolioPilot for five years and counting. **(2)** I ship AI in production, not demos — the eval layer I built at PortfolioPilot is what separates AI features that survive from ones that get rolled back. **(3)** I span the entire stack with judgment, which is what early-stage teams actually need. I\'m open to **founding-engineer or first-AI-engineer roles at AI-forward seed-to-Series-A teams**.',
+      'Three signals worth weighting: **(1)** I\'ve done it before: founding engineer at IntuitionAI through acquisition, first engineer at PortfolioPilot for five years and counting. **(2)** I ship AI in production, not demos. The eval layer I built at PortfolioPilot is what separates AI features that survive from ones that get rolled back. **(3)** I span the entire stack with judgment, which is what early-stage teams actually need. I\'m open to **founding-engineer or first-AI-engineer roles at AI-forward seed-to-Series-A teams**.',
     citations: [
       { label: 'Reach out', href: 'mailto:mohithgm@gmail.com' },
       { label: 'About', href: '/about' },
@@ -241,7 +241,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['who', 'about', 'intro', 'introduction', 'background', 'profile', 'overview', 'summary', 'biography', 'bio'],
     answer:
-      'I\'m **Mohith G** — a Product Engineer with 11+ years building products at YC-backed startups. Currently the first engineer at **[PortfolioPilot](https://portfoliopilot.com)** (an SEC-registered AI financial advisor). Previously founding engineer at **[IntuitionAI](https://intuition.ai)** (acquired by Domino Data Lab), and shipped early at Rippling and AthenaHealth. I ship the entire stack — design → DAGs → frontend → backend → DB → infra → AI. The full story is on [/about](/about), drawn as a DAG on the home page.',
+      'I\'m **Mohith G**, a Product Engineer with 11+ years building products at YC-backed startups. Currently the first engineer at **[PortfolioPilot](https://portfoliopilot.com)** (an SEC-registered AI financial advisor). Previously founding engineer at **[IntuitionAI](https://intuition.ai)** (acquired by Domino Data Lab), and shipped early at Rippling and AthenaHealth. I ship the entire stack: design → DAGs → frontend → backend → DB → infra → AI. The full story is on [/about](/about), drawn as a DAG on the home page.',
     citations: [{ label: 'About', href: '/about' }],
   },
 ];

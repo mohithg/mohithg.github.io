@@ -49,7 +49,7 @@ export default function HeroBackground() {
 
   return (
     <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      {/* Mesh gradient — moves with both scroll and cursor */}
+      {/* Mesh gradient: moves with both scroll and cursor */}
       <motion.div
         style={{ y: meshY, x: cursorMeshX, opacity: haloOpacity }}
         className="absolute -inset-40 [animation:var(--animate-mesh)]"

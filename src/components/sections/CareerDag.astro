@@ -4,7 +4,7 @@ import { CAREER, CAREER_EDGES } from '../../lib/career';
 // Layout: assign x,y by hand for a pleasing DAG.
 // Coordinate space is a 1200x600 viewBox.
 // Order is reverse-chronological (present on the LEFT) so that on mobile
-// — where the SVG horizontally scrolls — the user sees the current role
+// (where the SVG horizontally scrolls) the user sees the current role
 // first, then swipes right to walk back through history.
 const POSITIONS: Record<string, { x: number; y: number }> = {
   globalpredictions:{ x: 100,  y: 300 },
@@ -28,7 +28,7 @@ const yearLabel = (n: typeof CAREER[number]) =>
         Eleven years, rendered as a <span class="gradient-text-anim">directed acyclic graph</span>.
       </h2>
       <p data-reveal style="--i: 2" class="mt-5 text-lg text-paper-dim text-pretty">
-        It's how I think about systems — and, it turns out, how my career has run too.
+        It's how I think about systems. And, it turns out, how my career has run too.
         Hover any node for the receipts.
       </p>
     </header>

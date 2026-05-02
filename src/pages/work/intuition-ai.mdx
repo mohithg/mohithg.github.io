@@ -10,7 +10,7 @@ metrics:
   - { value: "Acquired", label: "by Domino Data Lab, 2018" }
   - { value: "3y", label: "post-acquisition at Domino" }
   - { value: "Core platform", label: "real-time + architecture revamp" }
-description: IntuitionAI / Domino Data Lab case study — founding-engineer story, model monitoring before it was a category, and three years revamping a Fortune-500 ML platform.
+description: IntuitionAI / Domino Data Lab case study. Founding-engineer story, model monitoring before it was a category, and three years revamping a Fortune-500 ML platform.
 ---
 
 import Owned from "../../components/work/Owned.astro";
@@ -20,18 +20,18 @@ import NextWork from "../../components/work/NextWork.astro";
 
 ## The setup
 
-In 2017, I left a full-stack engineering job at [Navya](https://navyanetwork.com) to build a company. **[IntuitionAI](https://intuition.ai)** was a small team — a couple of founders, an ML scientist, and me — and the bet was a simple one that turned out to be early. *Companies are deploying machine learning models to production. They have no idea what those models are doing once they ship.*
+In 2017, I left a full-stack engineering job at [Navya](https://navyanetwork.com) to build a company. **[IntuitionAI](https://intuition.ai)** was a small team (a couple of founders, an ML scientist, and me) and the bet was a simple one that turned out to be early. *Companies are deploying machine learning models to production. They have no idea what those models are doing once they ship.*
 
 Today, every MLOps platform has a model-monitoring product. In 2017, almost none did. We built one of the first. Less than a year later, it was acquired by Domino Data Lab.
 
 I joined Domino as part of the acquisition and stayed for three years. What started as integrating one acquired product into a larger platform became a deep tour through the **core** of how Domino works: data engineering, real-time systems, an architecture revamp of significant parts of the stack, and a lot of late nights making other people's ML reliable.
 
 <Owned items={[
-  "<strong>At IntuitionAI:</strong> built the model monitoring service from scratch — a complete system on <em>Kafka, Python, and React</em>. Drift detection, data-quality checks, prediction logging, alerting.",
+  "<strong>At IntuitionAI:</strong> built the model monitoring service from scratch: a complete system on <em>Kafka, Python, and React</em>. Drift detection, data-quality checks, prediction logging, alerting.",
   "Stood up the entire stack solo for the first six months: Kafka-backed ingestion, time-series storage, Python monitoring engine, React dashboard, customer-facing SDK.",
-  "Owned the integration into Domino's platform after acquisition — both the technical migration and the product re-shaping.",
+  "Owned the integration into Domino's platform after acquisition: both the technical migration and the product re-shaping.",
   "<strong>At Domino:</strong> joined the core platform team. <em>Scala backend, React frontend.</em> Worked on the parts of Domino that the rest of Domino is built on.",
-  "Built and shipped real-time systems — streaming evaluation, live model performance, the bits where latency matters.",
+  "Built and shipped real-time systems: streaming evaluation, live model performance, the bits where latency matters.",
   "Led an architecture revamp of significant portions of the codebase: cleaning up tech debt that had accumulated through hyper-growth, introducing modern patterns, breaking things into services that should've been services years earlier.",
   "Across both companies: production incident response, customer-facing on-call, and the unsexy work of making an enterprise platform actually work for enterprises."
 ]} />
@@ -68,17 +68,17 @@ I joined Domino as part of the acquisition and stayed for three years. What star
 
 In mid-2018, Domino approached us. They had a Fortune-500 customer base that ran ML in production at scale. They had a platform that helped data scientists *build* models. They didn't have model monitoring. We did.
 
-The acquisition closed quickly. The integration took longer — most of the next year. Engineering acquisitions look clean from the outside; up close, they are a hundred small judgment calls about which parts of the acquired thing to **preserve**, which parts to **rebuild** to fit the new platform, and which parts to **throw away** because the assumptions baked into them no longer hold. I made a lot of those calls. Some were right. Some I'd make differently now.
+The acquisition closed quickly. The integration took longer (most of the next year). Engineering acquisitions look clean from the outside; up close, they are a hundred small judgment calls about which parts of the acquired thing to **preserve**, which parts to **rebuild** to fit the new platform, and which parts to **throw away** because the assumptions baked into them no longer hold. I made a lot of those calls. Some were right. Some I'd make differently now.
 
-The product that emerged became part of Domino's monitoring story for the next several years. The work that came after — three years on Domino's core platform — taught me more about distributed systems and enterprise software than the rest of my career combined.
+The product that emerged became part of Domino's monitoring story for the next several years. The work that came after (three years on Domino's core platform) taught me more about distributed systems and enterprise software than the rest of my career combined.
 
 <HardProblem title="Re-architecting a fast-growing platform without breaking the customers paying you to make it work.">
 
-Domino had been growing fast for years before I arrived. The codebase showed it: services that should have been services were modules that imported each other. Tech debt had accumulated in the way it always does — every individual decision was reasonable at the time, but the sum was a system that was harder to change than it should be.
+Domino had been growing fast for years before I arrived. The codebase showed it: services that should have been services were modules that imported each other. Tech debt had accumulated in the way it always does: every individual decision was reasonable at the time, but the sum was a system that was harder to change than it should be.
 
-The architecture revamp wasn't a rewrite — rewrites are how startups die. It was a **strangler-fig pattern**, slow and surgical, applied to several core subsystems over more than a year. We picked one boundary at a time, drew a clean interface across it, ported the cleanest path through that boundary first, then let the new thing grow at the expense of the old. Customers never saw it. Engineering velocity inside the boundary went up — measurably — within a quarter of each strangler completing.
+The architecture revamp wasn't a rewrite. Rewrites are how startups die. It was a **strangler-fig pattern**, slow and surgical, applied to several core subsystems over more than a year. We picked one boundary at a time, drew a clean interface across it, ported the cleanest path through that boundary first, then let the new thing grow at the expense of the old. Customers never saw it. Engineering velocity inside the boundary went up (measurably) within a quarter of each strangler completing.
 
-The hardest part wasn't the technical work. It was the **constant negotiation with deadlines**. Every quarter, the company needed new customer-facing features. Every quarter, the architecture work was at risk of being the thing that got cut. The lesson — which I carry into every senior role since — is that you have to *bake the cleanup into the feature work*. Not "we'll refactor next sprint." *This* feature is delivered through *this* boundary; the refactor and the feature ship together; if the refactor doesn't ship, neither does the feature.
+The hardest part wasn't the technical work. It was the **constant negotiation with deadlines**. Every quarter, the company needed new customer-facing features. Every quarter, the architecture work was at risk of being the thing that got cut. The lesson, which I carry into every senior role since, is that you have to *bake the cleanup into the feature work*. Not "we'll refactor next sprint." *This* feature is delivered through *this* boundary; the refactor and the feature ship together; if the refactor doesn't ship, neither does the feature.
 
 It's slower in the short term. It's the only thing that works in the long term.
 
@@ -92,7 +92,7 @@ I left in mid-2021 not because anything was wrong, but because the LLM revolutio
 
 ## What I learned
 
-If you join a company through an acquisition, **the first six months decide everything**. The decisions you make about how the acquired thing fits in — what gets kept, what gets folded in, what gets thrown out — are easier to make in the first six months than ever again. Don't punt those decisions. Make them deliberately, write them down, and revisit them when the data tells you to.
+If you join a company through an acquisition, **the first six months decide everything**. The decisions you make about how the acquired thing fits in (what gets kept, what gets folded in, what gets thrown out) are easier to make in the first six months than ever again. Don't punt those decisions. Make them deliberately, write them down, and revisit them when the data tells you to.
 
 <NextWork
   prev={{ href: "/work/portfoliopilot", title: "PortfolioPilot" }}

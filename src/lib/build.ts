@@ -14,9 +14,9 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
     title: 'AI features in production',
     iconName: 'sparkles',
     blurb:
-      'Real LLM features, evaluated and shipped — not demos. Tool-using agents, RAG over real data, evals as first-class infrastructure.',
+      'Real LLM features, evaluated and shipped, not demos. Tool-using agents, RAG over real data, evals as first-class infrastructure.',
     examples: [
-      'PortfolioPilot AI advisor — agent stack, evals, guardrails',
+      'PortfolioPilot AI advisor: agent stack, evals, guardrails',
       'Early ChatGPT plugins → GPTs migration → custom agent runtime',
       'Streaming UIs over LLM tool calls',
     ],
@@ -26,7 +26,7 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
     title: 'Real-time systems',
     iconName: 'zap',
     blurb:
-      'Sub-second feedback loops where they matter — from real-time model monitoring at Domino to live-streaming AI advice at PortfolioPilot.',
+      'Sub-second feedback loops where they matter, from real-time model monitoring at Domino to live-streaming AI advice at PortfolioPilot.',
     examples: [
       'Model drift / data-quality monitoring at scale',
       'Streaming AI responses with optimistic UI',
@@ -38,7 +38,7 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
     title: 'Data pipelines & DAGs',
     iconName: 'workflow',
     blurb:
-      'Daily ETL, financial-data ingestion, eval pipelines — the unglamorous plumbing that makes everything else possible.',
+      'Daily ETL, financial-data ingestion, eval pipelines: the unglamorous plumbing that makes everything else possible.',
     examples: [
       'Multi-source financial data ingestion at PortfolioPilot',
       'Eval pipelines that run on every model + prompt change',
@@ -50,9 +50,9 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
     title: 'Frontend craft',
     iconName: 'layers',
     blurb:
-      'React since the early days — first React-to-prod app earned a Dan Abramov tweet. Today: design systems, complex state, taste.',
+      'React since the early days. First React-to-prod app earned a Dan Abramov tweet. Today: design systems, complex state, taste.',
     examples: [
-      'PortfolioPilot product UI — design system + component library',
+      'PortfolioPilot product UI: design system + component library',
       'Earned a Dan Abramov tweet for production React work in 2016',
       'Server components, Suspense, modern patterns shipped to real users',
     ],
@@ -77,7 +77,7 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
       'AWS, Kubernetes, observability, cost. I can stand it up, scale it, and pay for it.',
     examples: [
       'K8s deployments, GitOps, blue/green',
-      'Observability — traces, metrics, structured logs, evals as telemetry',
+      'Observability (traces, metrics, structured logs, evals as telemetry)',
       'Cost-aware architecture; choosing managed vs. self-hosted with eyes open',
     ],
   },

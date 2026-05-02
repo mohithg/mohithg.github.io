@@ -12,9 +12,9 @@ export const SITE = {
   location: 'Bengaluru, India',
   timezone: 'Asia/Kolkata',
   tagline: 'Product Engineer · ships any product, with AI in every layer',
-  longTagline: 'I ship any product — with AI in every layer, from DAGs to UI.',
+  longTagline: 'I ship any product, with AI in every layer, from DAGs to UI.',
   description:
-    'Mohith G is a Product Engineer with 11+ years building products at YC-backed startups. Today he ships AI agents in production at PortfolioPilot — an SEC-registered AI financial advisor — and uses agents to ship them faster. Previously founding engineer at IntuitionAI (acquired by Domino Data Lab), and shipped early at Navya, Rippling, AthenaHealth.',
+    'Mohith G is a Product Engineer with 11+ years building products at YC-backed startups. Today he ships AI agents in production at PortfolioPilot (an SEC-registered AI financial advisor), and uses agents to ship them faster. Previously founding engineer at IntuitionAI (acquired by Domino Data Lab), and shipped early at Navya, Rippling, AthenaHealth.',
   ogImage: '/og/default.png',
 } as const;
 
