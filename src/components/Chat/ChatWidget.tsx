@@ -18,7 +18,7 @@ type Msg =
 const greet: Msg = {
   id: 'greet',
   role: 'assistant',
-  text: "Hi — I'm a chat over Mohith's career. Ask me anything from the suggestions below, or type your own.\n\n*v1 runs against a curated answer bank — a live LLM version is coming soon.*",
+  text: "Hey — ask me anything about my work, my background, or how I think about shipping AI products. Pick a suggestion below, or type your own.\n\n*Heads-up: this v1 runs against a curated answer bank I wrote — a live LLM version is coming soon.*",
 };
 
 function renderMarkdown(text: string): string {
