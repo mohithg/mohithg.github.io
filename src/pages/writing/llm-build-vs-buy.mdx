@@ -1,0 +1,124 @@
+---
+layout: ../../layouts/Writing.astro
+title: "LLM build vs buy: the questions that actually matter"
+description: "Should you build your own model, fine-tune, host open-source, or call APIs? The decision depends on a few specific questions, and the answer is usually 'call APIs.'"
+publishDate: "2026-05-20"
+pillar: economics
+slug: llm-build-vs-buy
+---
+
+Once a quarter, an engineering team I'm working with has The Conversation. *"Should we be hosting our own model? We're spending a lot on the API."* The conversation usually ends with the team deciding to keep using the API, because the build option doesn't pencil out. But the conversation keeps coming up because the framing of "are we leaving money on the table" is hard to shake.
+
+This essay is about the framing that makes the decision actually clear. Spoiler: most teams should keep using the API. The build option pays off in narrower circumstances than the conversation suggests.
+
+## The four options
+
+Roughly, there are four operating models:
+
+1. **Frontier API.** Use Claude, GPT, etc. via paid API.
+2. **Hosted open source.** Run Llama, Qwen, Mistral, etc. on your own infrastructure or via a hosting service.
+3. **Fine-tuned open source.** Take a base open model, fine-tune on your data, run it.
+4. **Custom training from scratch.** Build the model yourself.
+
+Option 4 is reserved for a handful of well-funded labs and a few specific industrial use cases. For everyone else, it's a distraction. Skip it; this essay is about 1-3.
+
+## The case for the API
+
+Reasons to stay on the API:
+
+**Reason 1: model quality keeps improving.** The frontier model in 2026 is dramatically better than the frontier model in 2024. The gap between frontier and open source remains meaningful for many tasks. By going API, you ride the improvement curve for free.
+
+**Reason 2: zero ops overhead.** No GPUs to manage, no inference servers to deploy, no scaling to think about. The provider handles all of it. Your engineering team works on your product, not on infrastructure.
+
+**Reason 3: usage scales with revenue.** API costs scale with usage. So does your revenue (presumably). The cost is a variable expense matched to the value you're delivering.
+
+**Reason 4: easy to switch.** API providers compete. If one raises prices or has reliability issues, you can switch. Your hosted alternative locks you in.
+
+**Reason 5: full feature set.** APIs ship with prompt caching, structured outputs, batch processing, and other features that take real engineering to build yourself.
+
+For most teams, these reasons alone justify staying on the API. The cost is real but the alternatives' costs (engineering, infrastructure, opportunity) are usually higher.
+
+## When hosting open source pencils out
+
+A few situations where running open source makes sense.
+
+**Situation 1: very high volume, predictable.** If your throughput is high enough to keep GPUs continuously busy, the per-token cost of self-hosted inference can be lower than API pricing. The break-even is usually millions of tokens per day, sustained.
+
+**Situation 2: data residency requirements.** You can't send user data to third-party APIs because of compliance. Hosted open source on your own infrastructure is the answer; the cost is justified by the requirement.
+
+**Situation 3: latency sensitivity for short responses.** API latency includes network RTT. Hosted models close to your application have lower latency. Useful for interactive features where the round trip matters.
+
+**Situation 4: model fine-tuning required.** You need behavior from a model that you can only get by fine-tuning. The fine-tuning is on open source weights you control.
+
+If your situation matches one of these, hosting is on the table. If not, it usually doesn't pay off.
+
+## The hidden costs of self-hosting
+
+The cost comparison most teams do is naive: API price per token vs. hosted infrastructure cost per token. They look at GPU hourly rates, divide by tokens-per-hour, and conclude self-hosting is cheaper.
+
+The hidden costs that ruin the math:
+
+- **Engineering time to set up and maintain.** Inference servers, autoscaling, monitoring, eval pipelines. A real cost.
+- **Underutilization.** GPUs are expensive. If you're not running them at >70% utilization, the per-token cost is much higher than the spec sheet suggests.
+- **Capacity planning.** API providers handle bursts. You have to over-provision or accept latency spikes during peaks.
+- **Model upgrades.** When a new open model comes out, evaluating, deploying, and maintaining the old one in parallel is its own project.
+- **Opportunity cost.** Engineers spending time on inference infrastructure aren't shipping features.
+
+For most teams, these costs add up to multiples of the API spend they were trying to save. Self-hosting only makes sense when the savings are large enough to absorb these costs and still come out ahead.
+
+## When fine-tuning pays off
+
+Fine-tuning takes a base model and trains it further on your specific task. Some scenarios where it's worth it.
+
+**Scenario 1: structured output that vanilla models do poorly.** If your task has a specific output format and the base model produces it inconsistently, fine-tuning can lock in the format with much less prompt engineering.
+
+**Scenario 2: domain-specific vocabulary.** Medical, legal, scientific. Fine-tuning teaches the model your domain's vocabulary. Reduces hallucination and improves factual accuracy in the domain.
+
+**Scenario 3: cost reduction at scale.** A fine-tuned smaller model can match a larger model's quality on a specific task. If you have the volume, fine-tuning a small model is cheaper than calling a big model for the same job.
+
+**Scenario 4: latency reduction.** Smaller fine-tuned models run faster. Useful for high-frequency calls where latency matters.
+
+In each case, the fine-tuning is targeted at a specific gap. Generic "we want our model to be smarter" fine-tuning rarely delivers; specific "we need this format with this vocabulary" fine-tuning often does.
+
+## Fine-tuning as cost optimization
+
+A common pattern: you're using the frontier model for everything. You realize 70% of your traffic is repetitive, structured tasks. You fine-tune a small open model on that 70%. Route the simple cases to the fine-tune; route the hard cases to the frontier.
+
+The economics:
+- Frontier API: $X per call.
+- Fine-tuned small model: maybe $0.1X per call (depending on hosting).
+- 70% of traffic now at $0.1X: total cost down to ~33% of original.
+
+This works when the fine-tuning meaningfully reduces the per-call cost and the routing logic is reliable. Fine-tuning costs upfront ($1K-$10K depending on data size) and adds ongoing maintenance (re-train when model evolves, host the fine-tuned model). Worth it at scale.
+
+## The decision framework
+
+Five questions:
+
+1. **What's your current monthly LLM spend?** Below $5K/month, almost always stay on API; not enough volume to justify alternatives. Above $50K/month, alternatives start to pencil out.
+
+2. **Are you on a frontier API or a workhorse API?** If you're paying frontier prices for tasks that don't need frontier capability, the lowest-cost win is model routing within the API ecosystem, not switching to self-hosted.
+
+3. **What are your data residency requirements?** If real, hosting is a question of compliance, not cost. If not, this isn't the constraint.
+
+4. **Do you have specific tasks where fine-tuning would dramatically reduce cost or improve quality?** If yes, targeted fine-tuning may make sense. If you're vaguely thinking "fine-tune on our data," probably not.
+
+5. **What's your engineering bandwidth?** Self-hosting consumes engineering time. If your team is already underwater, the savings won't materialize because nobody can build and maintain the infrastructure.
+
+If most of your answers point to the API, stay on it. If multiple point to alternatives, do a deeper analysis with concrete numbers.
+
+## The thing that keeps changing
+
+A complication: the answers to these questions keep moving. New model releases shift the cost-quality curves. New hosting services lower the engineering overhead of self-hosting. New fine-tuning techniques (LoRA, adapters) make custom adaptation cheaper.
+
+Every 6-9 months, the build-vs-buy answer is worth revisiting. Not because most teams should switch, but because the cost of the API option keeps changing relative to the alternatives.
+
+The teams that have explicitly checked recently have an informed answer ("we evaluated this in February, our spend doesn't justify hosting yet"). The teams that haven't have an uninformed assumption that may or may not still hold.
+
+## The take
+
+Most teams should stay on the API. The cost feels high, but the alternatives' costs (engineering, infrastructure, opportunity) are higher for the typical product.
+
+The cases for hosting and fine-tuning are real but specific: very high volume, data residency, targeted cost optimization, particular fine-tuning wins. Match your situation to those cases honestly.
+
+Revisit the analysis every 6-9 months. The cost-quality curves move. Your traffic patterns change. The right answer in 2026 Q2 might be different from the right answer in 2026 Q4. Stay current; don't switch reflexively in either direction.

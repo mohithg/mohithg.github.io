@@ -1,0 +1,134 @@
+---
+layout: ../../layouts/Writing.astro
+title: "LLM unit economics: the math your CFO will eventually ask about"
+description: "Unit economics for LLM features look different from regular software unit economics. The variable costs are real, the gross margins can flip with usage patterns, and the questions are coming. Here's how to think about them."
+publishDate: "2026-05-14"
+pillar: economics
+slug: llm-unit-economics
+---
+
+For most of software's history, unit economics for SaaS were straightforward. Variable cost per user was tiny (some database storage, some bandwidth, some compute). Gross margin was 80%+. The math was: get the user; nearly everything they pay is margin.
+
+LLM features broke this model. Per-user variable cost is no longer trivial. A heavy user of an AI feature can cost more in inference than they pay in subscription. The gross margin can flip from 80% to negative, depending on usage patterns.
+
+Most teams shipping LLM features don't have the unit economics analyzed yet. The CFO will ask. This essay is the framework for the answer.
+
+## The variables
+
+To compute unit economics for an LLM feature, you need:
+
+1. **Cost per call.** Average inference cost when the user invokes the feature.
+2. **Calls per user per period.** How often the average user uses the feature.
+3. **Variable cost per user per period.** Calls × cost per call, plus any other variable costs (vector DB storage, eval costs, etc.).
+4. **Revenue per user per period.** What the user pays. Not all of which is attributed to this feature.
+5. **Attributable revenue.** What share of the user's payment is attributable to this feature.
+
+The unit economics: `attributable_revenue - variable_cost_per_user`. If positive, the feature is gross-margin positive. If negative, you're losing money on every user who uses it.
+
+## Why the average lies
+
+The first analysis most teams do: average revenue per user, minus average cost per user. They get a positive number. They conclude: feature is gross-margin positive.
+
+The conclusion is wrong because the distribution is skewed.
+
+LLM usage is heavy-tailed. The top 5% of users might generate 50% of the calls. The cost distribution looks like:
+
+- Median user: $0.50/month in cost
+- p90 user: $5/month in cost
+- p99 user: $50/month in cost
+- Top 1%: $200+/month in cost
+
+If the user's revenue contribution is flat (everyone pays the same subscription), the median user is highly profitable, the p90 user is breakeven, and the p99 user is a loss leader.
+
+The aggregate margin can be positive while a meaningful share of users (and a much larger share of cost) is unprofitable.
+
+## The cohort analysis
+
+The right unit economics analysis segments users by usage. Bucket them by monthly variable cost:
+
+```
+Bucket            Users   Revenue/user   Cost/user   Margin/user
+Light (<$1)       60%     $30            $0.50       $29.50
+Medium ($1-$5)    25%     $30            $2.50       $27.50
+Heavy ($5-$25)    12%     $30            $12         $18
+Power ($25+)      3%      $30            $80         -$50
+```
+
+The picture is much sharper. The light and medium users are great. The heavy users are still profitable. The power users are losing money.
+
+This view enables decisions: do we cap the power users? Charge them more? Optimize their workload? Accept the loss to keep them on the platform?
+
+The undifferentiated average answers none of these. The cohort view forces the question.
+
+## What changes when you have this data
+
+A few decisions get easier.
+
+**Pricing tiers.** If your basic plan loses money on the top 10% of users, your basic plan needs limits or a higher price. Tiered pricing where heavy users self-select into a higher tier captures their value without losing money on them.
+
+**Usage caps.** Even within a tier, cap the worst-case usage. Free tier with 100 calls/month means a user can't run up an unbounded bill. The cap is forgiving for normal use and protective against the long tail.
+
+**Targeted optimization.** When you know the top 1% is most of the cost, you can target optimizations there. A cache that helps the heavy users specifically might cut total spend 20% with no impact on the light users.
+
+**Acquisition strategy.** If your unit economics are good for the median user but bad for power users, your acquisition should target users who look like the median, not the power user demographic.
+
+## When variable cost grows with engagement
+
+The classic SaaS lesson is that engagement is good. More engaged users have higher LTV.
+
+For LLM features, this can flip. A more engaged user makes more calls, costs more, and might cost more than they're worth. Engagement and profitability decouple.
+
+The implication: you have to think about the cost-per-engaged-action, not just the engagement number. *"Engagement is up 30%"* is not unambiguously good if cost is up 50%.
+
+This is a different mental model from the SaaS playbook. Some engagement increases pay for themselves; others don't. Track both.
+
+## The model upgrade economics
+
+When a new model comes out, the unit economics change.
+
+Sometimes for the better: the new model is cheaper per token at similar quality. Your cost per call drops. Margins improve.
+
+Sometimes for the worse: the new model is more capable but more expensive, and your users use it more (because it's more useful), and total cost goes up.
+
+A useful exercise: run the cohort analysis under different model assumptions. *"If we move to the new model, what happens to each cohort's economics?"* The answer might be that you should move the light users (cheaper, marginal quality matters less) but keep the heavy users on the older, cheaper model. Hybrid pricing-and-routing.
+
+## Hidden variable costs
+
+Inference cost is the obvious variable cost. There are usually others:
+
+- **Vector database storage.** Per-user RAG indexes scale with usage.
+- **Eval costs.** If you're shadow-evaluating production, that's a per-call cost too.
+- **Logging and traces.** Heavy users generate more trace data, which costs more to store.
+- **Tool call costs.** If tools call third-party APIs that charge per request, that's variable cost.
+
+These can add 20-40% on top of the inference cost. The full variable cost number is what matters for unit economics, not just inference.
+
+## When negative unit economics is OK
+
+Sometimes losing money on a feature is the right call.
+
+- **Acquisition.** Free tier with negative economics, paid tier with positive economics, conversion makes the math work overall.
+- **Strategic positioning.** Capability that defines the product even if the specific feature loses money. (Be careful with this argument; it's often used to rationalize bad economics.)
+- **Network effects.** More usage of the feature creates more value for other users. (Rare but real for some products.)
+
+Negative unit economics is not always wrong. It's almost always worth being explicit about. The CFO is going to ask why you're losing money on heavy users. Have the answer.
+
+## What to track operationally
+
+A unit economics dashboard worth maintaining:
+
+- Variable cost per user, distribution (not just average)
+- Cost per active user, week over week
+- Margin per cohort (light/medium/heavy/power)
+- Cost per acquired user (LTV/CAC math, with cost reflecting LLM variable cost)
+- Trend lines on each (is the picture getting better or worse over time?)
+
+If you don't have these, the unit economics are a periodic surprise rather than a managed metric.
+
+## The take
+
+LLM unit economics are not the SaaS unit economics you're used to. The variable cost is real, the distribution is heavy-tailed, and engagement and profitability can decouple.
+
+Compute cost per user, not just total cost. Segment by cohort. Match pricing and limits to the cohort distribution. Have the conversation about heavy users before the bill forces it.
+
+The teams whose LLM features survive contact with the CFO are the ones who did the unit economics analysis early and reflected it in pricing and limits. The teams who didn't end up doing emergency cost cutting and pricing changes on the same day, and frequently lose users in the transition.

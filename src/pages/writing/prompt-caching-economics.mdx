@@ -1,0 +1,163 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Prompt caching: the optimization most teams underuse"
+description: "Modern LLM APIs let you cache the static parts of your prompt. Most teams enable it, then design prompts that defeat it. Here's how to get the actual savings."
+publishDate: "2026-05-15"
+pillar: economics
+slug: prompt-caching-economics
+---
+
+Prompt caching is the closest thing to free money in 2026 LLM economics. Every major provider supports it. The cost reduction is large (often 50-80% on the cached portion). The implementation is usually a flag.
+
+And yet most production prompts I've reviewed get only a fraction of the possible cache savings. The teams enable caching, then build prompts in a way that defeats the cache. The savings on paper don't match the savings in practice.
+
+This essay is about getting the actual savings.
+
+## How prompt caching works
+
+Modern LLM APIs cache prompt prefixes. If you make a call where the first N tokens are identical to a recent call, the model only re-processes the suffix. The cached prefix is billed at a fraction of the normal rate (Anthropic's caching is roughly 10% of normal cost on cached tokens; pricing varies by provider).
+
+The cache has a TTL (typically 5-10 minutes). It's keyed on the exact prefix tokens. Any change to the prefix invalidates the cache.
+
+The implication: anything that goes in the prefix and stays static gets the discount. Anything in the prefix that changes per-call doesn't.
+
+## The structure that maximizes cache hits
+
+Order your prompt from "most static" to "most dynamic":
+
+```
+[CACHED]
+1. System message: long-lived persona, instructions, constraints
+2. Tool definitions (if using tools)
+3. Few-shot examples
+4. Reference documents (RAG context that's used across many calls)
+
+[NOT CACHED]
+5. Conversation history so far
+6. Current user input
+7. Any per-call metadata (timestamp, request ID, etc.)
+```
+
+Most prompts I see have the dynamic stuff scattered throughout. The system message includes the current date. The tool definitions reference today's request ID. The "few-shot examples" are actually rotating per-user examples. The cache hit rate is near zero because nothing is actually static.
+
+The fix is to be disciplined about prefix purity: if it changes per call, it doesn't go in the static part.
+
+## Antipatterns that defeat the cache
+
+**Antipattern 1: current date in system prompt.** *"You are an assistant. The current date is 2026-04-15."* The date changes every day. The cache invalidates every day. Move the date to the user message or to a tool the model can call.
+
+**Antipattern 2: per-user content in system prompt.** *"You are the assistant for user [name]. Their preferences are X, Y, Z."* Each user has a different system prompt. No cross-user caching. Move user-specific context to the user message.
+
+**Antipattern 3: rotating few-shot examples.** Some teams rotate few-shot examples per call ("for variety"). The cache invalidates every call. Pick a stable few-shot set.
+
+**Antipattern 4: dynamic tool descriptions.** Tool descriptions that include the user's specific available actions ("you can take these actions: [dynamic list]"). The descriptions change per user, defeating the cache. Find a way to express tool availability through the tool list itself rather than the descriptions.
+
+**Antipattern 5: per-call instructions.** *"For this query specifically, focus on X."* Each call has different instructions. The system prompt is unstable. Move per-call hints to the user message.
+
+A useful rule: nothing in the cached prefix should contain anything specific to this call.
+
+## The math on a real prompt
+
+Take a typical agent prompt:
+
+- 2000 tokens of system + tool descriptions + few-shot
+- 500 tokens of conversation history
+- 100 tokens of current user input
+
+Without caching: 2600 tokens at full price per call.
+
+With well-structured caching: 2000 tokens at ~10% price + 600 tokens at full price.
+
+Rough cost reduction: ~70%.
+
+If your prompt is currently structured such that those 2000 tokens aren't actually cacheable (because they include dynamic content), you're paying full price for everything. Restructuring to make the prefix actually static recovers the 70% savings.
+
+## When the cache TTL hurts
+
+The cache has a 5-10 minute TTL on most providers. If your traffic is bursty (one call, then nothing for an hour, then another call), the cache will be cold most of the time.
+
+For sparse traffic patterns:
+
+- Cache hits on within-burst calls (good)
+- Cache miss on first call after a gap (full price)
+
+For high-frequency traffic:
+
+- Cache hits on most calls
+- Cache stays warm
+
+If your traffic is sparse and the cache TTL is biting, consider:
+
+- Pre-warming the cache with a "ping" call when the user lands on the relevant page
+- Adjusting the TTL through provider-specific options (some providers let you extend it for a fee)
+- Accepting that for sparse traffic, caching saves less; focus optimization elsewhere
+
+## Multiple cache breakpoints
+
+Some providers (Anthropic, OpenAI) let you mark multiple breakpoints in your prompt. This lets you have nested cacheable regions:
+
+```
+[BREAKPOINT 1: cache all tokens before this]
+System message + tool definitions
+
+[BREAKPOINT 2: cache all tokens before this]
+Few-shot examples (might rotate occasionally)
+
+[NOT CACHED]
+Conversation, user input
+```
+
+The first breakpoint cache hits every call (system + tools rarely change). The second breakpoint cache hits when few-shot doesn't change and misses when it does.
+
+This is slightly more complex but lets you get partial cache benefit even when some "static" content occasionally rotates.
+
+## Cache hit rate as a metric
+
+If you're serious about caching, instrument it.
+
+Track:
+- Total tokens in prompts
+- Cached tokens (tokens that hit the cache)
+- Cache hit rate = cached / total
+
+Aim for >70% cache hit rate on the prefix portion. If you're below 50%, your prompt structure is defeating the cache; investigate.
+
+Provider APIs return cache statistics in their response. Surface these in your trace data. Once you can see the rate, you can move it.
+
+## The interaction with model upgrades
+
+Cache hit rates reset across model upgrades. If you switch from Claude Sonnet 4.6 to Sonnet 4.7, the existing cache doesn't apply (different model, different cache namespace).
+
+For a few hours after a model switch, your cost will be higher because nothing is cached. This passes; the cache warms up.
+
+Plan for this window when you upgrade. If you switch in the middle of high-traffic time, you'll see a temporary cost spike. Switching during low-traffic windows minimizes the impact.
+
+## Caching and few-shot
+
+If your few-shot examples are stable, they're cacheable. This makes few-shot much cheaper than people assume.
+
+A common worry: "few-shot examples cost a lot of tokens per call." With caching, the cost is much lower than the token count suggests. The actual marginal cost of a 1500-token few-shot section is more like 150 tokens worth of full-price processing.
+
+This shifts the few-shot calculus. The cost of including examples drops. The bar for "is the example earning its tokens" lowers. You can be more generous with few-shot while staying cost-efficient.
+
+## What to do tomorrow
+
+If you have an LLM feature in production:
+
+1. Look at your current prompt structure. Is the prefix actually static?
+2. If not, identify what's making it dynamic. Move the dynamic stuff out.
+3. Enable caching in your API call (if you haven't already).
+4. Measure the cache hit rate over a day.
+5. If it's below 70%, iterate on prompt structure.
+
+The whole exercise takes an afternoon. The cost reduction can be 50-70% on the affected calls. The ROI is enormous.
+
+Then check that you're getting the cached pricing reflected in your bill. Some providers have nuances about which calls qualify; verify the actual savings, don't just trust the design.
+
+## The take
+
+Prompt caching is a free lunch most teams haven't fully claimed. The savings are large; the implementation is small; the discipline is making your prompt prefix actually static.
+
+Audit your prompts. Move dynamic content to the user message. Order static content from least to most volatile. Use multiple breakpoints if your provider supports them. Track cache hit rate as a first-class metric.
+
+The teams running cost-disciplined LLM products are the ones whose cache hit rate is high. The savings show up as smaller bills, which lets the unit economics work, which lets the product survive scale.

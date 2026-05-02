@@ -1,0 +1,140 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Model routing: spending the right amount of intelligence"
+description: "Not every request needs the frontier model. Routing requests to the right model tier is one of the highest-leverage cost optimizations and one of the most underused."
+publishDate: "2026-05-16"
+pillar: economics
+slug: model-routing-cost
+---
+
+A pattern that's surprisingly common in production: every request to an LLM feature uses the same model. Often the most expensive one available. The team picked Claude Sonnet 4.6 (or GPT-5, or whatever's newest) when they shipped, and that's what gets called for every user input regardless of complexity.
+
+The economic problem: many of those requests would be answered just as well by a cheaper, faster model. The team is paying frontier-model prices for mid-tier-model work. The savings from routing requests to the appropriate tier can be 5-10x with negligible quality impact.
+
+This essay is about how to do that routing without losing quality.
+
+## Why teams default to one model
+
+A few reasons.
+
+**Simplicity.** One model, one prompt, one set of tests. Lower cognitive overhead during development.
+
+**Avoiding regressions.** You know the frontier model handles your task. Switching to a cheaper one might break something. Easier to overspend than to investigate.
+
+**No clear router.** Even if you wanted to route, what classifies a request as "easy enough for the cheap model"? Building the classifier is its own problem.
+
+These are real reasons. They're also outweighed by the cost difference at scale.
+
+## The model tiers in 2026
+
+In 2026, the major providers have roughly three tiers:
+
+- **Frontier:** Claude Opus 4.7, GPT-5 (or equivalent). Best reasoning. Most expensive (often $15-30 per million input tokens).
+- **Workhorse:** Claude Sonnet 4.6, GPT-5-mini. Strong reasoning, faster, ~5x cheaper than frontier.
+- **Fast:** Claude Haiku 4.5, GPT-5-nano. Less reasoning depth, very fast, ~5x cheaper than workhorse (so ~25x cheaper than frontier).
+
+The price difference between frontier and fast is roughly 25x. If 70% of your requests can be served by the fast tier with acceptable quality, you save ~70% of your bill.
+
+## The routing patterns that work
+
+Three patterns, in order of complexity.
+
+**Pattern 1: explicit complexity routing.** Classify the request before deciding which model to use. Easy questions go to the fast model; hard questions go to the workhorse; only the genuinely complex go to frontier.
+
+The classifier is itself a (small, fast, cheap) LLM call: *"Is this a simple lookup, a moderate analysis, or a complex multi-step reasoning task?"* The classifier returns one of three buckets; you route accordingly.
+
+The classifier can be wrong. Over time, you tune the prompt and watch the rate of "downgraded request had bad output." Aim for the classifier to be conservative-but-not-too-conservative.
+
+**Pattern 2: cheap-then-escalate.** Run the cheap model first. Check the output. If it looks confident and complete, return it. If it looks uncertain or wrong, escalate to the workhorse.
+
+The check can be structural (did the output have the required fields?), or it can be the cheap model's self-reported confidence (some models output a confidence indicator), or it can be a separate cheap "is this answer good enough?" call.
+
+This pattern is more expensive than explicit routing on the cases that do escalate (you pay for the cheap call plus the expensive one), but cheaper on the cases that don't (the expensive call never happens). It's a net win when the success rate of the cheap model is high.
+
+**Pattern 3: hybrid agent orchestration.** The agent's main loop uses one model; specific sub-tasks call out to others. The orchestration model is workhorse; the routing/classification steps use fast; the actual answer composition uses frontier.
+
+This requires more architecture but achieves the most precise cost-vs-quality tradeoff.
+
+## What "appropriate quality" means here
+
+The key question for routing: how much quality drop is acceptable?
+
+Most teams imagine the cheap model is much worse than it actually is for routine tasks. Run the same 100 cases through frontier and fast. Look at the outputs side by side. For many task categories, the difference is small or zero on most cases.
+
+The fast model tends to fail in specific ways:
+
+- Multi-step reasoning where it skips a step
+- Long-context tasks where it loses track
+- Subtle nuance (tone, taste, edge cases)
+- Adversarial inputs designed to confuse
+
+For tasks that don't hit these failure modes, the fast model is usually fine. The disagreement between cheap and expensive is small.
+
+## Designing the classifier
+
+The classifier prompt is itself a piece of work. Some patterns:
+
+**Surface signals.** Length of input, presence of certain keywords, structural features. These don't need an LLM at all, just code.
+
+**Cheap LLM classifier.** Pass the request to a small model with a tight prompt: *"This is a customer query. Classify it as 'simple' (lookup, status check, FAQ-style), 'moderate' (analysis, multi-step but bounded), or 'complex' (open-ended, requires deep reasoning)."* Returns one of three.
+
+**Cached classifier results.** If the same query (or close paraphrase) was classified before, reuse the result. Most production traffic is repetitive.
+
+**Default to the safer choice.** When the classifier is uncertain, route to the more capable model. The extra cost on uncertain cases is worth the quality safety.
+
+## Where routing fails
+
+Three failure modes to watch for.
+
+**Failure 1: classifier drift.** The classifier was tuned for the user behavior of three months ago. Users now ask different things. The classifier sends complex queries to the cheap model and the quality dips.
+
+Fix: re-tune the classifier periodically against current production traffic.
+
+**Failure 2: tail mishandling.** The cheap model handles the median case fine but fails on edges. If you're not sampling and reviewing the cheap-model outputs, the failures are invisible.
+
+Fix: shadow eval the cheap-model outputs against the workhorse equivalent on a sample. Track agreement rate; alert if it drops.
+
+**Failure 3: overconfidence in escalation.** In the cheap-then-escalate pattern, you trust the cheap model's self-assessment to decide whether to escalate. If the cheap model is confidently wrong, you don't escalate, and you ship bad output.
+
+Fix: don't rely solely on self-assessment. Have structural checks that catch obvious failures (missing required fields, off-format outputs, etc.) and trigger escalation.
+
+## The economics
+
+A worked example. Suppose your traffic mix is:
+
+- 60% simple queries
+- 30% moderate queries
+- 10% complex queries
+
+Without routing (everything on workhorse): cost X per call, total = 100% of X.
+With routing (60% fast, 30% workhorse, 10% frontier):
+  - Fast: 0.6 * 0.2X = 0.12X
+  - Workhorse: 0.3 * X = 0.3X
+  - Frontier: 0.1 * 5X = 0.5X
+  - Total: 0.92X
+
+Hmm, only 8% savings? Yes, because we *upgraded* the complex 10% to frontier (where they previously ran on workhorse).
+
+The realistic version: if you weren't sending the complex 10% to frontier before (you were just letting workhorse handle them, with worse quality), the routing actually saves *and* improves quality on the complex tail.
+
+The pure cost win is bigger if:
+- Routing increases your fast-tier share (more queries qualify than you think)
+- You're currently on frontier, not workhorse, for everything
+
+For teams currently using frontier as their default, routing typically saves 50-70% with no quality drop.
+
+## When routing isn't worth it
+
+A few cases where routing adds complexity without savings.
+
+- *Very low traffic.* If you handle 100 calls a day, the absolute savings are small. The engineering cost of routing might exceed the savings. Just stay on workhorse.
+- *Highly variable workload.* If you can't tell complexity from the input alone, the classifier becomes unreliable. The escalation pattern works; the explicit routing doesn't.
+- *Prompt caching on a single model.* If you're highly cache-optimized on one model, switching models loses the cache benefit. The savings from routing have to overcome the cache loss.
+
+## The take
+
+Most LLM features default to a single model and overspend. Routing requests to the right tier (fast for easy, workhorse for moderate, frontier for complex) typically cuts cost 50-70% with minimal quality impact.
+
+The classifier needs ongoing maintenance and you need shadow eval to catch quality drops. Done well, routing is one of the highest-leverage cost optimizations available. Done poorly, it leaks bad output to users on the cheap tier.
+
+If you're paying frontier prices for every call, you're probably leaving 50%+ of your bill on the table. Build the routing layer; pick up the savings.

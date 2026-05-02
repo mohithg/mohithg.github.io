@@ -1,0 +1,150 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Cost attribution for LLM features: knowing where your bill comes from"
+description: "An aggregate API bill tells you nothing about which features, users, or queries drive cost. Without attribution, you can't optimize. Here's the model that works."
+publishDate: "2026-05-21"
+pillar: economics
+slug: cost-attribution-llm
+---
+
+The first time the engineering team gets the monthly LLM bill, the conversation usually goes like this:
+
+> *Finance:* The bill was $30K this month, up from $20K last month. What's driving the increase?
+> *Engineering:* ...we've been shipping more features, so probably more usage?
+> *Finance:* Which features specifically?
+> *Engineering:* Hard to say. The bill is just a single line item.
+
+This is the cost-attribution problem. The provider's bill gives you the total. It doesn't tell you which features, which users, which use cases drove the cost. Without that attribution, you can't optimize, you can't price, and you can't have a productive conversation with finance.
+
+This essay is about building cost attribution from day one.
+
+## Why it matters
+
+Aggregate cost numbers are debate-stoppers, not action-starters. Knowing your bill is $30K doesn't tell you what to do. Knowing that $20K of that came from one specific feature, used heavily by one cohort of users, on one type of query, immediately suggests interventions: optimize the feature, change the limits for that cohort, redesign that query type.
+
+The attribution turns the bill from a number into a punch list.
+
+## The minimum data model
+
+Every LLM call should be tagged with at least:
+
+```
+call_id: UUID
+timestamp: when
+user_id: who triggered it (if applicable)
+feature: which product feature
+prompt_version: which prompt
+model: which model
+input_tokens: count
+output_tokens: count
+cost_usd: computed
+metadata: anything else (request type, session, etc.)
+```
+
+This is logged for every call. The aggregate is your bill. The slice-and-dice is your attribution.
+
+You build this once. It pays for itself the first time finance asks why the bill went up.
+
+## What attribution lets you ask
+
+Once you have the data, the questions become tractable.
+
+**By feature.** What's the cost per feature per month? Which features are cheap, which are expensive? Are the expensive ones generating proportional value?
+
+**By user cohort.** Free users vs paid? Which segment costs the most per user? Are heavy users profitable?
+
+**By prompt version.** Did the recent prompt change increase cost? By how much? Was the quality improvement worth the cost increase?
+
+**By model.** What share of cost is on frontier vs workhorse vs fast? Is the routing working as designed?
+
+**By time.** Is cost trending up over weeks or months? At what rate? Why?
+
+**By specific high-cost calls.** Which individual calls cost the most? Are there outliers driving the bill?
+
+Each of these maps to potential interventions. Without the data, you guess at interventions; with the data, you target them.
+
+## Tagging discipline
+
+The hardest part of attribution isn't the data model. It's the discipline of tagging every call correctly.
+
+A few patterns that help.
+
+**Pattern 1: tagging at the gateway.** All LLM calls go through a thin wrapper or gateway. The wrapper enforces tagging. No raw provider SDK calls in product code.
+
+**Pattern 2: feature context propagation.** Each request to your service has a context object (user, feature, etc.). Pass it through to the LLM call. The wrapper reads from it.
+
+**Pattern 3: linting / static analysis.** A lint rule catches LLM calls without tags. PRs that introduce untagged calls fail CI.
+
+Without these, the tagging gradually erodes. Engineers forget; new code paths skip the tagging; the data becomes unreliable.
+
+## Cost vs unit-of-value
+
+Raw cost is interesting; cost per unit of value is more interesting.
+
+Examples:
+- *Cost per active user.* If you have 10K active users this month and $30K spend, that's $3 per active user. Useful for SaaS economics.
+- *Cost per successful task.* For agents, what's the cost per task that the user actually accepted the output of? Includes the cost of failed attempts.
+- *Cost per converted user.* For onboarding flows, what does it cost to convert a free user to paid?
+
+These ratios anchor cost in business value. They tell you whether the spend is generating return.
+
+## Building the cost dashboard
+
+A useful set of dashboards:
+
+1. **Total monthly spend, by feature.** Stacked bar chart. Tells you the feature mix and trend.
+2. **Cost per active user, weekly.** Trend over time. Should be stable or declining if you're optimizing well.
+3. **Top-10 cost features.** Always sorted; the top features are where to look for optimization.
+4. **Top-10 cost users.** The heavy hitters. Are they on the right plan?
+5. **Cost per cohort.** Free vs paid vs enterprise; trial vs longtime.
+6. **Cost per query type.** Within a feature, which query types are most expensive?
+
+These dashboards should be reviewed monthly by the team owning the LLM spend. Not just by finance.
+
+## What to alert on
+
+A few cost alerts worth setting up.
+
+**Daily spend above threshold.** Tells you if a sudden change happened (a runaway feature, a leaked prompt, a usage burst).
+
+**Cost per user trending up.** Means a feature is becoming more expensive per user; either usage per user grew or per-call cost grew. Worth investigating.
+
+**Single user above per-day threshold.** A single user costing $20+ a day might be legitimate (heavy user) or might be abuse. Either way, you want to know.
+
+**Cost per feature trending up faster than usage.** If feature X's cost is up 50% but its usage is only up 20%, the per-call cost grew. Probably a prompt or trajectory regression worth investigating.
+
+The alerts should page someone who can act, not just go to a generic dashboard channel.
+
+## Attribution and pricing
+
+Cost attribution feeds pricing. Once you know cost per cohort, you can price tiers that reflect actual cost.
+
+If you discover that the median paid user costs $3/month and the p95 costs $30/month, that's the basis for tier design. The standard tier covers $3 cost; higher tiers cover heavier users.
+
+Without attribution, pricing is intuition-based. With attribution, it's a calculation. The calculation is more defensible to customers (you can explain why the tiers exist) and more sustainable for the business (margins are predictable).
+
+## Internal accountability
+
+Cost attribution also lets you hold internal teams accountable.
+
+Each feature team owns its feature's cost line. Monthly reviews include cost trend, optimizations shipped, optimizations planned. Cost growth without justification is a yellow flag.
+
+This is similar to how cloud cost is managed in mature engineering orgs. AWS bills get attributed by service; teams own their service's bill. LLM bills should be the same.
+
+The opposite pattern: LLM cost is owned by no one in particular. Everyone assumes someone else is watching it. Nobody is. The bill grows.
+
+## The political dimension
+
+A note: cost attribution can become political. *"Your team's feature is costing the company $X."* Done badly, this turns into blame and arguments.
+
+Done well, it's neutral information. *"Here's what each feature costs. Here's the value each generates. Here are the interventions we're considering."* The conversation is about the math, not about fault.
+
+Frame the attribution as data, not judgment. Use it to support optimization decisions, not to assign blame. The teams that run cost attribution well make it a normal part of operations rather than a quarterly drama.
+
+## The take
+
+The aggregate LLM bill is too aggregated to act on. Tag every call with feature, user, prompt version, and model. Build dashboards that slice the spend along useful axes. Set alerts on cost trends.
+
+Attribution turns the bill from a single number into a punch list. The interventions become obvious; the prioritization becomes calculable; the conversation with finance becomes constructive.
+
+Build the attribution from day one. Adding it later is harder than adding it early, and waiting means you spend months without the visibility you'd want.

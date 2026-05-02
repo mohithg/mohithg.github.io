@@ -1,0 +1,145 @@
+---
+layout: ../../layouts/Writing.astro
+title: "LLM rate limits: budgeting for the throughput you actually need"
+description: "Provider rate limits constrain what you can ship more often than they should. Most teams hit the limits at the wrong time and don't have a plan. Here's the planning framework."
+publishDate: "2026-05-19"
+pillar: economics
+slug: llm-rate-limits
+---
+
+The first time a team's LLM feature hits a rate limit, the team is usually surprised. They knew the limits existed in theory; they hadn't planned for them in practice. By the time the limit was hit, it was a production incident: requests failing, users seeing errors, the team scrambling to request a quota increase that takes hours or days to process.
+
+This essay is about avoiding that incident. The planning isn't complicated; it just has to be done before the limit bites, not after.
+
+## The two kinds of limits
+
+Provider rate limits typically come in two forms:
+
+**Requests per minute (RPM).** How many API calls per minute. Easy to reason about; usually generous for paid accounts.
+
+**Tokens per minute (TPM).** How many input + output tokens per minute. The constraint that bites for most production workloads. A high-volume agent with long contexts can hit TPM long before it hits RPM.
+
+There's also typically a daily request cap and a monthly spend limit. Less common to hit but worth being aware of.
+
+The TPM is usually the binding constraint. Plan around it.
+
+## How to estimate your TPM need
+
+Three components.
+
+**Component 1: average tokens per request.** Sum of input + output tokens for a typical request. Pull this from your usage data. For agents, this is the total across all the agent's internal model calls per user-facing request.
+
+**Component 2: peak request rate.** Not your average request rate. Your peak rate. Production traffic is bursty; the peak is what hits the limit.
+
+**Component 3: safety margin.** The peak you measure today is not the peak tomorrow. Multiply your peak by 2-3x for headroom.
+
+`required_TPM = avg_tokens_per_request * peak_RPS * 60 * margin`
+
+If your math comes out above your provider quota, you have a problem. Either request more quota or start architecting around it.
+
+## The architecture choices when limits constrain
+
+If you can't get more quota (or while you're waiting), the architecture has to handle the limit gracefully.
+
+**Choice 1: queue and backpressure.** Requests queue. A worker pool processes them at a rate that fits the limit. Users see "your request is being processed" instead of an error.
+
+Pros: no errors. Cons: latency spikes during peaks.
+
+**Choice 2: degrade gracefully.** When approaching the limit, switch to a cheaper model (lower TPM consumption) or a non-AI fallback (template response, classical algorithm).
+
+Pros: feature stays available. Cons: lower quality during peaks.
+
+**Choice 3: drop low-value requests.** When approaching the limit, prioritize. Paid users get full service; free users get throttled or queued.
+
+Pros: protects revenue-generating traffic. Cons: requires user segmentation logic.
+
+**Choice 4: multi-provider failover.** When one provider's limit is hit, fail over to another provider with a different limit pool.
+
+Pros: effective doubling of capacity. Cons: requires maintaining prompts and evals against multiple models; reliability of failover is its own concern.
+
+Most production setups use some combination. A queue for short bursts, multi-provider failover for sustained peaks, segmentation for protecting paid traffic.
+
+## Measuring before the limit hits
+
+Set up alerts well before you hit the limit, not at it.
+
+```
+70% of TPM limit: warning, no action needed
+85% of TPM limit: alert, capacity planning needed soon
+95% of TPM limit: page, intervention now
+```
+
+The 85% alert is the one that matters. It gives you days or weeks to address before the 95% page. If your only alert is "we're hitting the limit," you're in incident mode.
+
+Track:
+- TPM utilization over time, peak per hour
+- Requests per minute, peak per hour
+- Failed requests due to rate limits (this should always be near zero)
+- Latency, especially p99 (queue effects show up in p99 first)
+
+## The quota request game
+
+Provider quotas are usually negotiable for serious customers. But the negotiation has friction.
+
+**For self-serve increases:** most providers have an in-console quota request flow. Increases up to some threshold are usually granted within a day or two.
+
+**For larger increases:** you'll need to talk to a sales or account person. Be ready to share your projected usage, your business case, and your compliance posture.
+
+**For very large quotas:** the provider may want a commitment. Annual contracts buy higher rate limits. The discount is often not just on price but on capacity.
+
+Plan the quota requests in advance. Don't wait until you're at 95%. Three weeks of lead time is reasonable for negotiated increases.
+
+## Multi-region considerations
+
+Some providers have regional rate limits. Your US-East limit is separate from your US-West limit. Routing requests across regions effectively multiplies your capacity.
+
+Caveats:
+- Latency: cross-region calls have higher RTT. Useful for batch but not always for interactive.
+- Compliance: some data has to stay in a region. Routing across regions has to respect this.
+- Consistency: caches and state may not be shared across regions.
+
+For high-throughput products, multi-region is a serious capacity tool. For most products, it's overkill until you've already hit the single-region limits.
+
+## Multi-provider strategy
+
+A pattern I've seen work: keep two providers warm. Most traffic goes to provider A. When provider A's rate limits constrain or there's an outage, traffic shifts to provider B.
+
+The cost of this:
+- Maintaining prompt versions for both (small)
+- Eval bench coverage for both (medium)
+- Code complexity for the routing layer (small)
+
+The benefit:
+- Effective capacity doubled
+- Resilient to single-provider outages
+- Negotiating leverage on quota and price
+
+Worth it for products where reliability is critical or where you've already saturated one provider. Not worth it for early-stage products where the engineering complexity isn't justified.
+
+## The cost of running close to limits
+
+A subtle cost: when you're running close to your rate limit, every spike causes errors and latency. The quality of service degrades even when you're under the limit on average.
+
+Aim to operate at 50-70% of your rate limit on average. This gives you headroom for spikes without incidents. If you're consistently at 85%+ on average, you need more capacity (quota increase, second provider, architectural change).
+
+Running close to limits is also a sign you haven't optimized cost. Every prompt-caching, model-routing, or context-trimming optimization that reduces your TPM usage also gives you headroom against the limit. Cost optimization and capacity headroom are the same problem from different angles.
+
+## What to plan for
+
+A rate-limit plan that works has these components:
+
+1. **Current state:** what's your TPM usage today? Average, peak?
+2. **Quota:** what's your limit?
+3. **Headroom:** how much room between current peak and limit?
+4. **Growth projection:** at what rate is usage growing? When will it hit the limit?
+5. **Mitigations available:** queue, backpressure, fallback, multi-provider, quota increase
+6. **Trigger thresholds:** at what utilization do you start each mitigation?
+7. **Owner:** who's responsible for executing?
+
+Most teams don't have this plan. They have it after their first rate-limit incident. Better to write it before the incident.
+
+## The take
+
+Rate limits are an operational concern that can become a product concern in an instant. Plan for them: measure your usage, set thresholds, have mitigations ready, request quota in advance.
+
+The architectural choices (queue, degrade, segment, failover) all work; pick the ones that fit your product. The discipline is having any plan at all. The teams that have a plan don't have rate-limit incidents. The teams that don't, do.

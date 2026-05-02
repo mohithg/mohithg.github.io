@@ -1,0 +1,158 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Optimizing LLM spend after the bill is already big"
+description: "Most cost-optimization advice assumes you're starting from scratch. What if you already have a $100K/month bill and need to bring it down without breaking the product? Here's the order of operations."
+publishDate: "2026-05-23"
+pillar: economics
+slug: optimizing-llm-spend-late-stage
+---
+
+Most LLM cost-optimization writing assumes you're early: you're designing the prompt, choosing the model, building the architecture. The advice is preventative.
+
+What if you're past that point? Your product has shipped, traffic is real, the bill is already big, and you need to bring it down without breaking what's working. The optimization you have to do is different: you're working in flight, with real users, with a system that has months of accumulated decisions baked in.
+
+This essay is the playbook for that situation.
+
+## The order of operations
+
+Five steps, in order. Each one has the highest cost-reduction-per-engineering-effort ratio at its position.
+
+1. **Measure where the cost actually goes.**
+2. **Enable prompt caching properly.**
+3. **Route requests to the right model tier.**
+4. **Cap trajectory and context bloat.**
+5. **Restructure the heaviest workloads.**
+
+Doing them in this order maximizes the ratio. Doing step 5 before steps 1-4 wastes effort on the wrong things.
+
+## Step 1: measure
+
+Before you optimize anything, get visibility. Tag every LLM call with feature, user, prompt version, model, tokens, cost. Build a dashboard.
+
+After a week of data, you'll see something like:
+
+- Feature A: 50% of cost
+- Feature B: 25% of cost
+- Top 5% of users: 40% of cost
+- Frontier model: 80% of cost
+- Long contexts (>20K tokens): 30% of cost
+
+Each percentage points to a different lever. The features that dominate cost are where the highest-leverage optimizations are. The cohorts that dominate are where pricing or limits matter. The model mix is where routing helps.
+
+Without this data, you optimize uniformly across the system, which is the wrong allocation. With it, you target the 20% of changes that yield 80% of the savings.
+
+## Step 2: prompt caching
+
+The fastest win for most teams that haven't already done it. Modern LLM APIs support prompt caching; the cached portion is billed at a fraction of the normal rate.
+
+The work:
+- Verify caching is enabled in your API calls
+- Audit your prompt structure: is the prefix actually static?
+- Move dynamic content (current date, per-user data, current request context) out of the system prompt and into the user message
+- Confirm cache hit rate is >70% on the prefix portion
+
+For most teams that haven't done this, the savings are 30-60% on the affected calls. The engineering effort is days, not weeks.
+
+## Step 3: model routing
+
+After caching, the next-biggest lever is using the right model tier for each request.
+
+The work:
+- Identify the task categories in your traffic (look at the dashboard from Step 1)
+- For each category, evaluate whether a cheaper model would suffice
+- Build a routing layer that classifies and dispatches
+
+For tasks where the cheap model produces equivalent quality, routing typically saves another 30-50%. The engineering effort is a sprint or two depending on how many task categories you have.
+
+Validation matters: shadow eval the cheap-model outputs against the expensive-model outputs to ensure quality holds.
+
+## Step 4: cap trajectory and context bloat
+
+For agent workloads, the long tail of long-trajectory runs eats budget. Cap it.
+
+The work:
+- Set a maximum step count per agent run
+- Set a maximum context size per call
+- Compress conversations that grow past a threshold
+- Strip unused tool descriptions per request
+
+Each of these bounds the cost of the worst cases without affecting the median. Budget caps reduce the heavy tail; quality on the typical case is unchanged.
+
+## Step 5: restructure the heaviest workloads
+
+Sometimes a workload is structurally expensive and no amount of caching, routing, or capping fixes it.
+
+Examples:
+- An RAG flow that puts 100K tokens of docs in every prompt: replace with retrieval that puts 5K tokens of relevant docs.
+- A daily report generation that runs realtime: switch to batch API for 50% savings.
+- An "agent" that's actually a fixed workflow doing 8 steps that could be 3: collapse the workflow.
+- A feature that calls the model on every keystroke: debounce or rate-limit to once per second.
+
+These are bigger changes. They require restructuring the feature. But for the highest-cost workloads, this is where the largest savings live.
+
+## What not to do (yet)
+
+Two optimizations to defer.
+
+**Defer 1: switch to self-hosted.** Tempting because the per-token cost looks cheaper. The engineering and ops cost is large; the savings often don't materialize at small or medium scale; the model quality on open source still trails frontier on some tasks. Save this for when you've done all the cheaper optimizations and still need more.
+
+**Defer 2: fine-tuning.** Useful in specific cases but adds ongoing maintenance overhead (re-train when models evolve, run your own infrastructure for the fine-tuned model). Same as self-hosting: do the simpler optimizations first.
+
+If you've done steps 1-5 and still need to cut cost, *then* consider self-hosted or fine-tuning. Most teams don't get there because steps 1-5 are sufficient.
+
+## Pricing as part of the optimization
+
+One non-engineering lever: change pricing.
+
+If your unit economics show that some user cohorts are unprofitable, the answer might be to charge them more, limit them, or push them to a higher tier. The cost is what it is; the question is whether you're collecting enough revenue to cover it.
+
+Pricing changes are politically harder than engineering optimizations because users notice. They're also faster: a pricing change ships in a day; an engineering optimization takes a sprint.
+
+For some situations, the right move is a combination: ship the engineering optimizations to bring cost down, then adjust pricing to absorb what's left.
+
+## The negotiation lever
+
+If your spend is large enough, talk to your provider's account team. There's often room on:
+
+- Rate per token (especially for committed volume)
+- Higher rate limits at lower or no cost
+- Annual commitments in exchange for discounts
+- Early access to new pricing tiers or features
+
+Provider sales teams want to keep big customers. The conversation is usually willing.
+
+The threshold where this matters: probably $20K+/month spend. Below that, the lift in negotiating discounts may not be worth the time. Above that, even a 10% discount is meaningful annual savings.
+
+## Internal communication
+
+A late-stage cost optimization usually has a finance person watching, an eng team executing, and a product team worried about quality regressions.
+
+A communication pattern that works:
+
+1. Show the cost trend and the breakdown (Step 1's dashboard)
+2. Identify the top 3-5 levers and projected savings
+3. Each lever has an owner, a timeline, and a quality-protection plan (eval coverage)
+4. Weekly progress updates with cost metrics
+
+The goal: eng owns the optimization work; product owns the quality monitoring; finance gets the predictability they want. Without explicit coordination, the optimization either stalls (eng is "too busy"), introduces regressions (no quality protection), or spends quietly without finance knowing.
+
+## What success looks like
+
+After a focused 2-3 month effort:
+
+- Caching enabled, hit rate >70% on cacheable calls
+- Routing live, frontier-model share dropped from 100% to 30-50%
+- Trajectory and context bloat capped
+- Top 1-2 heaviest workloads restructured
+- Total LLM spend down 50-70% from baseline
+- Quality regression: minimal (you protected with eval coverage)
+
+This is achievable for most teams who haven't done these optimizations yet. The work is bounded; the savings are large; the quality risk is manageable with proper eval discipline.
+
+## The take
+
+Late-stage LLM cost optimization is a defined playbook. Measure first; cache, route, cap, restructure, in that order. Defer the more expensive moves (self-hosted, fine-tuning) until the cheaper ones are exhausted.
+
+The savings are large. A 50-70% reduction is realistic for most teams that haven't done the work. The engineering effort is bounded; a focused 2-3 month effort can do most of it.
+
+Most teams sit on inefficient LLM spend longer than they need to. The optimization isn't hard; the prioritization is. With the right order of operations, the bill comes down without breaking what's working.

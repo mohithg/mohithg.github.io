@@ -1,0 +1,150 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Pricing tiers for AI features: matching limits to economics"
+description: "Flat-rate AI pricing leaves you exposed to the heavy users. Pure pay-per-use is hostile to most users. The middle ground is tiers with clear limits, designed around your cost distribution."
+publishDate: "2026-05-17"
+pillar: economics
+slug: llm-pricing-tier-design
+---
+
+Pricing AI features is harder than pricing regular SaaS. Regular SaaS has near-zero variable cost; flat pricing works because heavy users barely cost more than light ones. AI features have meaningful variable cost; flat pricing puts you on the wrong side of the cost curve when usage is heavy-tailed.
+
+The instinct to "just charge per use" is also wrong, in a different way. Per-use pricing creates anxiety. Users hesitate before each click, wondering what it'll cost. Engagement drops. The product feels expensive even when individual calls are cheap.
+
+The middle ground: tiers with clear, generous limits. The user has a budget; within the budget, usage feels free. Above the budget, they upgrade. This essay is about how to design those tiers around the actual cost economics.
+
+## Why flat pricing breaks
+
+A typical pattern: launch with a single subscription. $20/month, unlimited AI features. The light users are profitable. The heavy users are massively unprofitable.
+
+The team notices the cost climbing. They look at the data. The top 5% of users are 50% of the cost. Some users are costing $200+ a month against the $20 subscription.
+
+Now the team has a problem. They can:
+
+1. Eat the cost (margins shrink).
+2. Add limits to the existing tier (users feel betrayed).
+3. Introduce new pricing (existing users grandfather; new users see the new pricing).
+
+Each option is painful. The right call would have been to anticipate the heavy-user problem from the start.
+
+## The cost distribution drives the tier design
+
+Before designing tiers, understand the cost distribution.
+
+Plot the histogram of monthly variable cost per user. You'll see something like:
+
+- 50% of users under $1/month
+- 30% between $1 and $5
+- 15% between $5 and $20
+- 4% between $20 and $100
+- 1% above $100
+
+The tier boundaries should sit at natural breaks in this distribution. Below $5 → free or basic. $5-$20 → standard tier. $20+ → power tier with higher price.
+
+The limits per tier should be generous for the median user in that tier and tight for the top edge. *"Standard tier covers 10,000 calls per month, which is 95% of standard-tier users."*
+
+## Tier limits the user understands
+
+The limit metric should be one the user can reason about.
+
+Bad: *"Standard tier includes 5 million tokens per month."* Users don't know what a token is. Can't predict whether they'll hit the limit.
+
+Good: *"Standard tier includes 500 AI conversations per month, with up to 20 messages per conversation."* Users understand "conversations" and "messages." They can roughly estimate their usage.
+
+Even better: show usage in the UI. *"You've used 142 of 500 conversations this month."* The user has continuous feedback on where they stand against the limit.
+
+The metric design matters as much as the limit number. A confusing metric leads to user anxiety even when usage is well within limits.
+
+## The free tier problem
+
+Free tiers are critical for acquisition but easy to abuse. A few patterns.
+
+**Pattern 1: small free tier with clear bumper.** *"5 conversations per day, free forever."* Cost-bounded. Most users discover the value, want more, and upgrade.
+
+**Pattern 2: time-limited free trial.** *"All features free for 14 days."* No long-term cost exposure. High conversion pressure on day 14.
+
+**Pattern 3: free tier requires identity.** *"Free with a verified email and phone."* Reduces abuse from one-person-many-accounts patterns.
+
+**Pattern 4: rate-limited free tier.** *"Free tier capped at 100 calls per day."* Lets occasional users stay free; pushes heavy users to paid.
+
+Most successful AI products use some combination. The free tier serves acquisition and trial; the paid tier serves the actual business.
+
+## Per-use add-ons
+
+For users who exceed their tier but don't want to upgrade, per-use overage is a good middle ground.
+
+*"You've used your 500 conversations this month. Additional conversations are $0.10 each."*
+
+The user has explicit choice. They can stop using; they can pay per call; they can upgrade to a higher tier. They're not silently throttled or surprised by a higher bill next month.
+
+The overage price should reflect actual cost plus margin. Don't price it loss-leader; you'll lose money on the heavy edge.
+
+## Bring-your-own-key (BYOK)
+
+A pricing model that's emerged with AI: let the user bring their own model API key. They pay the model provider directly; you charge a smaller subscription for the product.
+
+Pros:
+- Variable cost flips to the user; your unit economics become flat-margin SaaS again
+- Power users get unlimited usage at their own cost
+- Reduces your inference bill dramatically
+
+Cons:
+- More setup friction (user has to get a key, paste it in)
+- Less control over which model is used
+- User experience varies based on which key tier they have
+
+BYOK is great for power-user products (developer tools, AI workbenches) and bad for mass-market consumer products. Match it to your user base.
+
+## Enterprise pricing is different
+
+Enterprise customers usually want predictable pricing more than they want optimal economics. They'll accept a higher absolute number for a flat predictable bill.
+
+The enterprise pricing pattern: annual contract, generous usage cap, overage at a discounted rate, dedicated capacity if they care about performance. The contract value is high; the customer values predictability over per-call optimization.
+
+This is the reverse of consumer pricing. Don't try to apply enterprise patterns to consumer or vice versa.
+
+## The transition from free-for-all to tiered
+
+If you're already in the situation of "we launched flat-rate, now usage is heavy-tailed and we're losing money on power users," the transition has to be careful.
+
+A path that works:
+
+1. Introduce the new tiers alongside the old. New users sign up at the new tiers; old users grandfather at the old plan.
+2. After 6-12 months, give old users notice: in 90 days, your plan converts to the equivalent new tier (with limits matching their usage).
+3. Honor the conversion. Power users will be unhappy. Some will leave. Most will upgrade.
+
+This is harder than getting the pricing right at launch. Pre-launch, do the unit economics analysis and get the tiers right.
+
+## What to track
+
+Monthly:
+- Distribution of variable cost per user (histogram, not just average)
+- Margin per tier
+- Overage revenue
+- Churn rate per tier
+- Conversion from free to paid
+
+Watch for:
+- Cost distribution shifting (a new feature shifted users to higher usage)
+- Margin compression in a tier (the tier's limits or price are wrong)
+- Users repeatedly hitting overage (they should upgrade; the upgrade isn't compelling)
+
+## What "good" looks like
+
+A well-designed AI pricing structure:
+
+- Free tier covers occasional users; conversion happens when value crosses the limit
+- Standard tier covers 80%+ of paying users with comfortable margin
+- Power tier covers heavy users with reasonable margin (smaller than standard tier margin)
+- Enterprise tier covers large customers with predictable margins
+- Variable cost is a managed, predictable line item, not a surprise
+
+Most teams don't have this. Most teams have one or two tiers, picked by intuition, with limits that haven't been calibrated against actual usage. The unit economics are murky, the heavy-user problem is real, and the conversation about "we need to change pricing" comes up quarterly.
+
+## The take
+
+AI features need pricing that reflects their variable cost. Flat pricing exposes you to the heavy tail. Pure per-use is hostile to users. Tiered pricing with generous limits is the middle ground.
+
+Design the tiers around the actual cost distribution. Make the limit metric understandable. Show usage in the UI. Add overage as an option for users who don't want to upgrade. Plan for the heavy-user case from the start, not after they appear.
+
+Pricing is product design, not finance. The AI feature's pricing model affects how users use it, which affects unit economics, which affects whether the product survives. Get it right early.

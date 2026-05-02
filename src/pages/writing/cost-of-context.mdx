@@ -1,0 +1,120 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The cost of context: why bigger windows aren't free"
+description: "Long context windows let you stuff more into a prompt. They don't let you do it for free. The cost scales superlinearly with context size in ways that surprise teams."
+publishDate: "2026-05-18"
+pillar: economics
+slug: cost-of-context
+---
+
+When models had 4K context windows, prompt engineering had a natural budget. You couldn't fit much; you had to be careful what you included. The constraint forced discipline.
+
+When models have 200K or 1M context windows, the constraint is gone. The temptation: stuff everything in the prompt and let the model figure out what's relevant. Tools support this, vector DBs make it easy, and the marketing message from providers is that long context is solved.
+
+The reality is more nuanced. Long context windows have costs that don't scale linearly with the number of tokens you stuff into them. Some of those costs are visible (more tokens = more spend), some are hidden (longer context = degraded reasoning quality on certain tasks).
+
+This essay is about the actual cost of long context.
+
+## The visible cost: tokens
+
+The simplest cost: more tokens means more dollars. If your context goes from 5K tokens to 50K tokens per call, your inference cost goes up roughly 10x (assuming linear pricing on input tokens).
+
+This is straightforward but easy to underestimate when you're building. The 50K-token prompt felt fine in development. In production, with 100K queries a month, the bill is 10x what the 5K-token version would have been.
+
+Cache the static parts (see prompt caching) and you can get some of this back. The static portion of a 50K-token prompt is cheap on cache hits; the dynamic portion is full price. If most of the bloat is in the static part, caching mostly fixes the cost. If it's in the dynamic per-call part, caching doesn't help.
+
+## The hidden cost: reasoning degradation
+
+Here's the less obvious cost. As context length grows, model performance on certain reasoning tasks degrades. This is well-documented: even frontier models have measurably worse recall, attention to detail, and multi-step reasoning when the context is mostly irrelevant filler.
+
+The phenomenon is sometimes called "lost in the middle" (the model under-attends to content in the middle of long contexts) and sometimes "context collapse" (long context induces vaguer reasoning). Both are real for current models.
+
+The implication: stuffing 200K tokens into the context to give the model "everything it might need" can make the model *worse* at the task than giving it a curated 5K. The cost isn't just the extra tokens; it's the extra tokens degrading the output quality.
+
+## When long context is actually appropriate
+
+A few cases where long context is the right tool.
+
+**Document analysis.** Summarizing a 100-page PDF, answering questions about a long codebase. The context is the input; the model needs all of it. There's no way to do the task without the long context.
+
+**Long conversations with relevant history.** A multi-hour customer support session where earlier turns reference later ones. Truncating loses important context.
+
+**Code generation referencing a large codebase.** Generating code that needs to fit into existing patterns. The codebase is the context; the model needs to see it.
+
+For these cases, long context is doing real work. Pay for it.
+
+## When long context is wrong
+
+Cases where long context is being used as a substitute for retrieval or design.
+
+**RAG via "stuff everything in."** Some teams have started skipping the retrieval step in RAG and just putting the entire knowledge base in the context. *"The model will figure out what's relevant."* It often does. It also costs 100x what a good retrieval would cost, and the model's quality is sometimes worse because of context degradation.
+
+**Conversation history without compaction.** Long-running conversations grow unbounded. Compaction (summarizing earlier turns) keeps context manageable. Skipping compaction means each call gets more expensive and less reliable as the conversation grows.
+
+**Tool descriptions for tools that aren't relevant.** An agent has 50 tools defined; only 5 are relevant to the current request. The 45 irrelevant tool descriptions are still in the prompt, costing tokens and confusing the model. A pre-filtering step (which tools might apply?) cuts the prompt to just the relevant ones.
+
+## The diagnostic
+
+For each of your prompts, ask: how much of this context is actually being used by the model?
+
+Some heuristics:
+
+- *Length of relevant portion:* if the model only references the first 5K of a 50K context, the rest is waste.
+- *Variability of relevance:* if the relevant 5K is in different places for different calls, retrieval is the right answer (find the relevant 5K each time).
+- *Static vs dynamic:* if the bulk is static, caching helps; if dynamic, it doesn't.
+
+Audits that take an hour can save 50%+ on cost for prompts that have grown organically.
+
+## Retrieval as cost optimization
+
+The classic case: replace "stuff the docs in the prompt" with "retrieve the relevant chunks."
+
+Retrieval setup:
+- Index your documents in a vector DB
+- For each request, embed the query
+- Top-k similar chunks come back
+- Stuff only those chunks into the prompt
+
+Cost of retrieval: a few cents per query (embedding + DB lookup).
+Savings: maybe 90% on the prompt size.
+Quality: often *better* because the model sees only relevant content.
+
+For knowledge-base products, this is a no-brainer. The teams that haven't done it are leaving large savings on the table.
+
+## Context compression
+
+For cases where you genuinely need a lot of context, compression can help.
+
+**Summarize before sending.** Pre-summarize long documents into shorter versions. Send the summary instead of the full text. Lossy but often acceptable.
+
+**Extract before sending.** Pull just the structured fields you need. The user's holdings as a list, not the full account JSON.
+
+**Hierarchical compression.** Summary at the top; details available on request via tool call. The model decides if it needs more detail and asks for it.
+
+These add complexity. They make sense when you've ruled out simpler approaches (retrieval, prompt redesign) and you genuinely need a lot of input.
+
+## The model's perspective
+
+It helps to think about context from the model's perspective. The model's job at each step is to attend to the relevant tokens and produce the next token. The more tokens you give it, the more it has to filter through to find the relevant ones.
+
+For tasks where relevance is concentrated (the model needs a few specific facts), sparse context wins. The model finds the facts quickly.
+
+For tasks where relevance is distributed (the model needs to integrate information across the whole context), dense context wins. The model's attention is over the full context anyway.
+
+Match the context structure to the task. Sparse: retrieve. Dense: keep it long but make every token earn its place.
+
+## What the trend looks like
+
+Over the last two years, model providers have raced to longer context windows. 200K, 1M, 2M tokens. The marketing implies you should use them.
+
+The real-world pattern: most production prompts are still under 20K tokens, even when the model supports much more. The teams that scale out to 100K+ tokens for routine prompts are usually overspending and underperforming.
+
+Long context is a capability for specific tasks. It's not a default for general prompts. Treat it as a tool, not a replacement for prompt design.
+
+## The take
+
+Long context windows are not free, in tokens or in reasoning quality. The temptation to stuff everything in produces prompts that are slower, more expensive, and often worse than carefully designed shorter ones.
+
+Audit your prompts for unused context. Replace "stuff the knowledge base" with retrieval. Compress conversations as they grow. Filter tool surfaces to only the relevant ones per request.
+
+Match context size to actual need. Use long context where it's the right tool. Don't use it as the default just because it's available.

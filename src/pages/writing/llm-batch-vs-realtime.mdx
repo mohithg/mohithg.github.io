@@ -1,0 +1,128 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Batch vs realtime LLM workloads: pick the right surface"
+description: "Many LLM workloads that run synchronously in production should be running asynchronously, and vice versa. The cost and reliability difference is large. Here's the framing."
+publishDate: "2026-05-22"
+pillar: economics
+slug: llm-batch-vs-realtime
+---
+
+A pattern I see in production: workloads that should be batch are running realtime, and workloads that should be realtime are running with weird async patterns. The decision was made by the engineer who shipped the feature, often without much thought, and never revisited.
+
+This matters because batch and realtime have dramatically different cost and reliability profiles. Batch APIs are typically 50% cheaper than realtime, with relaxed latency requirements. Realtime APIs are designed for synchronous user-facing requests. Picking the wrong surface costs money and reliability.
+
+This essay is about how to pick.
+
+## The two surfaces
+
+Most providers offer:
+
+**Realtime API.** Standard chat completions endpoint. Synchronous request-response. Latency typically a few seconds. Pricing is at the standard rate.
+
+**Batch API.** Submit jobs to be processed asynchronously. Results come back within hours (typically 24h SLA). Pricing is typically 50% off the realtime rate.
+
+The batch API exists because providers want to use spare capacity. They're willing to discount aggressively in exchange for flexibility on when the work runs.
+
+## When batch is the right choice
+
+Three signals.
+
+**Signal 1: the user isn't waiting for the result.** The work happens in the background. The user sees the result later (in their feed, by email, in a generated report). They don't sit and watch the spinner.
+
+**Signal 2: the work is parallelizable.** You have many independent items to process. Each item is a separate LLM call. They can run in any order.
+
+**Signal 3: the volume is meaningful.** Below a few hundred items, the savings don't justify the operational complexity of batch. Above a few thousand, the savings start to matter.
+
+Examples that fit:
+- Generating summaries for a large set of documents
+- Processing customer feedback from the last week
+- Embedding a corpus for retrieval
+- Classifying historical data
+- Generating personalized content for daily digest emails
+
+Each of these is async by nature. The user gets the result later. Batch is the right fit.
+
+## When realtime is the right choice
+
+Two signals.
+
+**Signal 1: the user is actively waiting.** A chat response, an inline suggestion, a search result. Latency matters.
+
+**Signal 2: the work is interactive.** The user's next action depends on this response. There's a synchronous flow that can't proceed without the result.
+
+Examples:
+- Chat assistant
+- Code completion in an IDE
+- Search-with-AI
+- Form-fill with AI suggestions
+
+For these, batch is wrong. The user can't wait.
+
+## The mismatched cases
+
+Three patterns I see going wrong.
+
+**Mismatch 1: realtime API for batch work.** A team has a job that processes 10,000 customer reviews. They wrote it as a loop over realtime API calls. Each call takes 3 seconds. Total wall clock: 8+ hours. Total cost: full realtime rate per call.
+
+The fix: switch to the batch API. Submit all 10,000 as a batch. Results come back overnight. Total cost: half. Operational complexity: small (handle the async result).
+
+**Mismatch 2: batch surfaces with realtime expectations.** A team builds a feature where the user generates a report and waits for it. The report uses LLM calls; the team uses batch to save money. The user sees a "your report is being generated" message and waits 4 hours for an email.
+
+Most users won't wait. They abandon the feature. The product team blames "engagement issues"; the actual issue is that the surface doesn't match the latency.
+
+The fix: either use realtime (and pay the higher cost for snappy delivery) or restructure the UX so the user genuinely doesn't expect immediate output (e.g., daily report generated overnight; user sees it next morning).
+
+**Mismatch 3: faux-async with sync underneath.** A team uses an async-looking interface but the underlying calls are realtime in a tight loop. The user sees a progress bar; the system is just running serial realtime calls.
+
+The fix: actually use batch. The progress bar can show the batch's progress; the cost halves.
+
+## Hybrid: realtime with batched cleanup
+
+A useful pattern when you have realtime-sensitive parts and batch-tolerant parts.
+
+```
+User asks question → realtime call → user gets answer
+[in background] queue follow-up tasks → batch process → store results
+```
+
+The user-facing path is realtime. The behind-the-scenes work (logging, indexing, embedding, deeper analysis) goes to batch. The user gets fast responses; you save money on the work that doesn't need to be fast.
+
+This pattern works particularly well for agents that do deep post-processing. The user gets the immediate response from realtime; the agent does deeper analysis in batch and presents richer context next time the user returns.
+
+## Implementation considerations
+
+If you're moving work from realtime to batch:
+
+- **Result handling becomes async.** The code that consumes the result needs to be a separate handler that runs when the batch completes (webhook, polling, etc.).
+- **Error handling is different.** Batch failures are detected later. Need a way to retry or alert on individual item failures.
+- **State management is different.** The batch job has to know what to do with the results: which database to update, which user to notify.
+
+These are real but bounded. Most teams can move appropriate workloads to batch in a sprint.
+
+## When the savings don't justify the work
+
+Some workloads sit in a middle zone where batch would technically work but the operational cost isn't worth it.
+
+- Low volume (under 1000 calls/day): batch's 50% savings are too small to justify the engineering work.
+- Latency requirements just over batch SLA: if you need results in 4 hours and batch SLA is 24h, batch doesn't fit.
+- One-off jobs: if you're only running this once, the engineering investment is wasted.
+
+For these, realtime is fine. The point isn't to use batch always; it's to use it where it pencils out.
+
+## Watching for opportunities
+
+Periodically review your LLM workloads. For each one, ask:
+
+1. Is the user actually waiting for the result?
+2. Could it be batched?
+3. What's the volume? Would the savings be material?
+
+A quarterly review catches workloads that grew organically into a state where batch would now make sense. Without the review, they keep running on realtime.
+
+## The take
+
+Batch and realtime are different cost-and-latency surfaces. Match the workload to the right surface.
+
+Realtime for user-waiting interactive work. Batch for background, parallelizable, volume work. Hybrid for cases where the user-facing part is realtime and the deeper work can be batched.
+
+The teams whose LLM costs are managed are the ones who routinely use the right surface. The teams whose costs are surprising are often paying realtime prices for batch work, or building janky async patterns over realtime APIs when batch would be simpler and cheaper.
