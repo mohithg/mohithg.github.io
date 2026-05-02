@@ -271,6 +271,44 @@
     transition-duration: 60ms;
   }
 
+  /* SVG node + edge spring entrance (used by DAG and architecture diagrams) */
+  .js [data-svg-anim] .svg-node-anim {
+    opacity: 0;
+    transform: translateY(14px) scale(0.7);
+    transform-box: fill-box;
+    transform-origin: center;
+    transition:
+      opacity 600ms var(--ease-out-soft, ease-out),
+      transform 720ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition-delay: calc(min(var(--i, 0), 12) * 70ms);
+  }
+  .js [data-svg-anim].is-visible .svg-node-anim {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .js [data-svg-anim] .svg-edge-anim {
+    opacity: 0;
+    transition: opacity 700ms var(--ease-out-soft, ease-out);
+    transition-delay: calc(0.5s + min(var(--i, 0), 8) * 80ms);
+  }
+  .js [data-svg-anim].is-visible .svg-edge-anim {
+    opacity: 1;
+  }
+
+  /* Tag chip stagger (children of [data-tags-anim]) */
+  .js [data-tags-anim] [data-tag] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.85);
+    transition:
+      opacity 380ms var(--ease-out-soft, ease-out),
+      transform 480ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition-delay: calc(min(var(--i, 0), 8) * 50ms);
+  }
+  .js [data-tags-anim].is-visible [data-tag] {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
   /* Marquee */
   .marquee {
     overflow: hidden;
@@ -284,6 +322,17 @@
   }
   .marquee:hover .marquee-track {
     animation-play-state: paused;
+  }
+
+  /* Hero scroll-linked headline (driven by HeroBackground via CSS vars) */
+  .hero-scroll-headline {
+    transform: scale(var(--hero-scroll-scale, 1));
+    opacity: var(--hero-scroll-opacity, 1);
+    transform-origin: 0 50%;
+    will-change: transform, opacity;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-scroll-headline { transform: none; opacity: 1; }
   }
 
   /* Animated gradient text */

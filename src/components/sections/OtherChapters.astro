@@ -35,9 +35,9 @@ const others = CAREER.filter((c) => !c.flagship);
             <p class="mt-4 text-paper-dim text-pretty">
               {node.summary}
             </p>
-            <div class="mt-5 flex flex-wrap gap-1.5">
-              {node.tags.map((t) => (
-                <span class="rounded-full border border-white/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-paper-muted">
+            <div class="mt-5 flex flex-wrap gap-1.5" data-tags-anim>
+              {node.tags.map((t, ti) => (
+                <span data-tag style={`--i: ${ti}`} class="rounded-full border border-white/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-paper-muted">
                   {t}
                 </span>
               ))}

@@ -55,7 +55,7 @@ const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n]));
 
   <div class="overflow-hidden rounded-2xl border border-white/10 bg-ink-2/40 p-2 sm:p-4">
     <div class="rounded-xl bg-ink-3/40 p-3 sm:p-5">
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto" data-svg-anim>
         <svg viewBox={`0 0 ${width} ${height}`} class="min-w-[760px] w-full max-w-none" role="img" aria-label={title}>
           <defs>
             <pattern id={`arch-grid-${title.replace(/\s/g, '')}`} x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -67,12 +67,12 @@ const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n]));
           </defs>
           <rect x="0" y="0" width={width} height={height} fill={`url(#arch-grid-${title.replace(/\s/g, '')})`} />
 
-          {edges.map((e) => {
+          {edges.map((e, ei) => {
             const a = nodeMap[e.from]!;
             const b = nodeMap[e.to]!;
             const cx = (a.x + b.x) / 2;
             return (
-              <g>
+              <g class="svg-edge-anim" style={`--i: ${ei}`}>
                 <path
                   d={`M ${a.x} ${a.y} C ${cx} ${a.y}, ${cx} ${b.y}, ${b.x} ${b.y}`}
                   stroke="#7C5CFF"
@@ -91,8 +91,8 @@ const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n]));
             );
           })}
 
-          {nodes.map((n) => (
-            <g class="arch-node">
+          {nodes.map((n, ni) => (
+            <g class="arch-node svg-node-anim" style={`--i: ${ni}`}>
               <rect
                 x={n.x - 90}
                 y={n.y - 28}

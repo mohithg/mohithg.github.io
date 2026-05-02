@@ -128,8 +128,37 @@ function tilt() {
   });
 }
 
+function visibilityToggle(selector: string, opts: IntersectionObserverInit) {
+  if (!('IntersectionObserver' in window)) {
+    document.querySelectorAll(`${selector}:not(.is-visible)`).forEach((el) => el.classList.add('is-visible'));
+    return;
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('is-visible');
+          io.unobserve(e.target);
+        }
+      }
+    },
+    opts
+  );
+  document.querySelectorAll(`${selector}:not(.is-visible)`).forEach((el) => io.observe(el));
+}
+
+function svgAnim() {
+  visibilityToggle('[data-svg-anim]', { threshold: 0.2, rootMargin: '0px 0px -10% 0px' });
+}
+
+function tagAnim() {
+  visibilityToggle('[data-tags-anim]', { threshold: 0.4, rootMargin: '0px 0px -5% 0px' });
+}
+
 function init() {
   reveal();
+  svgAnim();
+  tagAnim();
   countUp();
   cursorGlow();
   magnetic();

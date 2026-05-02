@@ -55,7 +55,7 @@ const yearLabel = (n: typeof CAREER[number]) =>
             <p class="hidden font-mono text-[11px] text-paper-muted sm:block">v11.{new Date().getFullYear() - 2014}</p>
           </div>
 
-          <div class="overflow-x-auto" data-dag-scroll>
+          <div class="overflow-x-auto" data-dag-scroll data-svg-anim>
             <svg viewBox="0 0 1200 600" class="min-w-[900px] w-full max-w-none" role="img" aria-label="Career timeline as a directed acyclic graph">
               <defs>
                 <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -80,19 +80,18 @@ const yearLabel = (n: typeof CAREER[number]) =>
               <rect x="0" y="0" width="1200" height="600" fill="url(#dotgrid)"/>
 
               <!-- Edges -->
-              {CAREER_EDGES.map(({ from, to }) => {
+              {CAREER_EDGES.map(({ from, to }, ei) => {
                 const a = POSITIONS[from]!;
                 const b = POSITIONS[to]!;
                 const cx = (a.x + b.x) / 2;
                 return (
-                  <g>
+                  <g class="svg-edge-anim" style={`--i: ${ei}`}>
                     <path
                       d={`M ${a.x} ${a.y} C ${cx} ${a.y}, ${cx} ${b.y}, ${b.x} ${b.y}`}
                       stroke="url(#edge-gradient)"
                       stroke-width="1.5"
                       fill="none"
                       stroke-dasharray="4 6"
-                      opacity="0.85"
                     >
                       <animate attributeName="stroke-dashoffset" values="0;-100" dur="6s" repeatCount="indefinite" />
                     </path>
@@ -101,14 +100,14 @@ const yearLabel = (n: typeof CAREER[number]) =>
               })}
 
               <!-- Nodes -->
-              {CAREER.map((node) => {
+              {CAREER.map((node, ni) => {
                 const pos = POSITIONS[node.id]!;
                 const isCurrent = node.end === 'present';
                 const isFlagship = !!node.flagship;
                 const fill = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#1A1A24';
                 const stroke = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#2A2A38';
                 return (
-                  <g class="dag-node group" data-node-id={node.id} style={`--x: ${pos.x}; --y: ${pos.y};`}>
+                  <g class="dag-node svg-node-anim group" data-node-id={node.id} style={`--i: ${ni}; --x: ${pos.x}; --y: ${pos.y};`}>
                     {(isFlagship || isCurrent) && (
                       <circle cx={pos.x} cy={pos.y} r="44" fill={isCurrent ? 'url(#node-glow-mint)' : 'url(#node-glow)'} class="opacity-60" />
                     )}

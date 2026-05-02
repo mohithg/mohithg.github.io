@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'motion/react';
 
 // Parallax mesh + grid + drifting nodes that respond to scroll AND cursor.
+// Also drives the scroll-linked headline scale/fade behavior on the hero.
 // Mounts as a React island behind the Hero copy.
 export default function HeroBackground() {
   const ref = useRef<HTMLDivElement>(null);
@@ -11,6 +12,20 @@ export default function HeroBackground() {
   const gridScale = useTransform(scrollY, [0, 800], [1, 1.1]);
   const nodesY = useTransform(scrollY, [0, 800], [0, -260]);
   const haloOpacity = useTransform(scrollY, [0, 600], [0.7, 0.2]);
+
+  // Drive a CSS variable on document.documentElement so non-React Astro
+  // components can read it (used by the hero headline for scroll-linked
+  // scale + fade as the visitor scrolls past).
+  useEffect(() => {
+    const unsub = scrollY.on('change', (v) => {
+      const t = Math.min(1, Math.max(0, v / 600));
+      const scale = 1 - t * 0.06;
+      const opacity = 1 - t * 0.5;
+      document.documentElement.style.setProperty('--hero-scroll-scale', String(scale));
+      document.documentElement.style.setProperty('--hero-scroll-opacity', String(opacity));
+    });
+    return () => unsub();
+  }, [scrollY]);
 
   // Cursor parallax
   const mx = useMotionValue(0);
