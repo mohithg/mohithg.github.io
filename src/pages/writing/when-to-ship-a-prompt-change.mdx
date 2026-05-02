@@ -1,0 +1,100 @@
+---
+layout: ../../layouts/Writing.astro
+title: "When to ship a prompt change"
+description: "The decision rule that separates teams who ship prompt changes confidently from teams who hover their finger over the button."
+publishDate: "2026-04-25"
+pillar: prompts
+slug: when-to-ship-a-prompt-change
+---
+
+I have watched teams agonize for an hour over whether to merge a one-line prompt change. I have watched other teams ship prompt rewrites in fifteen minutes between standup and lunch. The difference between them is not bravery. The difference is they have answered the same handful of questions ahead of time, and they trust the answers.
+
+This essay is about those questions. Answer them once, and most prompt-change decisions become mechanical.
+
+## Question 1: does the new prompt pass the bench?
+
+This is the first gate. If the answer is no, you don't ship, you iterate.
+
+"Pass the bench" needs a precise definition for your team. Mine looks like:
+
+- Overall eval score is within 2% of previous, *and*
+- No critical-criterion (the few criteria you marked "must always pass") regressed at all, *and*
+- No more than 5% of previously passing cases now fail.
+
+The numbers are negotiable. The structure is not. If you don't have these thresholds defined in advance, every prompt change becomes a debate.
+
+## Question 2: have you read the actual outputs?
+
+The bench score is necessary, not sufficient. You also have to read at least 10-20 actual model outputs from the new prompt. Pick a mix: easy cases, edge cases, cases the rubric flagged as borderline.
+
+You are looking for things the rubric doesn't measure. Tone shift. Verbosity creep. Hallucinated specifics. Unexpected formatting.
+
+If you read 20 outputs and they all look fine, ship. If you read 20 outputs and three feel off in a way the rubric didn't catch, don't ship. Add a rubric criterion that catches the feeling, then iterate.
+
+## Question 3: can you roll back?
+
+The answer should always be yes, ideally in under a minute. If your deploy story doesn't include a one-click rollback for prompt changes, fix that before your next prompt change.
+
+The reason this matters: prompt changes interact with production traffic in ways the bench can't fully predict. You will, at some point, ship a prompt change that passes the bench, looks fine in spot checks, and then turns out to break something subtle for a small fraction of users you didn't have on the bench. Time to detection is hours. Time to mitigation should be minutes. The difference is rollback speed.
+
+## Question 4: does anything downstream depend on the output format?
+
+If you changed the prompt in any way that could change the output format (added a field, removed a field, changed a value space), the downstream renderer or parser might break.
+
+Check. Run the prompt against your renderer with a few cases. Make sure the renderer doesn't throw, doesn't drop fields, doesn't render weird placeholders.
+
+This is the most common cause of prompt-change incidents in my experience. Output format drift. Easy to catch with a quick check. Easy to ship without if you skip the check.
+
+## Question 5: what does the gradual rollout look like?
+
+For a non-trivial prompt change, "gradual" should mean: 5% of traffic, watch for 24 hours, 25%, watch for 24 hours, 100%.
+
+For a small prompt change with a strong eval result, you can compress the rollout to a few hours per stage.
+
+For a prompt change that affects safety or compliance behavior, never go straight to 100%. Always start at 5% and watch for at least three days before ramping. The compliance failure modes don't show up in the bench; they show up at the 1-in-10,000 query rate, which means you need a few thousand queries through the new prompt before you can be confident you haven't broken something compliance-shaped.
+
+## When the rules don't apply
+
+Three exceptions, where you can ship faster than the standard process.
+
+**Hot fixes.** A live production bug is causing user-facing problems. You change the prompt to fix it. You can ship to 100% directly, but only if (a) the change is bounded (one specific behavior), (b) you have a tested rollback ready, and (c) you've added the failing case to the bench so you don't regress.
+
+**Disclaimer or wording cleanups.** Changes to text that the user sees but that doesn't change model decisions (formatting, capitalization, terminology updates). Lower risk. Faster process. Still run the bench, but you can skip the gradual rollout.
+
+**Safety patches.** Adding a new constraint to prevent a specific harmful behavior. Always ship to 100% immediately. The cost of the constraint being slightly miscalibrated is much lower than the cost of leaving the harmful behavior live.
+
+## What slows teams down (and shouldn't)
+
+Three common sources of friction that don't actually reduce risk.
+
+**Insisting on a perfect bench score.** Bench is a proxy. Bench can drift. Demanding a higher score than your previous version moved when there's no clear reason to believes the new prompt is better is just superstition. Set thresholds, hit them, ship.
+
+**Requiring multiple-engineer review on every change.** This makes sense for major changes. For minor changes (a wording tweak, a clarification), one engineer is enough if the eval scores are clean. The review queue is a tax. Tax only the changes that need taxing.
+
+**Treating every prompt change as a release event.** Most prompt changes can be merged and deployed continuously. Treating them as "releases" with formal sign-off creates a backlog and pushes engineers to bundle changes (which makes everything riskier).
+
+## The decision rule
+
+If I have one minute to decide whether to ship a prompt change, I run through:
+
+1. Bench passes my thresholds. ✓
+2. I've read 20 outputs and they look right. ✓
+3. Rollback is one click. ✓
+4. Downstream renderer was tested against the new outputs. ✓
+5. Rollout plan is appropriate to the size of the change. ✓
+
+Five checks. If they all pass, ship. If any fail, fix what failed and recheck.
+
+The teams who ship confidently have automated checks 1, 3, and 4. They do check 2 manually as part of the PR review. They have a templated rollout plan for check 5 that scales with the change size.
+
+The teams who hover over the button have skipped one or more of the automation steps and are trying to compensate with judgment. Judgment is expensive and inconsistent. Automation is cheap and consistent. The work is to move as much of the decision as possible into automation, then trust the automation.
+
+## The number that matters
+
+The metric I care about for prompt-change health: **mean time from prompt change idea to production deploy.**
+
+For a healthy team, this should be measured in hours for a small change and days for a large one. For an unhealthy team, it's measured in weeks.
+
+The unhealthy team isn't being more careful. They're being slower. They're shipping the same number of regressions as the fast team, just spread out over longer time spans, and accumulating prompt debt because every change is so expensive that nobody wants to make small ones.
+
+Make small changes. Make them often. Make the process for shipping them cheap. The result is a prompt that gets actively maintained, not a prompt that becomes too risky to touch.

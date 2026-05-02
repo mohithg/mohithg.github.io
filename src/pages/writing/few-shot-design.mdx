@@ -1,0 +1,122 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Few-shot design: the prompt technique that's underused in 2026"
+description: "Few-shot examples are the most reliable way to shape model behavior. Most production prompts use them badly or skip them entirely. Here's how to use them well."
+publishDate: "2026-04-24"
+pillar: prompts
+slug: few-shot-design
+---
+
+Few-shot prompting (showing the model examples of the input-output pattern you want, before giving it the real input) was one of the foundational techniques of the GPT-3 era. By the time we got to capable instruction-tuned models in 2023, the conventional wisdom had shifted: *"modern models follow instructions well, you don't need few-shot anymore."*
+
+This conventional wisdom is half right. You can usually get a working response from a modern model without examples. You can usually get a *significantly better* response with the right examples. The teams shipping production LLM features are still using few-shot heavily, just not the way the GPT-3 tutorials taught.
+
+This essay is about how to use few-shot in 2026 specifically: when it's worth the tokens, how to pick examples, and what mistakes are common enough that I see them in nearly every prompt I review.
+
+## Mistake 1: examples that are too easy
+
+The most common error: the few-shot examples in the prompt are all happy-path cases. The user input is well-formed, the desired output is straightforward, the model would have produced a similar response without the example.
+
+These examples don't teach the model anything it didn't already know. They consume tokens and give you a false sense that the prompt has been "tuned."
+
+The right examples are **the ones the model gets wrong without them**. Pick cases where the model's default behavior diverges from what you want. The example demonstrates the divergence and corrects it. After two or three of these, the model generalizes.
+
+Find these examples by running the prompt without few-shot, looking at outputs, marking the wrong ones, and turning the corrected versions into your few-shot set. The set is small (3-5 examples is usually enough), specific, and pointed at known failure modes.
+
+## Mistake 2: examples that don't match the actual input distribution
+
+Second common error: few-shot examples are crafted by hand to look pretty in the prompt, and they don't resemble the messy real-world inputs the model actually sees in production.
+
+The model learns from the examples. If your examples have well-punctuated, complete-sentence user inputs and your production traffic has typo-ridden, fragment inputs, the model will be slightly off-distribution at runtime.
+
+Pull your few-shot examples from real production data (anonymized as needed). The messier the better. The model needs to learn that real inputs look like real inputs.
+
+## Mistake 3: examples that demonstrate the output format inconsistently
+
+If your few-shot examples each format the output slightly differently (one uses bullets, one uses paragraphs, one uses a numbered list), you have just trained the model to be inconsistent. It will pattern-match to one or another of your examples per query, and the output format will vary.
+
+Pick a format. Use it identically across every example. The model is highly sensitive to the structure of demonstrated outputs. Use that sensitivity for you, not against you.
+
+## Mistake 4: too many examples
+
+There is a real tradeoff here. More examples generally improve task quality. More examples also consume tokens, which costs money, and they fill the context window, which leaves less room for actual user input or retrieval.
+
+For most tasks, the marginal value of examples drops off sharply after 3-5. Going from 1 example to 3 might lift quality 10 points. Going from 5 to 15 might lift it another 1 point. The cost is linear; the benefit is not.
+
+Pick the smallest set that demonstrates the patterns you care about. If you find yourself adding a 6th example because the model is still getting one specific thing wrong, ask whether that thing belongs in the prompt instructions instead of in another example.
+
+## Mistake 5: not refreshing examples when the model changes
+
+A few-shot set is partly a workaround for the model's specific weaknesses. When you upgrade the model, the weaknesses change. The few-shot examples that were targeted at GPT-4o's verbosity issue might be unnecessary on Claude Sonnet 4.6, which has different defaults.
+
+Every model upgrade should trigger a few-shot review. Try the prompt with no examples on the new model. If it works, drop the examples. If it doesn't, find the new failure modes and update the examples to target those.
+
+## What good few-shot examples look like
+
+A good few-shot example has four properties.
+
+1. **It targets a known failure mode.** You picked it because the model would mishandle this without seeing it.
+2. **It looks like real production input.** Not idealized. Not pretty. Real.
+3. **It demonstrates the output format exactly as you want it.** Same structure as every other example, same level of detail.
+4. **It is short.** Few-shot examples grow when nobody curates them. The shortest example that demonstrates the pattern is the best example.
+
+## A worked example
+
+Suppose you're building a query classifier. The model takes a user question and classifies it as one of: `account_question`, `market_question`, `recommendation_question`, or `other`.
+
+Without examples, the model does fine on obvious cases (*"how is my account doing?"* → `account_question`) but waffles on ambiguous ones (*"is now a good time to invest?"*: market or recommendation?).
+
+Bad few-shot set:
+
+```
+User: "how is my account doing?"
+→ account_question
+
+User: "what's the market doing today?"
+→ market_question
+
+User: "should I sell my Apple stock?"
+→ recommendation_question
+```
+
+These are the easy cases. The model gets them right anyway. The set teaches nothing.
+
+Good few-shot set:
+
+```
+User: "is now a good time to invest?"
+→ market_question
+(comment: market timing question, not a personalized recommendation)
+
+User: "should I be worried about my portfolio in this market?"
+→ account_question
+(comment: about user's specific portfolio, not market in general)
+
+User: "what would you recommend if I were 65?"
+→ recommendation_question
+(comment: personalized recommendation despite hypothetical framing)
+```
+
+Each example targets a real ambiguity. The classifications come with the reasoning. The model learns to apply the same disambiguation logic to new ambiguous cases.
+
+## When few-shot doesn't help
+
+For some tasks, few-shot examples don't move the needle. These are usually tasks where:
+
+- The output is purely creative and there's no consistent "right" answer
+- The task is well within the model's training distribution
+- The output is very long and the examples would dominate the context window
+
+For these, write clear instructions, skip the examples, and check whether the model performs adequately. If it does, save the tokens.
+
+## The diagnostic
+
+When I'm reviewing a prompt and I want to know if few-shot is being used well, I ask three questions.
+
+1. *Were these examples picked because the model gets them wrong without them?*
+2. *Do they look like real production traffic?*
+3. *Could you remove any of them without quality dropping?*
+
+If the answers are yes / yes / no, the few-shot is doing real work.
+
+If the answer to any is "I don't know," the few-shot was probably written once and never revisited. That's the moment to either invest five minutes in updating it or remove it entirely. Few-shot is too expensive (in tokens and context) to keep around as decoration.

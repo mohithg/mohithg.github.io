@@ -1,0 +1,112 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Prompt versioning that doesn't suck"
+description: "Versioning prompts is harder than versioning code because the artifact is a string and the test suite is fuzzy. Here's the workflow that ships."
+publishDate: "2026-04-26"
+pillar: prompts
+slug: prompt-versioning-practical
+---
+
+Versioning prompts feels like it should be solved. It is git. You commit the prompt, you bump the file, you ship.
+
+It is not git. The reason it is not git is that prompts have two properties code does not have, and both of them break the workflow.
+
+**Property 1: the test suite is statistical, not deterministic.** When you change a function in code, the unit tests either pass or fail. When you change a prompt, the eval bench tells you the pass rate went from 89% to 87% on a sample of 100 cases. Was that a regression? A statistical fluctuation? A real but tolerable cost? Hard to say.
+
+**Property 2: the artifact is opaque to diff.** A prompt change of 200 tokens looks the same as a prompt change of 5 tokens in the git history. A change to a single instruction can swing model behavior dramatically. A wholesale rewrite can leave model behavior nearly identical. The diff doesn't tell you which.
+
+These two properties together mean that the standard code-versioning workflow (commit, run tests, ship if green) is unreliable for prompts. You need a discipline tuned to the medium.
+
+## The workflow that ships
+
+Five steps, in order.
+
+### 1. Snapshot before you edit
+
+Before you touch the prompt, capture the current state on the eval bench. Run the bench, write down the score per criterion, write down some sample outputs.
+
+This sounds obvious. Most teams skip it. Without it, you can't tell whether your edit improved anything.
+
+### 2. Make one change at a time
+
+The temptation is to bundle multiple edits into a single prompt revision. Resist it. If you change three things at once and the eval score moves, you don't know which change moved it.
+
+One semantic change per prompt revision. Even if the changes are all small. Even if it means more revisions to push through review.
+
+### 3. Re-run the bench, look at the deltas
+
+Run the eval bench against the new prompt. Compare to the snapshot.
+
+Look at three numbers:
+
+- Overall pass rate (did it go up or down)
+- Per-criterion pass rate (did the criterion you were targeting actually improve)
+- Per-case stability (did any cases that were passing start failing)
+
+The third is the one teams forget. A prompt change can lift overall pass rate by 2% while breaking 5 specific cases that used to pass. Net positive on the bench, real regression in production for those specific paths. You need to look at case-level deltas, not just aggregate scores.
+
+### 4. Read the diffs in output
+
+For 10-20 specific cases, especially the ones near your boundary cases, read the new outputs side-by-side with the old outputs. Not the eval scores. The actual model responses.
+
+You will catch things the eval doesn't catch. Tone shifts. Unexpected verbosity. New patterns the rubric didn't know to look for. This is irreplaceable. Do it.
+
+### 5. Ship behind a flag, watch for a week
+
+Don't go from "passing the bench" to "100% of users." Start at 5%, watch the production metrics for a few days, ramp.
+
+The metrics that matter are not "did the bench pass" (you already verified that). The metrics are user-facing: completion rate, follow-up rate, satisfaction signals if you collect them, escalation rate. A prompt that passes the bench can still be subtly worse for users in ways the bench doesn't measure.
+
+The flag also gives you a one-click rollback. The single most important property of any prompt deploy is that you can revert it in seconds.
+
+## What goes in version control
+
+Every prompt change should be a single PR with the following:
+
+- The prompt change itself (one semantic edit)
+- A brief PR description explaining *what* and *why*
+- The before/after eval scores
+- A few representative output diffs (paste in the PR)
+- A link to any production case that motivated the change
+
+When you read this PR a year later, you should be able to reconstruct the reasoning without asking anyone.
+
+The PR description does not need to be long. *"Increased the limit on output bullets from 3 to 5; user research showed users wanted more context. Eval score: 0.89 → 0.91 overall, key-criterion 0.94 → 0.96. Sample diffs attached."* That's enough.
+
+## Naming versions
+
+Some teams use semver for prompts. *v1.0, v1.1, v1.2.* This works fine.
+
+Some teams use date-based versions. *2026-04-26, 2026-04-30.* This works fine too.
+
+Some teams use commit hashes. This is a mistake. Commit hashes are unmemorable. You will refer to your prompts a thousand times in conversation; you want a name your team can say out loud.
+
+I prefer semver-with-codename. *v23 ("more bullets")*. The number gives ordering, the codename gives memory. *"What was the regression in v17?"* is answerable. *"What was the regression in commit a3f9c12?"* is not.
+
+## The minor-major distinction
+
+A *minor* prompt change is one where the type signature of the output is unchanged. Reword an instruction. Tweak a threshold. Add a clarifying example. The downstream renderer still works.
+
+A *major* prompt change is one where the output schema changes. The downstream renderer needs an update. Calls to old prompt versions need to keep working until the renderer is updated.
+
+Treat major and minor differently. Minor changes flow through the normal review queue. Major changes need a coordinated migration: ship the new renderer, ship the new prompt behind a flag, ramp together. The renderer must be backward compatible for at least one prompt version, so you can roll back without losing the migration.
+
+This sounds heavy. It is. The alternative is shipping a prompt change that breaks the rendering layer in production at 3am.
+
+## When to retire a prompt version
+
+Once you've shipped a new prompt and observed it for a week with no regressions, you can retire the previous version from your supported set. Practically, this means:
+
+- Remove the old version from your `available_prompts` registry
+- Keep the file in git history (always)
+- Update any tests that pinned to the old version
+
+The principle: at most two prompt versions in production at any time, the current and the immediate previous. More than that and you have a maintenance problem masquerading as flexibility.
+
+## The thing this is really about
+
+Prompt versioning is one of those engineering disciplines that seems heavy until the first time it saves you. The first time you can answer *"which prompt was running when that bad response was generated, two weeks ago?"* with one click instead of a manual investigation, the whole workflow pays for itself.
+
+The discipline isn't about the tools. The discipline is about treating the prompt as the production artifact it actually is. Most prompt bugs are not bugs in the model. They are bugs in the prompt that nobody caught because the prompt is being treated like a string and not like code.
+
+Treat it like code. Version it like code. Roll it out like code. The prompt outlives every engineer who edits it. Make sure they can edit it confidently.

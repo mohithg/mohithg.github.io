@@ -1,0 +1,135 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Schema-first prompts: stop asking the model nicely"
+description: "Constrained generation, structured output APIs, and JSON schema have made prompt engineering more like API design and less like creative writing. Lean in."
+publishDate: "2026-04-23"
+pillar: prompts
+slug: schema-first-prompts
+---
+
+In 2023, getting a model to produce reliable JSON required prompt acrobatics. *"Respond only with valid JSON. Do not include a preamble. Do not include explanations. Start your response with `{`. ..."* You'd still get a response that started with *"Sure! Here's the JSON you requested:"* about 5% of the time, and your downstream parser would crash.
+
+In 2026, this is a solved problem at the API layer. Every major model provider supports structured output via JSON schema (Anthropic's `response_format`, OpenAI's `structured_outputs`, etc.). The model is constrained at decode time to produce valid JSON conforming to your schema. The 5% failure rate goes to roughly zero.
+
+This is a bigger change than it looks. It moves prompt engineering from "ask the model nicely and hope" to "specify the contract and require." Most production prompts in 2026 should be schema-first. Most aren't, because the prompt engineering tutorials haven't caught up.
+
+This essay is about the shift.
+
+## What constrained decoding actually does
+
+Under the hood, constrained decoding works by masking the model's token-by-token output to only allow tokens that keep the response valid against your schema. If the schema says the next field must be a string starting with a quote, the model can only emit `"`. If the schema says the response is complete, the model can only emit the closing brace.
+
+Result: the response is *always* valid JSON conforming to *exactly* your schema. No retries. No parsing errors. No "the model added an explanatory paragraph at the end."
+
+The catch: the model is still producing the *content* freely. Constrained decoding guarantees the structure. It does not guarantee the field values are correct, complete, or sensible. *That* is still your job.
+
+## What this changes about prompt design
+
+Three things.
+
+**You stop instructing about format.** Drop every line in your prompt that talks about output format, JSON delimiters, "respond only with," etc. The schema is doing that work. The instructions can be about what the *content* should mean.
+
+**You can decompose more aggressively.** Because each step's output has a guaranteed shape, you can chain LLM calls confidently. The output of step 1 is a typed object you pass into step 2. No string parsing in between. No format drift.
+
+**Schemas become part of your code, not your prompt.** Your `Pydantic` or `Zod` schema definitions are the source of truth. The prompt references them at build time. When you change a field, the schema is what changes; the prompt updates automatically. This is a clean separation: humans edit the meaning, schemas enforce the shape.
+
+## Schema-first prompt template
+
+Here is the structure I use for any prompt that should produce structured output.
+
+```python
+class PortfolioSummary(BaseModel):
+    headline: str = Field(
+        max_length=120,
+        description="One-sentence summary of the portfolio's current state"
+    )
+    key_metrics: list[Metric] = Field(
+        min_length=2, max_length=4,
+        description="Most important metrics for the user to notice"
+    )
+    suggested_actions: list[Action] = Field(
+        max_length=3,
+        description="Up to 3 actions the user might take, ordered by relevance"
+    )
+    tone: Literal["calm", "informational", "concerned"] = Field(
+        description="Tone of the response based on portfolio state"
+    )
+
+prompt = f"""
+You are a financial assistant. Given a portfolio analysis, produce
+a summary that meets the schema. The schema fields are well-described.
+Use the engine's analysis as the only source of truth for facts.
+"""
+
+response = llm.invoke(
+    system=prompt,
+    messages=[user_message_with_engine_output],
+    response_format=PortfolioSummary
+)
+# response is now a typed PortfolioSummary instance, validated.
+```
+
+The prompt is short. The schema is rich. Field descriptions in the schema do most of the instructional work the prompt used to do. The result is a typed object you can pass directly to your renderer.
+
+## When you don't want a schema
+
+Schema-first is the right default for production LLM features. There are exceptions.
+
+**Pure creative outputs.** A blog post draft, a creative writing prompt, a brainstorm. Forcing a schema on creative outputs constrains them in ways that hurt quality.
+
+**Long-form prose where the structure is the content.** An explanation that flows from premise to conclusion. The prose itself is the contract. A schema would over-segment it.
+
+**Free-form chat.** A general-purpose chatbot answering whatever a user asks. The user's questions are unbounded; the responses can't all fit one schema.
+
+For these, write a clear prompt and check the output. For everything else, use a schema.
+
+## The hybrid pattern
+
+For prompts where part of the output should be structured and part should be flowing prose, you can use a hybrid: structured wrapper, prose field.
+
+```python
+class BlogPostDraft(BaseModel):
+    title: str = Field(max_length=80)
+    slug: str = Field(pattern=r"^[a-z0-9-]+$")
+    estimated_reading_time_minutes: int = Field(ge=1, le=30)
+    body_markdown: str = Field(
+        description="The article body in Markdown, with H2 sections"
+    )
+    suggested_tags: list[str] = Field(max_length=5)
+```
+
+The structured fields are validated. The prose field (`body_markdown`) is freely written. You get the best of both.
+
+## What teams underuse
+
+Two specific patterns I almost never see, both of which are powerful.
+
+**Discriminated unions.** When the model needs to produce one of several different output shapes depending on context, use a discriminated union schema. The model picks the variant; the schema validates the chosen variant's fields.
+
+```python
+class Recommendation(BaseModel):
+    type: Literal["rebalance", "hold", "alert", "no_action"]
+    # ... fields differ based on type via discriminated union
+```
+
+The model can no longer accidentally produce a `rebalance` variant with `alert` fields. The schema enforces the per-variant shape.
+
+**Enum fields with controlled vocabulary.** Where the answer is one of a finite set of values, make the field a `Literal` of those values. The model can't invent a new one. This is how you tie the prompt's vocabulary to the engine's vocabulary at the type level (see also: the AI vocabulary contract essay).
+
+## The migration
+
+If you're sitting on a prompt that produces unstructured prose and you want to move to schema-first, the migration is usually three steps.
+
+1. Define the schema for what the output should be. Start coarse, refine as you find edge cases.
+2. Add the schema to your LLM call as the response format.
+3. Strip the format-related instructions out of your prompt. Keep only the meaning-related instructions.
+
+Run your eval bench. The pass rate usually goes up because the structural failure modes (malformed JSON, missing fields, extra commentary) disappear.
+
+The downstream code that consumed the prose now consumes typed objects. This is a refactor, but it is a strict improvement: typed code is easier to test, easier to evolve, easier to debug.
+
+## What's left for the prompt
+
+After you move to schema-first, the prompt is mostly about *meaning*: what should the response actually say, what tone should it take, what facts should it use, what limitations should it observe.
+
+This is the part of prompt engineering that requires judgment. The format part was busywork. Constrained decoding has automated it. Use the time saved to think harder about the meaning, which is the only part that ever really mattered.

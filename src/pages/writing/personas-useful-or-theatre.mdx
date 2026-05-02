@@ -1,0 +1,94 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Personas in prompts: useful or theatre?"
+description: "Almost every system prompt starts with 'You are a helpful assistant.' Most personas in prompts are decorative. Here's when they actually move the needle, and when they're padding."
+publishDate: "2026-04-22"
+pillar: prompts
+slug: personas-useful-or-theatre
+---
+
+Open any production system prompt and there's a 90% chance the first line is some variant of *"You are a helpful and knowledgeable assistant."* The next line is often *"You speak in a friendly, professional tone."* The line after that might assign the assistant a name, a role, a backstory.
+
+The persona is doing... something. The team is convinced it matters. They added it months ago and haven't tested whether removing it changes anything.
+
+I have done that test on enough prompts to have a strong opinion: **most personas in production prompts are decorative.** Removing them changes nothing measurable. They're padding the prompt, costing tokens, and giving the team a false sense that they've shaped the model's behavior.
+
+But "most" isn't "all." Some personas do real work. Knowing the difference saves you tokens and gives you better-tuned outputs.
+
+## What personas actually do
+
+The mechanism: a persona biases the model's output distribution toward responses consistent with that persona. *"You are a senior software engineer"* makes the model lean toward technical depth, code-aware analogies, and a slightly more direct tone. *"You are a kindergarten teacher"* makes it lean toward simpler vocabulary, encouragement, and patience.
+
+The strength of the bias depends on (a) how distinctive the persona is, (b) how clearly the persona is expressed, and (c) how relevant the persona is to the task. A vague persona expressed weakly on a task that doesn't benefit from persona shaping does nothing.
+
+## Personas that don't help
+
+Three categories.
+
+**Generic-friendly personas.** *"You are a helpful, harmless assistant who is always polite and patient."* The model is already this by default. Saying it again costs tokens and changes nothing.
+
+**Personas that contradict the task.** *"You are a witty stand-up comedian"* in a prompt that's actually summarizing legal documents. The persona pulls the model in one direction; the task pulls it in another. The result is unpredictable.
+
+**Personas as branding decoration.** *"You are Aiden, the helpful assistant for Acme Inc."* The user never sees the name "Aiden." It's in the prompt because someone thought naming the assistant would matter. Test it: rename to "Bob," see if outputs change. They won't.
+
+## Personas that do help
+
+Three categories.
+
+**Domain personas** (when the domain matters). *"You are a senior tax accountant. Apply IRS rules and conventions."* This biases toward correctness in domain-specific edge cases. Test it on tax-specific queries; the persona-tuned outputs are noticeably more rigorous than the bare-prompt outputs.
+
+**Tone personas** (when tone is part of the product). *"You are a warm, plain-spoken financial advisor. You explain concepts the way you'd explain them to a smart friend, not a colleague."* The tone is part of the user experience. The persona shapes it. Removing it makes the model default to a more institutional voice.
+
+**Constraint personas** (when behavior limits matter). *"You are a customer service agent who never makes commitments on behalf of the company. You always refer pricing or contract questions to a human."* The persona reinforces a constraint. It works because the persona's behavior is consistent with the constraint, so the model has multiple reinforcing signals.
+
+## How to test if your persona is doing anything
+
+Three-step test, takes ten minutes.
+
+1. Run your eval bench with the prompt as-is. Note the score.
+2. Remove the persona section. Run the bench again.
+3. Compare. If the score moved by less than your noise floor (usually 1-2%), the persona is decoration. If it moved by more, the persona is doing real work.
+
+This test is so simple and so often skipped. Most teams have never run it on their own prompts. The teams that do run it almost always find at least one persona line they can remove with no impact.
+
+## The token cost
+
+A typical persona section is 50-200 tokens. At a million queries a month, with prompt caching, this is small money (maybe a few dollars). Without prompt caching, it's larger (maybe $50-100/month). Either way, the cost isn't the main reason to question personas.
+
+The main reason is **prompt clarity**. Every line in the prompt is competing for the model's attention. A persona that doesn't pay for itself is taking attention away from the instructions that do. Reducing prompt noise is a cheap quality win.
+
+## What I do in production
+
+My current rule: include a persona only if I can articulate, in one sentence, what the persona is doing that the model wouldn't do without it.
+
+Examples I'd keep:
+
+- *"You are a senior tax accountant"* (biases toward IRS-rule correctness)
+- *"You are a plain-spoken financial advisor who explains things the way you would to a smart friend"* (shapes tone)
+- *"You are a customer service representative who never commits on behalf of the company"* (reinforces a constraint)
+
+Examples I'd cut:
+
+- *"You are a helpful and knowledgeable AI assistant"* (default behavior, no signal)
+- *"You are friendly and professional"* (default, no signal)
+- *"You are Sarah, the AI advisor for [Company]"* (decorative)
+
+The discipline isn't anti-persona. It's anti-decoration. Personas are a real tool. They work better when you use them deliberately.
+
+## The strongest personas
+
+If you want the maximum bias from a persona, three patterns work.
+
+**Specificity over generality.** *"You are a Stanford-trained statistician who works in financial risk modeling"* will bias the model more than *"You are an expert."*
+
+**Behavior over identity.** *"You always show your work"* will bias the model more than *"You are rigorous."* Specify what the persona *does*, not just who they *are*.
+
+**Counterexample over example.** *"You never use the word 'guarantee'"* is stronger than *"You speak carefully about risk."* Negative constraints are sharper than positive descriptions.
+
+The strongest personas combine all three: specific identity, specific behaviors, specific things they don't do.
+
+## The take
+
+Don't ban personas. Don't decorate with them either. Test what each one does, keep the ones that work, drop the ones that don't. The result is a leaner prompt that does more useful work per token.
+
+The hidden benefit is that this discipline forces you to think about what behaviors you actually want from the model. *"What is this persona biasing toward, that the model wouldn't do otherwise?"* is a productive question. *"What persona should we add?"* is usually not. Start with the behavior you want; choose the persona (if any) that produces it.

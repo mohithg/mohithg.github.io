@@ -1,0 +1,132 @@
+---
+layout: ../../layouts/Writing.astro
+title: "System prompts that age well"
+description: "A system prompt is shipped code. It needs the same discipline. Here are the patterns that survive a year of model upgrades, prompt edits, and team turnover."
+publishDate: "2026-04-27"
+pillar: prompts
+slug: system-prompts-that-age-well
+---
+
+A system prompt is the longest-living piece of code in most LLM applications. It is in the codebase from the first prototype. It is still in the codebase three years later. It has accumulated edits from every engineer who has touched the system, and most of those edits were made under pressure, in response to a specific bug, with no time to think about how the change interacts with everything else in the prompt.
+
+By year two, most system prompts are unmaintainable. They contradict themselves. They contain instructions that no longer apply to the current model. They reference features that no longer exist. They are 4,000 tokens of accumulated band-aids and the team is afraid to touch them because no one remembers why each line is there.
+
+This essay is about the patterns that prevent that fate.
+
+## Pattern 1: structure your prompt like a document
+
+A wall of paragraphs is the worst format for a system prompt. It is hard to read, hard to diff, hard to edit confidently.
+
+A structured prompt with explicit sections is much easier to maintain.
+
+```
+# Role
+You are a financial assistant for PortfolioPilot.
+
+# Capabilities
+- Summarize a user's portfolio
+- Explain why the system recommended an action
+- Answer questions about holdings, allocations, performance
+
+# Constraints
+- Never recommend buying or selling a specific security
+- Never use the words "guaranteed," "safe," "risk-free"
+- Always include the standard risk disclaimer (added by renderer)
+
+# Output format
+Respond with the following JSON: ...
+```
+
+Sections make the prompt scannable. Sections make the diff readable. Sections make it possible for a new engineer to find where to add their fix without scrambling the whole thing.
+
+## Pattern 2: separate intent from implementation detail
+
+A common bug pattern: a specific instruction creeps into the system prompt, gets generalized across all queries, breaks edge cases nobody thought about.
+
+*"Always start the response with the user's name."* sounds innocuous. Six months later, someone notices the AI starts every response with the literal string `null` because the user object didn't have a name field for guest users.
+
+The fix: separate the *intent* (be personal, address the user) from the *implementation* (use their name). The intent goes in the prompt. The implementation goes in the renderer or the data preparation step.
+
+Keep the prompt about what the model should *think*, not what string it should *output*.
+
+## Pattern 3: version the prompt
+
+Treat the prompt like any other code artifact. Pin it to a version. Log the version with every model call. When you change the prompt, increment the version. When you debug an old conversation, you know exactly which prompt produced it.
+
+```python
+PROMPT_VERSION = "v23"
+
+response = llm.invoke(
+    system=load_prompt(PROMPT_VERSION),
+    messages=messages,
+    metadata={"prompt_version": PROMPT_VERSION}
+)
+```
+
+Now your logs include the prompt version. When you investigate a production issue, the first question (*"which prompt was active when this happened?"*) takes one click instead of a git archeology session.
+
+## Pattern 4: comment the why
+
+Every non-obvious instruction in the prompt should be comment-annotated with *why* it's there. Most prompts have lines that look weird out of context but exist because of a specific past bug.
+
+```
+# Always specify the time horizon when discussing returns.
+# (Added v17: model was citing 1-month returns as if they were
+# annualized, which legal flagged as misleading.)
+- When mentioning returns, always include the period: "5-year",
+  "year-to-date", etc.
+```
+
+The *Added v17* comment is the institutional memory. Six months later, when someone wonders if they can simplify this instruction, they can read the comment and decide informedly. Without the comment, they delete the line, ship, and recreate the bug.
+
+The model never sees these comments (you strip them at build time). They exist for the humans.
+
+## Pattern 5: make the prompt build from sources
+
+The worst possible prompt format is a single 4,000-token string in a Python file. The best format is something composable from sources.
+
+Build your prompt at runtime from:
+- A base template
+- A list of capabilities (loaded from a registry)
+- A list of constraints (loaded from a configuration file)
+- A list of disclaimers (loaded from your concepts file)
+- A list of tools available to the model (loaded from your tool registry)
+- The current date (since the model's training cutoff is in the past)
+
+Each source is independently editable, version-controlled, and reviewable. The build step assembles them. You can render the assembled prompt to a file for review. You can diff prompt versions by diffing the sources.
+
+This is more infrastructure than a single string. It pays for itself the first time you have to update a constraint that's referenced in three places.
+
+## Pattern 6: write down what you removed
+
+This is a discipline that almost no team practices and that almost every team would benefit from.
+
+When you remove an instruction from the prompt, write down *why* in a `prompt-history.md` file or similar. *"Removed v23: the 'always start with the user's name' rule, because it broke for guest users."*
+
+The reason: future engineers will be tempted to re-add the same instruction, not realizing it has been tried and failed. The history file is the institutional memory of failed prompt patterns.
+
+Keep this file in the repo. Encourage everyone to add to it. It will save you from the same prompt regression three times.
+
+## Pattern 7: re-evaluate when the model changes
+
+Most prompts contain instructions that compensate for specific weaknesses of specific models. *"You sometimes generate code with mismatched parentheses; please double-check before responding."* Useful when you wrote it. Useless or actively counterproductive when the model has improved.
+
+Every model upgrade should trigger a prompt audit. Re-read the whole prompt. Ask of every instruction: *is this still load-bearing for the new model?* If you can remove it, do. The shortest prompt that still passes the eval bench wins.
+
+This is unglamorous work. It is also the work that keeps your prompt from accreting into a 4,000-token relic.
+
+## What the worst prompts have in common
+
+After reviewing many production prompts across different teams, the worst prompts share three properties.
+
+1. **They are unstructured walls of text.** No sections, no comments, no version, no source structure. Just a long string.
+2. **They contradict themselves.** Different sections give contradictory instructions, often because they were added at different times by different people for different reasons.
+3. **They contain specific narrow rules from past bugs without context.** *"Never use the word 'invest' in a question."* Why? Nobody remembers. The line stays.
+
+The best prompts share the opposite properties.
+
+1. **They have explicit structure**, with sections labelled by function.
+2. **They are internally consistent**, with one clear purpose per section.
+3. **They explain themselves**, with comments that survive the build step or live in a sibling history file.
+
+A system prompt is not throwaway code. It is a piece of long-lived infrastructure. Design it like one.

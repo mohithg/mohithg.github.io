@@ -1,0 +1,94 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Prompts as type signatures"
+description: "The quickest mental model improvement for prompt engineering: stop thinking of prompts as instructions, start thinking of them as type signatures for the model's output."
+publishDate: "2026-04-28"
+pillar: prompts
+slug: prompts-as-type-signatures
+---
+
+The mental model that improved my prompt-writing the most cost nothing and took five minutes to internalize.
+
+Stop thinking of a prompt as a *set of instructions*. Start thinking of it as a *type signature for the model's output*.
+
+In a typed language, when you write `function summarize(text: string): { headline: string; bullets: string[] }`, you have specified what goes in and what comes out. The compiler checks the implementation against the type. The caller doesn't need to read the implementation to know what they'll get back.
+
+A prompt does the same thing for an LLM. The system prompt is the type signature. The user input is the function argument. The model's response should fit the signature you specified, or you should treat the response as invalid and either retry, repair, or reject.
+
+This reframing has consequences.
+
+## Consequence 1: prompts get shorter
+
+When you think of a prompt as instructions, you write more instructions when the model is wrong. *"Don't include a preamble. Don't apologize. Always start with the main point. Never say 'as an AI.' Use markdown headers..."* The prompt grows as a list of negative examples and special cases.
+
+When you think of a prompt as a type signature, you specify the shape of the output and let the model figure out how to fill it. Something like `Output JSON with { headline: string, bullets: string[3], tone: 'plain' | 'urgent' | 'reassuring' }`. The model has a clear contract. Most of the negative-example babysitting becomes unnecessary because the contract excludes it by construction. You can't add a preamble to a JSON object. You can't apologize inside a `tone` enum.
+
+The prompt that started at 800 tokens of "do this, don't do that" collapses to 200 tokens of schema. Cheaper, faster, more reliable.
+
+## Consequence 2: validation becomes possible
+
+If your prompt is a type signature, you can validate the output against the signature. JSON schema, Zod, Pydantic, whatever. If the output doesn't fit the signature, you have a bug to handle: retry the LLM call, ask it to fix the specific problem, or escalate.
+
+If your prompt is just instructions, you can only validate by reading the response and judging it. This is what LLM-as-judge evals are. It's expensive and noisy.
+
+The teams I've watched that actually ship reliable LLM features are the teams that have committed to structured outputs everywhere they can. They use the model providers' native structured-output features when available (constrained decoding), and they validate every response against a schema before passing it downstream. The schema is the contract. The model has to conform. Most modern models conform reliably enough that the retry rate is under 1%.
+
+## Consequence 3: composition becomes obvious
+
+If each LLM call has a clear input type and output type, you can compose them like functions. The output of one prompt becomes the input to another. Each step is independently testable. Each step has a debuggable contract.
+
+This is where agent architectures should live: a graph of typed transformations, not a single mega-prompt that does everything.
+
+I have seen many agent systems that use one giant prompt to handle classification, retrieval, synthesis, formatting, and safety checks all in one model call. They are hard to debug, hard to evaluate, hard to optimize. The teams that decompose into typed steps have more code but less suffering. Each step does one thing. Each step has a small, clear schema. Each step can be replaced with a different model independently.
+
+## Consequence 4: prompt review becomes mechanical
+
+When prompts are instructions, reviewing a prompt change is reviewing prose. Subjective. Slow. Easy to miss things.
+
+When prompts are type signatures, reviewing a prompt change is reviewing an interface change. The reviewer asks: what's the new input shape? What's the new output shape? What's the migration path for callers? This is the same conversation you'd have on any API change. It's a conversation engineering teams already know how to have.
+
+## A worked example
+
+Here is a real prompt I rewrote using this model.
+
+The original (~600 tokens):
+
+> *"You are a helpful financial assistant. When a user asks about their portfolio, analyze the holdings and provide a clear, friendly summary. Be encouraging but honest. Don't make specific buy or sell recommendations. Always mention risks. Keep responses under 150 words. Use plain English, not jargon. Don't include disclaimers (we add those separately). Don't mention that you're an AI. Format the response as 1-2 paragraphs..."*
+
+This kept producing inconsistent outputs. Different lengths, different tones, sometimes with disclaimers, sometimes without.
+
+The rewrite (~200 tokens):
+
+```
+You are a financial assistant. Given a portfolio summary,
+respond with the following JSON object:
+
+{
+  "summary": string  // 50-150 words, plain English, no jargon
+  "tone": "plain" | "encouraging" | "concerned"
+  "key_observations": string[]  // 1-3 bullets
+  "mentioned_risks": string[]  // 0-3 risks if relevant
+  "recommendations": []  // always empty, not your job
+}
+
+Use 'concerned' tone only if the portfolio is more than 30%
+in any single holding or has lost more than 15% in 30 days.
+```
+
+The output is now schema-conformant. Length is bounded by the JSON structure. Tone is one of three values. Recommendations are mechanically excluded. The downstream renderer takes the JSON and produces the final user-facing string with disclaimers attached at the right point.
+
+The bug rate went from frequent to negligible. Eval pass rate went from "we keep tuning" to "this passes." The prompt got shorter and cheaper.
+
+## When this doesn't work
+
+The type-signature framing has limits.
+
+It works for prompts whose outputs feed into other systems. It works less well for prompts whose outputs go directly to a human reader and are expected to be expressive. *"Write me a poem about my cat"* doesn't have a useful type signature. *"Summarize this support ticket and classify its urgency"* absolutely does.
+
+For the human-facing output cases, you can still use a hybrid: the LLM produces structured output (an object with `paragraphs: string[]`, `tone: string`), and a thin renderer turns the structure into the final prose. This way, you keep the validation, you keep the composability, and you only let the model freestyle on the parts that benefit from freestyling.
+
+## The mental model in one line
+
+Think of every prompt as `function(input: SomeType) -> SomeOtherType`, with the input type being whatever you put in the user message, and the output type being whatever you constrain the response to look like. If you can't write the type signature, you don't yet understand what you want the model to do. Writing the signature is the work.
+
+The prompts get shorter. The bugs get rarer. The tests get easier. The system gets composable. None of this requires a new framework or a new model. It just requires the discipline of treating LLM outputs as data with a contract, instead of strings to inspect.

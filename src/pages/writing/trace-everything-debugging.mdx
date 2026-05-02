@@ -1,0 +1,116 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Debugging LLM apps: the trace-everything approach"
+description: "You cannot debug what you cannot replay. The single highest-leverage habit in LLM engineering is making every model call inspectable after the fact."
+publishDate: "2026-04-21"
+pillar: prompts
+slug: trace-everything-debugging
+---
+
+The first time a user reports a wrong AI response, you have two choices. Either you can replay exactly what the model saw and produced, or you can guess at what might have gone wrong. The first option lets you fix the bug in 20 minutes. The second option lets you spend a week chasing ghosts.
+
+This essay is about building the first option, by default, from day one.
+
+## What "trace everything" actually means
+
+For every LLM call your system makes, you log:
+
+1. **The full prompt** (system, user messages, tool definitions, every byte sent to the model)
+2. **The model parameters** (model name, temperature, max tokens, stop sequences, response format)
+3. **The full response** (the assistant message, tool calls, finish reason, usage metrics)
+4. **The metadata** (timestamp, user id if available, session id, request id, prompt version, code commit, environment)
+5. **What happened next** (was the response shown to the user, parsed successfully, used in another call, dropped on error)
+
+You log this in a way that lets you, weeks later, point at any one user-facing event and reconstruct the chain of model calls that produced it.
+
+This is more than the standard "I logged the user message and the assistant response" most teams start with. The reason it matters is that the bugs you actually want to debug usually involve the parts you didn't think to log.
+
+## The bugs trace-everything catches
+
+Three categories that are nearly impossible to debug without it.
+
+**Prompt-version bugs.** *"This response was generated three weeks ago. We've shipped six prompt changes since then. Which prompt was active at the time?"* If you logged the prompt version with the response, this is a one-second answer. If you didn't, it's a git archeology session.
+
+**Tool-call bugs.** A user asks the agent something. The agent makes four tool calls. The third tool call returns weird data. The fourth call uses that weird data to compute something wrong. The user sees the wrong something. Without traces, all you know is the user's input and the final wrong output. With traces, you see exactly which tool returned the bad data.
+
+**Subtle prompt-change regressions.** You upgraded the prompt last week. You've been getting reports of slightly off responses since. With traces, you can compare last week's responses (old prompt) to this week's (new prompt) on similar queries. The diff is the regression.
+
+## What to log, mechanically
+
+The simplest possible schema, in a single table:
+
+```
+trace_id        UUID
+parent_trace_id UUID nullable
+session_id      UUID
+user_id         UUID nullable
+created_at      timestamp
+event_type      enum  -- 'llm_call', 'tool_call', 'final_response'
+prompt_version  text
+model_name      text
+input           jsonb  -- full input payload
+output          jsonb  -- full output payload
+metadata        jsonb  -- any other context
+duration_ms     int
+cost_usd        numeric
+```
+
+Every LLM call writes one row. Every tool call writes one row, with `parent_trace_id` pointing to the LLM call that requested the tool. Every final response writes one row, with `parent_trace_id` pointing to the chain that produced it.
+
+The full conversation tree for any user interaction is then a `WITH RECURSIVE` query starting from the final response. You can reconstruct exactly what happened.
+
+## Where to put the data
+
+You have three options.
+
+**Application logs (Datadog, Honeycomb, etc.).** Easiest to set up. Hard to query for the kind of structural traversal you need. Search-oriented, not graph-oriented. Works for the simplest debugging.
+
+**Dedicated trace storage (Langfuse, Helicone, Arize, etc.).** Built for this use case. Good UI for browsing traces. Worth the cost if you're shipping a serious LLM product.
+
+**Your own database.** A Postgres table or two and a small UI. More work upfront, total control. Cheap to operate. My default for projects where I want full control.
+
+The choice matters less than the discipline of actually capturing the data. Pick one and go. You can migrate later.
+
+## The PII problem
+
+Traces include user input. User input includes PII. You have to think about what you're storing and where.
+
+Three patterns:
+
+**Redact at log time.** Run a regex pass over the input before storing it, scrubbing emails, phone numbers, account numbers. Cheapest. Misses things regexes don't catch.
+
+**Hash sensitive fields.** Replace `john@example.com` with `<email-hash-a3f9>`. Lets you correlate without storing the literal. More work to implement.
+
+**Tokenize through a separate service.** PII goes into a vault, the trace stores tokens. Strongest. Most operational overhead.
+
+Pick the level of care that matches your domain. For a financial product, all three. For a side project, redaction is fine.
+
+## What good trace UIs look like
+
+The fastest debugging happens when the trace UI lets you do three things.
+
+1. **Find by user query.** Type a phrase, see every conversation that contained it. Scroll through chronologically.
+2. **Expand the tree.** For any final response, expand to see all the LLM calls and tool calls that produced it. Show their full inputs and outputs.
+3. **Diff with a sibling.** "Show me the same query running through the new prompt." See the two responses side by side, with a structured diff highlighting what's different.
+
+Most off-the-shelf trace UIs do (1) and (2) well and (3) badly. If you're rolling your own, prioritize (3). It's the killer feature for prompt-change debugging.
+
+## What to do with traces beyond debugging
+
+A trace pipeline is more useful than just a debugger.
+
+**Eval set generation.** Every interesting production trace can become an eval case. The bench grows organically from real traffic instead of imagined cases.
+
+**Cost analysis.** Aggregate cost per trace, per user, per query type. Find the expensive paths. Optimize the ones that matter.
+
+**Quality monitoring.** Sample traces periodically. Have a human or LLM judge rate them. Track quality over time as you ship changes.
+
+**Compliance audit trail.** For regulated domains, the trace pipeline becomes the audit log. *"This response was generated at this time, with this prompt, using this engine signal, by this model."* The regulator likes this.
+
+The trace pipeline pays for itself many times over once you have it. The hard part is committing to building it before you "need" it. The teams that wait until they need it are the teams whose first incident takes a week to debug instead of an afternoon.
+
+## Build it day one
+
+If I'm starting an LLM project today and I have to choose what to build first, between the feature and the trace pipeline, I build the trace pipeline first. Every time. The feature without the pipeline is unmaintainable. The pipeline without the feature gives you the foundation to ship the feature confidently.
+
+This sounds backwards. It is the cheapest insurance you will ever buy. The first time a stakeholder asks *"why did the AI say that?"* and you have a 30-second answer, you will understand why.
