@@ -44,13 +44,11 @@ export default function WorkCard(props: Props): ReactNode {
   return (
     <motion.a
       href={props.href}
-      data-glow
       style={{ ['--glow-color' as string]: accentGlow[accent] }}
-      initial={reduce ? false : { opacity: 0, y: 60, scale: 0.98 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, margin: '0px 0px -10% 0px' }}
+      initial={reduce ? false : { opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.7,
+        duration: 0.6,
         ease: [0.16, 1, 0.3, 1],
         delay: props.index * 0.08,
       }}

@@ -8,25 +8,21 @@ type Props = {
   index?: number;
   accent?: Accent;
   className?: string;
-  glow?: boolean;
   lift?: boolean;
   id?: string;
 };
 
-const ACCENT_RGB: Record<Accent, string> = {
-  violet: 'var(--color-violet)',
-  mint: 'var(--color-mint)',
-  pink: 'var(--color-pink)',
-};
-
 // A reusable Motion-powered card: spring entrance from below, hover lift
-// with spring physics, optional cursor-glow.
+// with spring physics. We deliberately do NOT use the CSS cursor-glow
+// system here because it sets a data-glow-init attribute on the element
+// post-hydration, which would cause a React hydration mismatch and freeze
+// the card in its initial (opacity 0) state. The motion hover effect is
+// enough on its own.
 export default function SpringCard({
   children,
   index = 0,
-  accent = 'violet',
+  accent: _accent = 'violet',
   className = '',
-  glow = true,
   lift = true,
   id,
 }: Props) {
@@ -34,11 +30,8 @@ export default function SpringCard({
   return (
     <motion.div
       id={id}
-      data-glow={glow ? '' : undefined}
-      style={glow ? { ['--glow-color' as string]: ACCENT_RGB[accent] } : undefined}
-      initial={reduce ? false : { opacity: 0, y: 36, scale: 0.96 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, margin: '0px 0px -8% 0px' }}
+      initial={reduce ? false : { opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{
         type: 'spring',
         stiffness: 220,
