@@ -32,7 +32,7 @@ const yearLabel = (n: typeof CAREER[number]) => {
       </h2>
       <p data-reveal style="--i: 2" class="mt-5 text-lg text-paper-dim text-pretty">
         It's how I think about systems. And, it turns out, how my career has run too.
-        Hover any node for the receipts.
+        Hover any node to see what I built there.
       </p>
     </header>
 
@@ -153,7 +153,7 @@ const yearLabel = (n: typeof CAREER[number]) => {
               {CAREER.map((node, ni) => {
                 const pos = POSITIONS[node.id]!;
                 const isCurrent = node.end === 'present';
-                const isFlagship = !!node.flagship;
+                const isFlagship = node.dagFlagship ?? !!node.flagship;
                 const fill = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#1A1A24';
                 const stroke = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#2A2A38';
                 return (
@@ -194,29 +194,34 @@ const yearLabel = (n: typeof CAREER[number]) => {
             </svg>
           </div>
 
-          <!-- Hover popover lives OUTSIDE the scroll container so positioning
-               it never triggers the inner scrollbar. Positioned absolutely
-               relative to the rounded-xl frame above. The popover is itself
-               clickable: hovering it keeps it open, and the CTA at the
-               bottom navigates to the relevant page. -->
-          <a
-            data-dag-popover
-            href="#"
-            class="absolute z-20 hidden w-64 rounded-xl border border-white/10 bg-ink-2/95 p-4 shadow-2xl backdrop-blur-md transition-opacity duration-150 hover:border-violet/40"
-            style="opacity: 0;"
-          >
-            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-mint">
-              <span data-popover-dates></span>
-              <span class="mx-2 text-white/20">·</span>
-              <span data-popover-role class="text-violet-soft"></span>
-            </p>
-            <p data-popover-company class="mt-2 font-display text-base font-semibold tracking-tight text-paper"></p>
-            <p data-popover-summary class="mt-2 text-xs leading-relaxed text-paper-dim"></p>
-            <p data-popover-cta-row class="mt-3 hidden items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-violet-soft">
-              <span data-popover-cta></span>
+          <!-- Persistent details panel. Sits below the SVG and updates on
+               node hover. Always visible, never repositions, no flicker. -->
+          <div data-dag-details class="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/10 bg-white/5 sm:grid-cols-[1fr_auto]">
+            <div class="bg-ink-2/60 p-4 sm:px-5 sm:py-4">
+              <div data-details-empty class="font-mono text-[11px] uppercase tracking-[0.25em] text-paper-muted">
+                <span class="text-mint">/ career.dag</span>
+                <span class="mx-2 text-white/20">·</span>
+                <span>hover any node above to see what I built there</span>
+              </div>
+              <div data-details-content class="hidden">
+                <p class="font-mono text-[10px] uppercase tracking-[0.2em]">
+                  <span data-details-dates class="text-mint"></span>
+                  <span class="mx-2 text-white/20">·</span>
+                  <span data-details-role class="text-violet-soft"></span>
+                </p>
+                <p data-details-company class="mt-1.5 font-display text-lg font-semibold tracking-tight text-paper"></p>
+                <p data-details-summary class="mt-1.5 max-w-2xl text-sm leading-relaxed text-paper-dim"></p>
+              </div>
+            </div>
+            <a
+              data-details-cta
+              href="#"
+              class="hidden items-center justify-between gap-3 bg-violet/10 px-5 py-4 font-mono text-[11px] uppercase tracking-widest text-violet-soft transition-colors hover:bg-violet/20 sm:flex sm:flex-col sm:items-end sm:justify-center sm:px-6"
+            >
+              <span data-details-cta-text>open the case study</span>
               <span aria-hidden="true">→</span>
-            </p>
-          </a>
+            </a>
+          </div>
 
           <!-- Legend -->
           <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/5 pt-4 font-mono text-[11px] text-paper-muted">
@@ -286,27 +291,28 @@ const yearLabel = (n: typeof CAREER[number]) => {
 
   function initHover() {
     const svgRaw = document.querySelector<SVGSVGElement>('[data-dag-svg]');
-    const popoverRaw = document.querySelector<HTMLAnchorElement>('[data-dag-popover]');
-    if (!svgRaw || !popoverRaw) return;
+    const detailsRaw = document.querySelector<HTMLElement>('[data-dag-details]');
+    if (!svgRaw || !detailsRaw) return;
     if (svgRaw.dataset.hoverInit === '1') return;
     svgRaw.dataset.hoverInit = '1';
     const svg: SVGSVGElement = svgRaw;
-    const popover: HTMLAnchorElement = popoverRaw;
+    const details: HTMLElement = detailsRaw;
 
-    const popoverDates = popover.querySelector<HTMLElement>('[data-popover-dates]')!;
-    const popoverRole = popover.querySelector<HTMLElement>('[data-popover-role]')!;
-    const popoverCompany = popover.querySelector<HTMLElement>('[data-popover-company]')!;
-    const popoverSummary = popover.querySelector<HTMLElement>('[data-popover-summary]')!;
-    const popoverCta = popover.querySelector<HTMLElement>('[data-popover-cta]')!;
-    const container = popover.parentElement!;
-    if (!popoverDates || !popoverRole || !popoverCompany || !popoverSummary || !popoverCta || !container) return;
+    const empty = details.querySelector<HTMLElement>('[data-details-empty]')!;
+    const content = details.querySelector<HTMLElement>('[data-details-content]')!;
+    const dDates = details.querySelector<HTMLElement>('[data-details-dates]')!;
+    const dRole = details.querySelector<HTMLElement>('[data-details-role]')!;
+    const dCompany = details.querySelector<HTMLElement>('[data-details-company]')!;
+    const dSummary = details.querySelector<HTMLElement>('[data-details-summary]')!;
+    const dCta = details.querySelector<HTMLAnchorElement>('[data-details-cta]')!;
+    const dCtaText = details.querySelector<HTMLElement>('[data-details-cta-text]')!;
 
     const nodes = Array.from(svg.querySelectorAll<SVGGElement>('.dag-node'));
     const edges = Array.from(svg.querySelectorAll<SVGGElement>('.dag-edge'));
 
     function activate(node: SVGGElement) {
       const id = node.dataset.nodeId!;
-      svg!.setAttribute('data-active', id);
+      svg.setAttribute('data-active', id);
 
       nodes.forEach((n) => n.classList.toggle('is-active', n === node));
       edges.forEach((edge) => {
@@ -315,43 +321,37 @@ const yearLabel = (n: typeof CAREER[number]) => {
         edge.classList.toggle('is-active', from === id || to === id);
       });
 
-      popoverDates.textContent = node.dataset.nodeDates ?? '';
-      popoverRole.textContent = node.dataset.nodeRole ?? '';
-      popoverCompany.textContent = node.dataset.nodeCompany ?? '';
-      popoverSummary.textContent = node.dataset.nodeSummary ?? '';
-      popoverCta.textContent =
-        node.dataset.nodeCurrent === 'true'
-          ? 'click to read the PortfolioPilot case study'
-          : node.dataset.nodeFlagship === 'true'
-          ? 'click to read the case study'
-          : 'click for chapter detail';
+      dDates.textContent = node.dataset.nodeDates ?? '';
+      dRole.textContent = node.dataset.nodeRole ?? '';
+      dCompany.textContent = node.dataset.nodeCompany ?? '';
+      dSummary.textContent = node.dataset.nodeSummary ?? '';
 
-      const rect = node.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      // Center popover horizontally on node, place 14px below.
-      const desiredLeft = rect.left - containerRect.left + rect.width / 2;
-      const popoverWidth = 256; // matches w-64
-      const left = Math.max(
-        12,
-        Math.min(desiredLeft - popoverWidth / 2, containerRect.width - popoverWidth - 12)
-      );
-      const top = rect.bottom - containerRect.top + 14;
-      popover.style.left = `${left}px`;
-      popover.style.top = `${top}px`;
-      popover.classList.remove('hidden');
-      requestAnimationFrame(() => {
-        popover.style.opacity = '1';
-      });
+      const link = node.querySelector('a');
+      const href = link?.getAttribute('href') ?? '#';
+      const hasCaseStudy = href.startsWith('/work/');
+      const isCurrent = node.dataset.nodeCurrent === 'true';
+      if (hasCaseStudy) {
+        dCta.setAttribute('href', href);
+        dCtaText.textContent = isCurrent ? 'open the PortfolioPilot case study' : 'open the case study';
+        dCta.classList.remove('hidden');
+        dCta.classList.add('flex');
+      } else {
+        dCta.classList.add('hidden');
+        dCta.classList.remove('flex');
+      }
+
+      empty.classList.add('hidden');
+      content.classList.remove('hidden');
     }
 
     function deactivate() {
       svg.removeAttribute('data-active');
       nodes.forEach((n) => n.classList.remove('is-active'));
       edges.forEach((e) => e.classList.remove('is-active'));
-      popover.style.opacity = '0';
-      window.setTimeout(() => {
-        popover.classList.add('hidden');
-      }, 160);
+      empty.classList.remove('hidden');
+      content.classList.add('hidden');
+      dCta.classList.add('hidden');
+      dCta.classList.remove('flex');
     }
 
     nodes.forEach((node) => {

@@ -9,7 +9,12 @@ export type CareerNode = {
   tags: readonly string[];
   href?: string;
   caseStudy?: string;
+  /** Drives whether this role gets its own card in /selected-work. */
   flagship?: boolean;
+  /** Drives the visual emphasis in the DAG (violet glow + lit border).
+   *  Defaults to `flagship` if unset. Use this to highlight a chapter in
+   *  the DAG without giving it its own Selected Work card. */
+  dagFlagship?: boolean;
 };
 
 export const CAREER: readonly CareerNode[] = [
@@ -39,6 +44,7 @@ export const CAREER: readonly CareerNode[] = [
     tags: ['Distributed systems', 'MLOps', 'Real-time', 'Scala', 'React', 'K8s'],
     href: 'https://dominodatalab.com',
     caseStudy: '/work/intuition-ai',
+    dagFlagship: true,
   },
   {
     id: 'intuition-ai',
