@@ -108,13 +108,12 @@ export const CAREER: readonly CareerNode[] = [
 
 export const FLAGSHIPS = CAREER.filter((c) => c.flagship);
 
-export type Edge = { from: string; to: string };
+export type Edge = { from: string; to: string; dotted?: boolean };
 
 export const CAREER_EDGES: readonly Edge[] = [
   { from: 'athena', to: 'codebrahma' },
   { from: 'codebrahma', to: 'rippling' },
-  { from: 'codebrahma', to: 'navya' },
-  { from: 'rippling', to: 'navya' },
+  { from: 'codebrahma', to: 'navya', dotted: true },
   { from: 'navya', to: 'intuition-ai' },
   { from: 'intuition-ai', to: 'domino' },
   { from: 'domino', to: 'globalpredictions' },

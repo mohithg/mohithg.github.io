@@ -44,7 +44,7 @@ const yearLabel = (n: typeof CAREER[number]) => {
 
       <!-- Frame -->
       <div data-reveal data-reveal-scale style="--i: 3" class="relative rounded-2xl border border-white/5 bg-ink-2/40 p-2 backdrop-blur-sm sm:p-4">
-        <div class="rounded-xl bg-ink-3/40 p-4 sm:p-6">
+        <div class="relative rounded-xl bg-ink-3/40 p-4 sm:p-6">
           <!-- Header bar like an Airflow DAG view -->
           <div class="mb-4 flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -58,7 +58,7 @@ const yearLabel = (n: typeof CAREER[number]) => {
             <p class="hidden font-mono text-[11px] text-paper-muted sm:block">v11.{new Date().getFullYear() - 2014}</p>
           </div>
 
-          <div class="relative overflow-x-auto" data-dag-scroll data-svg-anim>
+          <div class="overflow-x-auto" data-dag-scroll data-svg-anim>
             <svg
               data-dag-svg
               viewBox="0 0 1200 600"
@@ -68,9 +68,9 @@ const yearLabel = (n: typeof CAREER[number]) => {
             >
               <defs>
                 <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.45"/>
-                  <stop offset="50%" stop-color="#7C5CFF" stop-opacity="0.85"/>
-                  <stop offset="100%" stop-color="#00E5A0" stop-opacity="0.85"/>
+                  <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.7"/>
+                  <stop offset="50%" stop-color="#7C5CFF"/>
+                  <stop offset="100%" stop-color="#00E5A0"/>
                 </linearGradient>
                 <linearGradient id="edge-gradient-active" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stop-color="#A088FF"/>
@@ -92,22 +92,58 @@ const yearLabel = (n: typeof CAREER[number]) => {
               <!-- Background dot grid -->
               <rect x="0" y="0" width="1200" height="600" fill="url(#dotgrid)"/>
 
-              <!-- Edges -->
-              {CAREER_EDGES.map(({ from, to }, ei) => {
+              <!-- Edges: solid gradient line + travelling comet spark.
+                   Edges marked dotted render as a thin dotted indicator for
+                   "softer / auxiliary" transitions. -->
+              {CAREER_EDGES.map(({ from, to, dotted }, ei) => {
                 const a = POSITIONS[from]!;
                 const b = POSITIONS[to]!;
                 const cx = (a.x + b.x) / 2;
+                const d = `M ${a.x} ${a.y} C ${cx} ${a.y}, ${cx} ${b.y}, ${b.x} ${b.y}`;
+                if (dotted) {
+                  return (
+                    <g class="svg-edge-anim dag-edge dag-edge-dotted" data-from={from} data-to={to} style={`--i: ${ei}`}>
+                      <path
+                        class="dag-edge-path"
+                        d={d}
+                        stroke="#7C5CFF"
+                        stroke-opacity="0.55"
+                        stroke-width="1.5"
+                        fill="none"
+                        stroke-linecap="round"
+                        stroke-dasharray="2 6"
+                      />
+                    </g>
+                  );
+                }
                 return (
                   <g class="svg-edge-anim dag-edge" data-from={from} data-to={to} style={`--i: ${ei}`}>
+                    <!-- Solid base: the connection -->
                     <path
                       class="dag-edge-path"
-                      d={`M ${a.x} ${a.y} C ${cx} ${a.y}, ${cx} ${b.y}, ${b.x} ${b.y}`}
+                      d={d}
                       stroke="url(#edge-gradient)"
-                      stroke-width="2"
+                      stroke-width="2.5"
                       fill="none"
-                      stroke-dasharray="4 6"
+                      stroke-linecap="round"
+                    />
+                    <!-- Multi-dot flow overlay: fast, bright dashes streaming along the line -->
+                    <path
+                      class="dag-edge-flow"
+                      d={d}
+                      stroke="#FFFFFF"
+                      stroke-width="2.5"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-dasharray="3 9"
+                      opacity="0.55"
                     >
-                      <animate attributeName="stroke-dashoffset" values="0;-100" dur="6s" repeatCount="indefinite" />
+                      <animate
+                        attributeName="stroke-dashoffset"
+                        values="0;-48"
+                        dur="2.4s"
+                        repeatCount="indefinite"
+                      />
                     </path>
                   </g>
                 );
@@ -156,26 +192,31 @@ const yearLabel = (n: typeof CAREER[number]) => {
                 );
               })}
             </svg>
-
-            <!-- Hover popover (HTML, positioned over the SVG via JS) -->
-            <div
-              data-dag-popover
-              class="pointer-events-none absolute z-20 hidden w-64 rounded-xl border border-white/10 bg-ink-2/95 p-4 shadow-2xl backdrop-blur-md transition-opacity duration-150"
-              style="opacity: 0;"
-            >
-              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-mint">
-                <span data-popover-dates></span>
-                <span class="mx-2 text-white/20">·</span>
-                <span data-popover-role class="text-violet-soft"></span>
-              </p>
-              <p data-popover-company class="mt-2 font-display text-base font-semibold tracking-tight text-paper"></p>
-              <p data-popover-summary class="mt-2 text-xs leading-relaxed text-paper-dim"></p>
-              <p class="mt-3 flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-paper-muted">
-                <span data-popover-cta>click to open the case study</span>
-                <span aria-hidden="true">→</span>
-              </p>
-            </div>
           </div>
+
+          <!-- Hover popover lives OUTSIDE the scroll container so positioning
+               it never triggers the inner scrollbar. Positioned absolutely
+               relative to the rounded-xl frame above. The popover is itself
+               clickable: hovering it keeps it open, and the CTA at the
+               bottom navigates to the relevant page. -->
+          <a
+            data-dag-popover
+            href="#"
+            class="absolute z-20 hidden w-64 rounded-xl border border-white/10 bg-ink-2/95 p-4 shadow-2xl backdrop-blur-md transition-opacity duration-150 hover:border-violet/40"
+            style="opacity: 0;"
+          >
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-mint">
+              <span data-popover-dates></span>
+              <span class="mx-2 text-white/20">·</span>
+              <span data-popover-role class="text-violet-soft"></span>
+            </p>
+            <p data-popover-company class="mt-2 font-display text-base font-semibold tracking-tight text-paper"></p>
+            <p data-popover-summary class="mt-2 text-xs leading-relaxed text-paper-dim"></p>
+            <p data-popover-cta-row class="mt-3 hidden items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-violet-soft">
+              <span data-popover-cta></span>
+              <span aria-hidden="true">→</span>
+            </p>
+          </a>
 
           <!-- Legend -->
           <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/5 pt-4 font-mono text-[11px] text-paper-muted">
@@ -219,9 +260,12 @@ const yearLabel = (n: typeof CAREER[number]) => {
   [data-dag-svg][data-active] .dag-edge.is-active { opacity: 1; }
   [data-dag-svg][data-active] .dag-edge.is-active .dag-edge-path {
     stroke: url(#edge-gradient-active);
+    stroke-width: 3.5;
+    filter: drop-shadow(0 0 10px rgba(160, 136, 255, 0.6));
+  }
+  [data-dag-svg][data-active] .dag-edge.is-active .dag-edge-flow {
+    opacity: 0.9;
     stroke-width: 3;
-    stroke-dasharray: none;
-    filter: drop-shadow(0 0 8px rgba(160, 136, 255, 0.55));
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -242,12 +286,12 @@ const yearLabel = (n: typeof CAREER[number]) => {
 
   function initHover() {
     const svgRaw = document.querySelector<SVGSVGElement>('[data-dag-svg]');
-    const popoverRaw = document.querySelector<HTMLDivElement>('[data-dag-popover]');
+    const popoverRaw = document.querySelector<HTMLAnchorElement>('[data-dag-popover]');
     if (!svgRaw || !popoverRaw) return;
     if (svgRaw.dataset.hoverInit === '1') return;
     svgRaw.dataset.hoverInit = '1';
     const svg: SVGSVGElement = svgRaw;
-    const popover: HTMLDivElement = popoverRaw;
+    const popover: HTMLAnchorElement = popoverRaw;
 
     const popoverDates = popover.querySelector<HTMLElement>('[data-popover-dates]')!;
     const popoverRole = popover.querySelector<HTMLElement>('[data-popover-role]')!;
