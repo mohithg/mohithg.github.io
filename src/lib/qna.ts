@@ -25,7 +25,7 @@ export const QNA: readonly QnA[] = [
     questions: ['What did Mohith ship at PortfolioPilot?', 'What does he do at PortfolioPilot?', 'Global Predictions work', 'Tell me about PortfolioPilot'],
     keywords: ['portfoliopilot', 'pilot', 'global', 'predictions', 'financial', 'advisor', 'first', 'engineer', 'ai', 'currently', 'today', 'now', 'job', 'role'],
     answer:
-      'Mohith is the **first engineer** at PortfolioPilot (Global Predictions), since June 2021. He bootstrapped the codebase, built the financial-data ingestion DAGs, the recommendation engine, and the AI advisor stack — including one of the **first wave of ChatGPT plugins** in 2023, the GPTs migration, and a custom agent runtime today. He owns the **eval & guardrail layer** that catches bad financial advice before it ships, and is still actively shipping the surfaces that decide whether the AI is right.',
+      'Mohith is the **first engineer** at PortfolioPilot (Global Predictions), since June 2021. PortfolioPilot is an **SEC-registered AI financial advisor** — a real fiduciary, not a chatbot pretending. He bootstrapped the codebase, built the financial-data ingestion DAGs, the recommendation engine, and the AI advisor stack — including one of the **first wave of ChatGPT plugins** in 2023, the GPTs migration, and a custom agent runtime today. He owns the **eval & guardrail layer** that catches bad financial advice before it ships.',
     citations: [{ label: 'PortfolioPilot case study', href: '/work/portfoliopilot' }],
   },
   {
