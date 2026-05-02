@@ -96,7 +96,7 @@ export const CAREER: readonly CareerNode[] = [
     id: 'athena',
     role: 'Software Engineer',
     company: 'AthenaHealth',
-    start: '2014-07',
+    start: '2015-01',
     end: '2015-08',
     location: 'Chennai',
     summary:

@@ -16,8 +16,11 @@ const POSITIONS: Record<string, { x: number; y: number }> = {
   athena:           { x: 1120, y: 300 },
 };
 
-const yearLabel = (n: typeof CAREER[number]) =>
-  `${n.start.split('-')[0]}–${n.end === 'present' ? 'now' : n.end.split('-')[0]}`;
+const yearLabel = (n: typeof CAREER[number]) => {
+  const sy = n.start.split('-')[0];
+  const ey = n.end === 'present' ? 'now' : n.end.split('-')[0];
+  return sy === ey ? sy : `${sy}–${ey}`;
+};
 ---
 
 <section id="career" class="relative overflow-hidden border-t border-white/5 py-24 sm:py-32">
@@ -40,7 +43,7 @@ const yearLabel = (n: typeof CAREER[number]) =>
       </div>
 
       <!-- Frame -->
-      <div data-reveal data-reveal-scale style="--i: 3" class="rounded-2xl border border-white/5 bg-ink-2/40 p-2 backdrop-blur-sm sm:p-4">
+      <div data-reveal data-reveal-scale style="--i: 3" class="relative rounded-2xl border border-white/5 bg-ink-2/40 p-2 backdrop-blur-sm sm:p-4">
         <div class="rounded-xl bg-ink-3/40 p-4 sm:p-6">
           <!-- Header bar like an Airflow DAG view -->
           <div class="mb-4 flex items-center justify-between">
@@ -55,13 +58,23 @@ const yearLabel = (n: typeof CAREER[number]) =>
             <p class="hidden font-mono text-[11px] text-paper-muted sm:block">v11.{new Date().getFullYear() - 2014}</p>
           </div>
 
-          <div class="overflow-x-auto" data-dag-scroll data-svg-anim>
-            <svg viewBox="0 0 1200 600" class="min-w-[900px] w-full max-w-none" role="img" aria-label="Career timeline as a directed acyclic graph">
+          <div class="relative overflow-x-auto" data-dag-scroll data-svg-anim>
+            <svg
+              data-dag-svg
+              viewBox="0 0 1200 600"
+              class="min-w-[900px] w-full max-w-none"
+              role="img"
+              aria-label="Career timeline as a directed acyclic graph"
+            >
               <defs>
                 <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.3"/>
-                  <stop offset="50%" stop-color="#7C5CFF" stop-opacity="0.7"/>
-                  <stop offset="100%" stop-color="#00E5A0" stop-opacity="0.7"/>
+                  <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.45"/>
+                  <stop offset="50%" stop-color="#7C5CFF" stop-opacity="0.85"/>
+                  <stop offset="100%" stop-color="#00E5A0" stop-opacity="0.85"/>
+                </linearGradient>
+                <linearGradient id="edge-gradient-active" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#A088FF"/>
+                  <stop offset="100%" stop-color="#00E5A0"/>
                 </linearGradient>
                 <radialGradient id="node-glow" cx="50%" cy="50%" r="50%">
                   <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.4"/>
@@ -85,11 +98,12 @@ const yearLabel = (n: typeof CAREER[number]) =>
                 const b = POSITIONS[to]!;
                 const cx = (a.x + b.x) / 2;
                 return (
-                  <g class="svg-edge-anim" style={`--i: ${ei}`}>
+                  <g class="svg-edge-anim dag-edge" data-from={from} data-to={to} style={`--i: ${ei}`}>
                     <path
+                      class="dag-edge-path"
                       d={`M ${a.x} ${a.y} C ${cx} ${a.y}, ${cx} ${b.y}, ${b.x} ${b.y}`}
                       stroke="url(#edge-gradient)"
-                      stroke-width="1.5"
+                      stroke-width="2"
                       fill="none"
                       stroke-dasharray="4 6"
                     >
@@ -107,9 +121,19 @@ const yearLabel = (n: typeof CAREER[number]) =>
                 const fill = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#1A1A24';
                 const stroke = isCurrent ? '#00E5A0' : isFlagship ? '#7C5CFF' : '#2A2A38';
                 return (
-                  <g class="dag-node svg-node-anim group" data-node-id={node.id} style={`--i: ${ni}; --x: ${pos.x}; --y: ${pos.y};`}>
+                  <g
+                    class="dag-node svg-node-anim group"
+                    data-node-id={node.id}
+                    data-node-role={node.role}
+                    data-node-summary={node.summary}
+                    data-node-company={node.company}
+                    data-node-dates={yearLabel(node)}
+                    data-node-flagship={isFlagship ? 'true' : 'false'}
+                    data-node-current={isCurrent ? 'true' : 'false'}
+                    style={`--i: ${ni}; --x: ${pos.x}; --y: ${pos.y};`}
+                  >
                     {(isFlagship || isCurrent) && (
-                      <circle cx={pos.x} cy={pos.y} r="44" fill={isCurrent ? 'url(#node-glow-mint)' : 'url(#node-glow)'} class="opacity-60" />
+                      <circle class="dag-node-glow" cx={pos.x} cy={pos.y} r="44" fill={isCurrent ? 'url(#node-glow-mint)' : 'url(#node-glow)'} class:list={["opacity-60"]} />
                     )}
                     <a href={node.caseStudy ?? `#career-${node.id}`} class="cursor-pointer">
                       <rect
@@ -132,6 +156,25 @@ const yearLabel = (n: typeof CAREER[number]) =>
                 );
               })}
             </svg>
+
+            <!-- Hover popover (HTML, positioned over the SVG via JS) -->
+            <div
+              data-dag-popover
+              class="pointer-events-none absolute z-20 hidden w-64 rounded-xl border border-white/10 bg-ink-2/95 p-4 shadow-2xl backdrop-blur-md transition-opacity duration-150"
+              style="opacity: 0;"
+            >
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-mint">
+                <span data-popover-dates></span>
+                <span class="mx-2 text-white/20">·</span>
+                <span data-popover-role class="text-violet-soft"></span>
+              </p>
+              <p data-popover-company class="mt-2 font-display text-base font-semibold tracking-tight text-paper"></p>
+              <p data-popover-summary class="mt-2 text-xs leading-relaxed text-paper-dim"></p>
+              <p class="mt-3 flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-paper-muted">
+                <span data-popover-cta>click to open the case study</span>
+                <span aria-hidden="true">→</span>
+              </p>
+            </div>
           </div>
 
           <!-- Legend -->
@@ -151,26 +194,133 @@ const yearLabel = (n: typeof CAREER[number]) =>
   .dag-node rect {
     transform-box: fill-box;
     transform-origin: center;
-    transition: transform 200ms var(--ease-out-soft, ease-out);
+    transition: transform 200ms var(--ease-out-soft, ease-out), filter 200ms var(--ease-out-soft, ease-out);
   }
   .dag-node:hover rect {
     transform: translateY(-2px);
-    filter: drop-shadow(0 6px 20px rgba(124, 92, 255, 0.4));
+    filter: drop-shadow(0 6px 20px rgba(124, 92, 255, 0.45));
   }
+
+  /* Edge / node states driven by JS toggling data-active on the SVG */
+  [data-dag-svg] .dag-edge,
+  [data-dag-svg] .dag-node {
+    transition: opacity 220ms var(--ease-out-soft, ease-out);
+  }
+  [data-dag-svg] .dag-edge-path {
+    transition: stroke-width 200ms var(--ease-out-soft, ease-out), filter 220ms var(--ease-out-soft, ease-out);
+  }
+
+  /* When any node is active, dim everything by default */
+  [data-dag-svg][data-active] .dag-edge { opacity: 0.18; }
+  [data-dag-svg][data-active] .dag-node { opacity: 0.45; }
+
+  /* Then re-light the active node and its connected edges */
+  [data-dag-svg][data-active] .dag-node.is-active { opacity: 1; }
+  [data-dag-svg][data-active] .dag-edge.is-active { opacity: 1; }
+  [data-dag-svg][data-active] .dag-edge.is-active .dag-edge-path {
+    stroke: url(#edge-gradient-active);
+    stroke-width: 3;
+    stroke-dasharray: none;
+    filter: drop-shadow(0 0 8px rgba(160, 136, 255, 0.55));
+  }
+
   @media (prefers-reduced-motion: reduce) {
     animate { display: none; }
   }
 </style>
 
 <script>
-  // On narrow viewports, the DAG SVG scrolls horizontally. Start scrolled
-  // to the LEFT (Global Predictions = current) so visitors see the present
-  // first. The reverse-chronological layout means swiping right = going
-  // back in time, which is intuitive.
-  function init() {
+  // 1. On narrow viewports, the DAG SVG scrolls horizontally. Start scrolled
+  //    to the LEFT (Global Predictions = current).
+  // 2. Hover behavior: highlight related edges, dim everything else, and
+  //    show a small HTML popover with the role and summary.
+  function initScroll() {
     document.querySelectorAll<HTMLElement>('[data-dag-scroll]').forEach((el) => {
       el.scrollLeft = 0;
     });
+  }
+
+  function initHover() {
+    const svgRaw = document.querySelector<SVGSVGElement>('[data-dag-svg]');
+    const popoverRaw = document.querySelector<HTMLDivElement>('[data-dag-popover]');
+    if (!svgRaw || !popoverRaw) return;
+    if (svgRaw.dataset.hoverInit === '1') return;
+    svgRaw.dataset.hoverInit = '1';
+    const svg: SVGSVGElement = svgRaw;
+    const popover: HTMLDivElement = popoverRaw;
+
+    const popoverDates = popover.querySelector<HTMLElement>('[data-popover-dates]')!;
+    const popoverRole = popover.querySelector<HTMLElement>('[data-popover-role]')!;
+    const popoverCompany = popover.querySelector<HTMLElement>('[data-popover-company]')!;
+    const popoverSummary = popover.querySelector<HTMLElement>('[data-popover-summary]')!;
+    const popoverCta = popover.querySelector<HTMLElement>('[data-popover-cta]')!;
+    const container = popover.parentElement!;
+    if (!popoverDates || !popoverRole || !popoverCompany || !popoverSummary || !popoverCta || !container) return;
+
+    const nodes = Array.from(svg.querySelectorAll<SVGGElement>('.dag-node'));
+    const edges = Array.from(svg.querySelectorAll<SVGGElement>('.dag-edge'));
+
+    function activate(node: SVGGElement) {
+      const id = node.dataset.nodeId!;
+      svg!.setAttribute('data-active', id);
+
+      nodes.forEach((n) => n.classList.toggle('is-active', n === node));
+      edges.forEach((edge) => {
+        const from = edge.dataset.from;
+        const to = edge.dataset.to;
+        edge.classList.toggle('is-active', from === id || to === id);
+      });
+
+      popoverDates.textContent = node.dataset.nodeDates ?? '';
+      popoverRole.textContent = node.dataset.nodeRole ?? '';
+      popoverCompany.textContent = node.dataset.nodeCompany ?? '';
+      popoverSummary.textContent = node.dataset.nodeSummary ?? '';
+      popoverCta.textContent =
+        node.dataset.nodeCurrent === 'true'
+          ? 'click to read the PortfolioPilot case study'
+          : node.dataset.nodeFlagship === 'true'
+          ? 'click to read the case study'
+          : 'click for chapter detail';
+
+      const rect = node.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      // Center popover horizontally on node, place 14px below.
+      const desiredLeft = rect.left - containerRect.left + rect.width / 2;
+      const popoverWidth = 256; // matches w-64
+      const left = Math.max(
+        12,
+        Math.min(desiredLeft - popoverWidth / 2, containerRect.width - popoverWidth - 12)
+      );
+      const top = rect.bottom - containerRect.top + 14;
+      popover.style.left = `${left}px`;
+      popover.style.top = `${top}px`;
+      popover.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        popover.style.opacity = '1';
+      });
+    }
+
+    function deactivate() {
+      svg.removeAttribute('data-active');
+      nodes.forEach((n) => n.classList.remove('is-active'));
+      edges.forEach((e) => e.classList.remove('is-active'));
+      popover.style.opacity = '0';
+      window.setTimeout(() => {
+        popover.classList.add('hidden');
+      }, 160);
+    }
+
+    nodes.forEach((node) => {
+      node.addEventListener('mouseenter', () => activate(node));
+      node.addEventListener('mouseleave', deactivate);
+      node.addEventListener('focus', () => activate(node));
+      node.addEventListener('blur', deactivate);
+    });
+  }
+
+  function init() {
+    initScroll();
+    initHover();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });
