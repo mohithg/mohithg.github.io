@@ -194,29 +194,26 @@ const yearLabel = (n: typeof CAREER[number]) => {
             </svg>
           </div>
 
-          <!-- Persistent details panel. Sits below the SVG and updates on
-               node hover. Always visible, never repositions, no flicker. -->
+          <!-- Persistent details panel. Always shows something useful:
+               by default, the current role (Global Predictions); on hover,
+               whichever node the cursor is on. Server-rendered with the
+               default content so there's no flash. -->
           <div data-dag-details class="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/10 bg-white/5 sm:grid-cols-[1fr_auto]">
             <div class="bg-ink-2/60 p-4 sm:px-5 sm:py-4">
-              <div data-details-empty class="font-mono text-[11px] uppercase tracking-[0.25em] text-paper-muted">
-                <span class="text-mint">/ career.dag</span>
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em]">
+                <span data-details-dates class="text-mint">2021–now</span>
                 <span class="mx-2 text-white/20">·</span>
-                <span>hover any node above to see what I built there</span>
-              </div>
-              <div data-details-content class="hidden">
-                <p class="font-mono text-[10px] uppercase tracking-[0.2em]">
-                  <span data-details-dates class="text-mint"></span>
-                  <span class="mx-2 text-white/20">·</span>
-                  <span data-details-role class="text-violet-soft"></span>
-                </p>
-                <p data-details-company class="mt-1.5 font-display text-lg font-semibold tracking-tight text-paper"></p>
-                <p data-details-summary class="mt-1.5 max-w-2xl text-sm leading-relaxed text-paper-dim"></p>
-              </div>
+                <span data-details-role class="text-violet-soft">Founding / First Engineer</span>
+              </p>
+              <p data-details-company class="mt-1.5 font-display text-lg font-semibold tracking-tight text-paper">Global Predictions · PortfolioPilot</p>
+              <p data-details-summary class="mt-1.5 max-w-2xl text-sm leading-relaxed text-paper-dim">
+                First engineer on the team. Built the SEC-registered AI financial advisor ground-up. Hedge-fund-grade quantitative engine underneath; AI on top is the layer that turns dense statistical output into language a user can act on.
+              </p>
             </div>
             <a
               data-details-cta
-              href="#"
-              class="hidden items-center justify-between gap-3 bg-violet/10 px-5 py-4 font-mono text-[11px] uppercase tracking-widest text-violet-soft transition-colors hover:bg-violet/20 sm:flex sm:flex-col sm:items-end sm:justify-center sm:px-6"
+              href="/work/portfoliopilot"
+              class="flex items-center justify-between gap-3 bg-violet/10 px-5 py-4 font-mono text-[11px] uppercase tracking-widest text-violet-soft transition-colors hover:bg-violet/20 sm:flex-col sm:items-end sm:justify-center sm:px-6"
             >
               <span data-details-cta-text>open the case study</span>
               <span aria-hidden="true">→</span>
@@ -298,8 +295,6 @@ const yearLabel = (n: typeof CAREER[number]) => {
     const svg: SVGSVGElement = svgRaw;
     const details: HTMLElement = detailsRaw;
 
-    const empty = details.querySelector<HTMLElement>('[data-details-empty]')!;
-    const content = details.querySelector<HTMLElement>('[data-details-content]')!;
     const dDates = details.querySelector<HTMLElement>('[data-details-dates]')!;
     const dRole = details.querySelector<HTMLElement>('[data-details-role]')!;
     const dCompany = details.querySelector<HTMLElement>('[data-details-company]')!;
@@ -310,9 +305,17 @@ const yearLabel = (n: typeof CAREER[number]) => {
     const nodes = Array.from(svg.querySelectorAll<SVGGElement>('.dag-node'));
     const edges = Array.from(svg.querySelectorAll<SVGGElement>('.dag-edge'));
 
-    function activate(node: SVGGElement) {
+    // Find the "current" node (the one still running) and use it as the
+    // default panel state. On hover, swap; on mouseleave, revert to it.
+    const defaultNode = nodes.find((n) => n.dataset.nodeCurrent === 'true') ?? nodes[0];
+
+    function applyNode(node: SVGGElement, dimUnrelated: boolean) {
       const id = node.dataset.nodeId!;
-      svg.setAttribute('data-active', id);
+      if (dimUnrelated) {
+        svg.setAttribute('data-active', id);
+      } else {
+        svg.removeAttribute('data-active');
+      }
 
       nodes.forEach((n) => n.classList.toggle('is-active', n === node));
       edges.forEach((edge) => {
@@ -333,25 +336,23 @@ const yearLabel = (n: typeof CAREER[number]) => {
       if (hasCaseStudy) {
         dCta.setAttribute('href', href);
         dCtaText.textContent = isCurrent ? 'open the PortfolioPilot case study' : 'open the case study';
-        dCta.classList.remove('hidden');
-        dCta.classList.add('flex');
+        dCta.style.display = '';
       } else {
-        dCta.classList.add('hidden');
-        dCta.classList.remove('flex');
+        dCta.style.display = 'none';
       }
+    }
 
-      empty.classList.add('hidden');
-      content.classList.remove('hidden');
+    function activate(node: SVGGElement) {
+      applyNode(node, true);
     }
 
     function deactivate() {
+      // Don't go empty. Revert the panel to the default (current) role
+      // and clear the dim/active state so the DAG looks "at rest".
       svg.removeAttribute('data-active');
       nodes.forEach((n) => n.classList.remove('is-active'));
       edges.forEach((e) => e.classList.remove('is-active'));
-      empty.classList.remove('hidden');
-      content.classList.add('hidden');
-      dCta.classList.add('hidden');
-      dCta.classList.remove('flex');
+      if (defaultNode) applyNode(defaultNode, false);
     }
 
     nodes.forEach((node) => {
