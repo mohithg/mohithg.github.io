@@ -98,7 +98,7 @@ export const QNA: readonly QnA[] = [
     questions: ['Where did he study?', 'What\'s his education?', 'Degree?'],
     keywords: ['education', 'study', 'degree', 'university', 'school', 'gold', 'medalist', 'topper'],
     answer:
-      'Computer Science, **gold medalist** and **batch topper** at **CMR University**.',
+      'Computer Science, **gold medalist** and **batch topper** at **[Saveetha Engineering College](https://saveetha.ac.in)**, affiliated with **Anna University**.',
   },
   {
     id: 'location',
