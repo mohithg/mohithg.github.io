@@ -94,7 +94,13 @@ I'm still here, still shipping.
 
 ## What I'd do differently
 
-I'd instrument the chain end-to-end **earlier**. The biggest debugging cost across five years has been moments where the macro signal said one thing, the recommendation said another, and the AI translation said a third, and we had to walk the chain backward to figure out where it diverged. If I started over, every layer would emit its rationale by default from day one, not added in retrofit. The lesson scales: in any system where multiple stages compose into a user-visible output, the rationale at each stage is part of the contract, not a logging concern.
+I'd treat the AI's vocabulary as a **contract**, not an output.
+
+We built the AI as a translation layer over the quant engine, which was the right call architecturally. What I underweighted for too long is that the words the AI is *allowed to say* are themselves a contract on the engine. If the AI tells a user *"consider tax-loss harvesting,"* then tax-loss harvesting has to be something the engine can identify, quantify, justify, and audit. If the AI says *"your portfolio is over-concentrated in semiconductors,"* the engine has to be able to defend that classification on demand, in a way a regulator would accept. The AI's vocabulary is, in effect, a hidden API on the underlying system.
+
+For a long time that contract lived in nobody's repo. The quant team would ship a new model output and the AI team would invent words for it; once a quarter we'd discover the AI had been recommending something the engine couldn't fully verify, or the engine had been computing something the AI never surfaced. Both directions of that asymmetry are bad in different ways: one creates compliance risk, the other wastes the engine's best work. The fix, when we wrote it down, was a single document both teams co-owned: every concept the AI is permitted to use, what engine signal it maps to, what disclaimers it travels with, what regulatory constraints attach to it. The document should have existed on day one, before the first prompt.
+
+The generalizable lesson, which I now hunt for in any AI product: when two teams compose into one user-visible artifact, the *words* of that artifact are an API between them. The team that ships the surface and the team that ships the substance need to agree on the vocabulary before either of them writes a line of code. In a regulated domain, *especially* before either of them writes a line of code.
 
 <NextWork
   prev={{ href: "/", title: "Home" }}
