@@ -5,7 +5,6 @@ import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import ChatWidget from '../components/Chat/ChatWidget.tsx';
 import CommandPalette from '../components/CommandPalette/CommandPalette.tsx';
-import Cursor from '../components/Cursor/Cursor.tsx';
 import { SITE } from '../lib/site';
 
 type Props = {
@@ -94,7 +93,6 @@ const ogUrl = new URL(image, SITE.url).toString();
 
     {!hideFooter && <Footer />}
 
-    <Cursor client:idle />
     <ChatWidget client:idle />
     <CommandPalette client:idle />
 
