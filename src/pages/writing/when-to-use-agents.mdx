@@ -1,0 +1,135 @@
+---
+layout: ../../layouts/Writing.astro
+title: "When to use an agent (and when not to)"
+description: "The 'agent' label has been applied to almost every LLM feature. Most of them shouldn't be agents. Here's the actual decision criteria."
+publishDate: "2026-05-06"
+pillar: agents
+slug: when-to-use-agents
+---
+
+In 2024 and 2025, every LLM product gained an "AI Agent." Most of them are not agents. They are workflows or assistants with the word "agent" stuck on for branding. This is mostly harmless, but it has obscured a real architectural question: when does your feature actually benefit from being an agent, and when is the agent pattern just adding cost and unreliability?
+
+This essay is about the actual decision.
+
+## What "agent" means in this essay
+
+An agent, in the sense I'm using it, has these properties:
+
+1. The model decides which actions to take, in what order
+2. The actions can vary across runs based on what the model observes
+3. The model loops: it acts, observes the result, decides the next action
+
+An LLM call that always does the same thing in the same order is not an agent; it's a workflow. An LLM call that can call one tool but not chain them is not an agent; it's a tool-using prompt. An agent is specifically the loop-with-discretion pattern.
+
+## The case for agent patterns
+
+When does this pattern actually pay off?
+
+**Case 1: the work is variable in shape.** The user asks something; the right way to answer depends on what the model finds. *"Tell me what's interesting about my portfolio"*. The relevant facts vary. The agent might pull holdings, then notice high concentration, then check correlations, then summarize. A different portfolio might trigger a different sequence.
+
+**Case 2: the task is open-ended.** *"Help me plan a vacation."* There's no fixed workflow. The agent gathers preferences, explores options, narrows down, books. The shape of the work emerges from the interaction.
+
+**Case 3: deep tool ecosystems.** When the model has access to many tools and the right one to use depends on what's been learned so far. The model is acting as the orchestration layer, picking the next tool based on observations.
+
+**Case 4: long-running tasks with intermediate observations.** Research tasks, multi-step debugging, anything where each step's result reshapes the plan.
+
+In these cases, the agent pattern is the right fit because no fixed workflow could encode the right behavior across all situations.
+
+## The case against agents (when a workflow would work)
+
+Many features benefit from being workflows rather than agents.
+
+**Case 1: the work is well-shaped.** *"Summarize this article."* The shape is fixed: read input, produce summary. No discretion needed. A single LLM call (or a fixed two-step prompt chain) does the job. An agent would just add latency and failure modes.
+
+**Case 2: the task has a known plan.** Even if it's multi-step, if the steps don't change run-to-run, encode them as a workflow. *"Triage this support ticket: classify, route, draft response."* Three steps, always the same. Don't agent-ize it.
+
+**Case 3: the cost of agent failure is high.** Agents are inherently more flaky than workflows. They can loop, misuse tools, get stuck. If the cost of a failure is a refunded customer or a regulatory headache, the agent's discretion is a liability, not a feature.
+
+**Case 4: latency matters.** Each agent step is a model call. Multi-step agents are inherently slower than direct workflows. If the user is waiting for a response in the chat window, the latency of a 5-step agent is too long.
+
+In these cases, the agent pattern is overkill. A simpler architecture wins.
+
+## The decision tree
+
+Here's the practical decision I make.
+
+```
+Does the work always do the same steps in the same order?
+  → Yes: workflow. Hard-code it.
+
+  → No: does the model need to inspect intermediate results
+        to decide next steps?
+    → No: parallel multi-call prompt. Run the calls in
+          parallel; combine the results.
+
+    → Yes: how many steps, typically?
+      → 2-3: chained prompts with model-driven routing
+              between them.
+      → 4+: agent.
+```
+
+Most product features that get the "agent" label fall into the workflow or chained-prompt buckets, not the agent bucket. The teams that ship reliably realize this and downsize.
+
+## What "downsizing from an agent" looks like
+
+A pattern I've seen play out: a team builds an agent, finds it flaky and slow, and rebuilds it as a workflow. The workflow version is faster, more reliable, and the loss in capability is smaller than expected.
+
+The thing the agent did that the workflow doesn't:
+
+- Long-tail handling of weird user inputs (the agent could improvise; the workflow has to fall back gracefully)
+- Multi-tool sequences for tasks the user describes vaguely
+
+What the workflow gains:
+
+- Predictable latency
+- Predictable cost
+- Predictable behavior (you can reason about all paths)
+- Easier to test and eval
+- Easier to debug
+
+For most product features, the gain is worth the loss. The agent's improvisation was *cool* but rarely the difference between satisfaction and dissatisfaction. The reliability of the workflow matters more.
+
+## Hybrid: workflow with an agent escape hatch
+
+A useful pattern when you're not sure: a workflow that handles the common cases, with an agent fallback for the unusual ones.
+
+```
+def handle_request(user_input):
+    intent = classify_intent(user_input)
+    if intent in KNOWN_WORKFLOWS:
+        return run_workflow(intent, user_input)
+    else:
+        return run_agent(user_input)  # the catch-all
+```
+
+The known intents (probably 80% of traffic) hit the predictable, fast workflow. The unknown intents (the long tail) hit the agent. You get the reliability for the bulk of traffic and the flexibility for the edges.
+
+Over time, as you discover patterns in the agent-handled traffic, you can promote those patterns into workflows. The agent's traffic share shrinks; the workflows' share grows. The system gets faster and more reliable as you learn what users actually want.
+
+## The agent maturity ladder
+
+Most teams' agent journeys go through this progression:
+
+1. **Excited:** "Everything will be an agent! Agents will be the future of UX!"
+2. **Building:** First agent works in demos; flaky in production.
+3. **Patching:** Add error handling, retries, structured outputs, tool guardrails. Reliability improves.
+4. **Disillusioned:** Realize the agent is solving a problem a workflow could solve. Rebuild the most-used flows as workflows.
+5. **Mature:** Reserve agent patterns for genuinely open-ended work. Use workflows for everything else.
+
+Most teams I've watched get to step 4. The teams that stay in step 1-3 too long burn cycles on reliability work that wouldn't have been needed with the right architecture from the start.
+
+## The reliability-flexibility tradeoff
+
+This is the actual axis. Agents are flexible and unreliable. Workflows are rigid and reliable. Picking the right point on this axis is the architectural decision.
+
+Most product features want more reliability than flexibility. The user is doing the same things over and over (asking about their portfolio, drafting an email, answering a customer question). The flexibility budget is small. Use it where it matters; don't pay for it where it doesn't.
+
+Agents earn their flexibility cost when the user is genuinely doing exploratory work that you couldn't have predicted. For everything else, workflows are the right answer.
+
+## The take
+
+Stop asking "should we add an agent?" Ask "what shape does the work take?"
+
+If the shape is fixed: workflow. If it's variable but bounded: chained prompts. If it's truly open-ended: agent.
+
+The teams shipping the most reliable LLM products are the ones who downsize from agents to workflows when the workflow would do, and reserve agents for the cases where flexibility is the actual product. The reliability gains are large; the capability losses are smaller than you'd think.

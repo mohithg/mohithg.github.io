@@ -1,0 +1,107 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The five most common agent failure modes (and how to fix each)"
+description: "Production agents fail in predictable ways. Knowing the patterns saves weeks of debugging. Here are the five I see most often and what actually fixes them."
+publishDate: "2026-05-07"
+pillar: agents
+slug: agent-failure-modes
+---
+
+Production agents have a smaller variety of failure modes than the chaos of the model output suggests. Most agent bugs in the wild fall into one of five categories. Knowing the categories lets you triage faster and fix the right thing.
+
+This essay is the field guide.
+
+## Failure 1: looping
+
+The agent gets stuck in a loop. It calls the same tool with the same arguments, gets the same response, decides to call the same tool again. The user waits. Eventually the loop hits the step limit and the agent returns whatever partial state it has.
+
+**Why it happens.** The model's chain-of-thought concludes that the next step is a specific tool call. The tool returns a result that the model interprets as "I need to try again." The model proposes the same call. Repeat.
+
+This is especially common with tools that have ambiguous outputs ("no results found" vs. "invalid query") or with retrieval tools where the model thinks rephrasing will help but it doesn't.
+
+**Fixes.**
+
+- *Add cycle detection.* If the agent proposes the same (tool, args) tuple it has already executed, skip it and instruct the model to try something different.
+- *Improve tool error messages.* If the tool returns "no results," distinguish between "the query was wrong" and "the data isn't there." The model needs different signals.
+- *Set a hard step limit.* Even the best agent should have a cap. 15-20 steps for most tasks. Beyond that, fail loudly and ask the user.
+- *Add explicit reflection.* Periodically inject a system message: "You've taken N steps. Are you making progress? If not, summarize what you've learned and ask the user for guidance."
+
+## Failure 2: confidently wrong tool calls
+
+The agent decides to use a tool, calls it with arguments that look reasonable but are wrong, gets a successful response that has wrong-or-misleading data, and proceeds confidently. The user gets bad output, and the agent has no idea anything went wrong.
+
+**Why it happens.** The tool descriptions don't sufficiently constrain when each tool is appropriate. The model picks the most plausible-looking tool, calls it, and trusts the result. The error is silent.
+
+**Fixes.**
+
+- *Tighten tool descriptions.* Make clear when each tool is and isn't appropriate. Negative examples help: "Do not use this for X."
+- *Validate tool arguments.* If the model passes bad arguments, the tool should reject them with a clear message rather than returning misleading data.
+- *Add post-hoc verification steps.* For high-stakes outputs, the agent should sanity-check its conclusions against the source data before responding.
+- *Tag tool outputs with confidence.* If a tool call returned a low-confidence answer, the agent should treat the answer with appropriate skepticism.
+
+## Failure 3: lost context across steps
+
+The agent gathers a fact in step 2, makes a decision in step 5, but by step 8 has forgotten the fact. The final response contradicts something the agent had earlier observed and acted on.
+
+**Why it happens.** The conversation history grows with each step. Earlier facts get pushed out of the model's effective context, especially if the agent is long-running. Or, the model summarizes its earlier work for itself and the summary loses the relevant detail.
+
+**Fixes.**
+
+- *Externalize task state.* Important facts go into a structured task state, not the conversation. The agent reads from task state when it needs to remember.
+- *Periodic state summaries.* Every N steps, the agent generates a structured summary of what it's learned and the summary becomes part of its context.
+- *Pin critical facts.* If a fact is load-bearing, mark it as pinned: it stays in the context window even when the conversation gets compressed.
+- *Reduce step count.* If the agent doesn't need 15 steps, don't let it take 15 steps. Each step adds noise.
+
+## Failure 4: tool-result misinterpretation
+
+The agent calls a tool, gets a result, and reads it wrong. The tool returned `{"status": "pending"}` and the agent interpreted it as "completed." The downstream behavior is consequently wrong.
+
+**Why it happens.** The tool's output format is ambiguous, or the model's reading of structured data is brittle. Especially common with tools that return rich JSON: the model picks the wrong field, or hallucinates a field that doesn't exist, or assumes a field's meaning that's different from the actual semantics.
+
+**Fixes.**
+
+- *Make tool outputs human-readable, not just machine-readable.* Include a human-language summary at the top of the response. The model reads the summary; the structure is a backup.
+- *Use unambiguous status enums.* `"pending"` vs. `"completed"` vs. `"failed"` should be impossible to confuse. Don't use `success: true` for partial successes.
+- *Test the agent on each tool's edge cases.* If your tool can return five different status values, test the agent against all five.
+- *Validate the agent's reading.* Have the agent explicitly state its interpretation of the tool result before acting: "The tool returned status='pending', meaning I should wait." Catches misreadings.
+
+## Failure 5: silent termination
+
+The agent stops short. It produces a final answer that's incomplete: it skipped steps, it didn't pursue an obvious thread, it gave up on a tool error and moved on. The user gets a partial answer that looks like a complete one.
+
+**Why it happens.** The model's prompt doesn't sufficiently establish what "done" means. The model decides it's done when it has *something* to say, not when it has *the right* something. Common with agents that have a "respond to the user" tool and the model reaches for it too eagerly.
+
+**Fixes.**
+
+- *Define completion criteria explicitly.* The system prompt should say what it means for a task to be complete. "You are done when you have addressed all of the user's questions, used at least one source for each factual claim, and either reached a conclusion or explicitly noted what's unresolved."
+- *Add a self-check step.* Before responding, have the agent generate a checklist of what it should have done and verify each. If anything is missing, address it.
+- *Penalize early termination in eval.* If your bench includes cases where the agent should have done more steps and didn't, those should fail.
+- *Inspect the response, not just the trajectory.* If the trajectory looks fine but the response is shallow, the bench should catch this. Add cases that test depth.
+
+## How to triage a new failure
+
+When a user reports an agent doing the wrong thing, walk through the trace and ask:
+
+1. Did the agent loop? (Failure 1)
+2. Did it call a tool that was wrong for the situation? (Failure 2)
+3. Did it forget something it had already learned? (Failure 3)
+4. Did it misread a tool result? (Failure 4)
+5. Did it stop short of completing the task? (Failure 5)
+
+Almost every agent failure is one of these. Once you've identified the category, the fix is in the corresponding section above.
+
+## What's harder than the five common failures
+
+A small share of agent failures don't fit these categories cleanly. Common subtler ones:
+
+- *Sycophancy.* The agent agrees with whatever the user just said, even when the user is wrong. (Fix: explicit "you can disagree with the user when the data supports it" instructions in the system prompt.)
+- *Mode collapse.* Across many runs, the agent does the same shallow thing instead of the appropriate work. (Fix: examples in the prompt of what good vs. shallow looks like.)
+- *Drift.* The agent's behavior degrades over a long conversation, getting more verbose, more cautious, or more error-prone as the context grows. (Fix: periodic compaction and state externalization.)
+
+These are real, but they're rarer. Solve the five common ones first.
+
+## The take
+
+Agent failures look chaotic. They're not. The same five patterns produce most production failures. The fixes are different for each, but each is bounded and tractable.
+
+When debugging an agent, identify the failure category first. Apply the corresponding fix. Add a regression test to your eval bench. Move on. The teams that ship reliable agents are the ones who recognize the patterns instead of debugging each failure as if it were brand new.

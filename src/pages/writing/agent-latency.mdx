@@ -1,0 +1,143 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Agent latency: where the seconds actually go"
+description: "An agent that takes 30 seconds to answer is unusable for most product surfaces. Here's where the time actually goes and which optimizations move the needle."
+publishDate: "2026-05-11"
+pillar: agents
+slug: agent-latency
+---
+
+The first version of any agent feels slow. Sometimes shockingly slow. A user types a question; ten or twenty seconds pass; finally a response appears. By the time it arrives, the user has either lost interest or has begun to doubt the system.
+
+This essay is about where the seconds actually go in agent latency, and which optimizations are worth the engineering effort. Some of the standard advice (smaller models, shorter prompts) underdelivers on agent workloads. The actually-effective optimizations are different.
+
+## Anatomy of agent latency
+
+A typical agent run has four sources of latency.
+
+**Source 1: model inference time.** Each model call takes some seconds. For an agent doing N steps, this is N times the per-call latency.
+
+**Source 2: tool call latency.** Each tool the agent calls takes some time to execute and return. Network calls, database queries, third-party APIs.
+
+**Source 3: agent overhead.** Time spent assembling prompts, parsing responses, managing state, logging.
+
+**Source 4: human (or system) wait states.** If the agent has to wait for confirmation or external input, that's wall clock time even though it's not active processing.
+
+Most agent latency is Source 1 (model inference) or Source 2 (tool calls). Source 3 is usually a small share. Source 4 is huge when present and zero when not.
+
+## Where teams look first (and why it's wrong)
+
+The instinct: switch to a smaller, faster model. The agent was using Claude Sonnet 4.6; switch to Claude Haiku 4.5; maybe latency drops 3x.
+
+This sometimes works. More often, it doesn't, because:
+
+- The smaller model has lower reasoning quality, so the agent takes more steps to converge
+- More steps means more model calls, partially offsetting the per-call speedup
+- Worse tool usage means more retries and dead ends
+
+Net effect: maybe 30% latency improvement, with worse output quality. Not the win you wanted.
+
+The next instinct: shorten the prompt. Strip the system message, drop the few-shot examples, trim the tool descriptions. Saves a few hundred tokens per call.
+
+Also marginal. Token-count savings translate to milliseconds of latency. Useful in aggregate but rarely the bottleneck.
+
+The actual bottlenecks are different.
+
+## What actually moves the needle
+
+Five optimizations, ranked by typical impact.
+
+**Optimization 1: parallelize tool calls.** If the agent needs to call three tools whose results are independent, call them in parallel. The model can emit multiple tool calls in a single response (most APIs support this). Latency goes from 3 * tool_time to 1 * tool_time.
+
+This alone often cuts agent latency by 50% on data-gathering tasks. Most teams call tools sequentially out of habit.
+
+**Optimization 2: stream the final response.** Even if the agent's reasoning takes 8 seconds, if the final response can stream, the user sees the first words after 1 second and reads at human speed. Perceived latency drops dramatically.
+
+The catch: streaming requires the final response to be the one the agent commits to first. If the agent decides to revise after starting to respond, streaming breaks. Design the trajectory so the response is the last thing.
+
+**Optimization 3: cut steps with better tool design.** An agent that takes 6 steps could often take 3 with better tools. If the agent is calling `search_users` followed by `get_user_details` followed by `get_user_portfolio`, that's three round trips. A single `get_user_summary_by_search` tool combines them into one call.
+
+This is the highest-leverage optimization for repeated patterns. Identify the agent's common sequences; collapse them into single tools.
+
+**Optimization 4: cache tool results within a session.** Within a conversation, the agent might call `get_user_portfolio` multiple times. The portfolio doesn't change between calls (much). Cache the result with a short TTL. Subsequent calls return instantly.
+
+Useful for any tool whose output is stable over a conversation timescale.
+
+**Optimization 5: speculative execution.** While the model is thinking about whether to call a tool, you can speculatively execute the most likely tool in the background. If the model decides yes, you have the result ready; if no, you discard it.
+
+Advanced; pays off mainly for high-throughput agents where the speculation cost is justified by the latency savings.
+
+## Where to put the budget
+
+A useful framing: each agent has a latency budget (e.g., 5 seconds for a chat agent, 30 seconds for an analysis agent). Each step spends some of the budget.
+
+Track the budget breakdown across cases:
+- N steps * average_per_step_latency = step time
+- Tool call time per case
+- Overhead
+
+For each component over budget, figure out the optimization that addresses it. Don't optimize uniformly; optimize where the budget is being spent.
+
+## Streaming partial results
+
+For agents whose work has natural intermediate milestones, stream the milestones to the user.
+
+Instead of:
+```
+[silence for 15 seconds]
+"Here's your portfolio summary: ..."
+```
+
+Stream:
+```
+"Looking at your portfolio..."
+[2 seconds]
+"Found your holdings. Checking market data..."
+[3 seconds]
+"I see one notable change. Let me explain..."
+[7 seconds]
+"Here's the summary: ..."
+```
+
+The user perceives this as fast (something is always happening) even though total latency is the same. The intermediate updates also keep the user engaged so they don't tab away.
+
+Streaming intermediate updates is a UX choice as much as a latency optimization. Done well, it makes a 15-second agent feel faster than a non-streaming 5-second agent.
+
+## When the agent is too slow no matter what
+
+Sometimes the agent legitimately needs to do work that can't be made fast. A research task, a deep analysis, a long-running process. No optimization brings it under the user's patience threshold.
+
+For these, the right answer is to make the agent asynchronous. The user submits the request, gets a "we're working on it" acknowledgement, and gets the result later (notification, email, when they return to the app).
+
+This is not a latency optimization. It's a UX shift. The agent operates on a different timescale than the chat. Some products fit this model; others don't. Be deliberate about which.
+
+## Cold start vs steady state
+
+Latency on the first request of a session is usually slower than steady state. Reasons:
+
+- Caches are cold
+- Connection pools haven't warmed up
+- The model's prompt cache is empty
+
+If your agent is high-frequency-per-user, the first request is the only slow one and subsequent requests benefit from warm caches. If it's once-per-session, the cold-start latency is the user's actual experience.
+
+Optimize accordingly: pre-warm caches when the user lands; use prompt caching aggressively; design tools to favor reuse within a session.
+
+## What the user perceives
+
+The user doesn't care about technical latency. They care about perceived latency. Some patterns:
+
+- A spinner alone after 2 seconds feels slow.
+- A streaming response, even if total time is longer, feels fast.
+- Intermediate updates ("checking your portfolio...") feel fast.
+- A confident response after 1 second feels great.
+- A confident response after 8 seconds feels acceptable if it's clearly worth waiting for.
+- An unconfident or wandering response after 3 seconds feels broken.
+
+Engineering for perceived latency, not just measured latency, is the difference between "the agent is too slow" and "the agent is fine."
+
+## The take
+
+Agent latency comes mainly from model calls and tool calls. Smaller models and shorter prompts help marginally. The real wins are parallel tool calls, response streaming, fewer-step trajectories via better tool design, and intermediate updates that mask wait time as progress.
+
+Profile your agent's actual latency breakdown. Optimize where the time is going. Engineer for perceived latency, not just total latency. The agent that feels fast and produces good output beats the agent that's technically faster but feels stuck.

@@ -1,0 +1,142 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Tool permissions for agents: the principle of least privilege"
+description: "An agent with the wrong tool permissions is a security incident waiting to happen. Here's the permission model that keeps agents capable without giving them the keys to everything."
+publishDate: "2026-05-10"
+pillar: agents
+slug: agent-tool-permissions
+---
+
+The default permissions for AI agents in 2026 are still too permissive. Most teams give the agent broad access to tools, then trust the prompt to keep it from doing the wrong thing. The prompt is not load-bearing. The architecture should enforce what the prompt aspires to.
+
+This essay is about how to think about agent tool permissions the way you'd think about a service account's IAM policy: principle of least privilege, scoped credentials, audit trails, explicit elevation for dangerous operations.
+
+## What can go wrong with permissive tool access
+
+The risks scale with the agent's capabilities.
+
+**Tool scope creep.** The agent has access to `update_user` to support a profile-update flow. A clever prompt or a confused model triggers `update_user` for a different user, or for fields the original use case didn't intend.
+
+**Cross-user contamination.** The agent operates on behalf of users. If credentials are shared across user contexts, the agent might accidentally act on user A's behalf using user B's request as input.
+
+**Privilege escalation.** The agent has read access to one resource, write access to another. Through a chained tool call, it ends up with effective write access to the read-only resource (e.g., reads a config, modifies it, writes it back via a different tool).
+
+**Destructive actions on production data.** The agent has access to a `delete` tool that was intended for staging. It uses the tool in production. Records are gone.
+
+**Exfiltration.** The agent has access to user data and the ability to send messages externally. A prompt-injection attack uses the agent to send the user's data to an attacker-controlled address.
+
+Each of these is preventable with proper permission scoping. Each happens regularly because the scoping isn't done.
+
+## The permission model
+
+A useful model for agent tool permissions has four layers.
+
+**Layer 1: tool surface scoping.** Each agent has a defined set of tools it can call. The tool set is static and reviewed. Adding a tool to the surface requires a code change, not a prompt change.
+
+**Layer 2: per-call argument validation.** Each tool call has its arguments validated server-side before execution. The validation enforces things the model can't be trusted with: user_id matches the authenticated user, fields being modified are in an allowed set, etc.
+
+**Layer 3: capability tokens.** Dangerous tools require a capability token that's narrower than the agent's general credentials. The token might be scoped to a single operation, a single resource, a short time window.
+
+**Layer 4: confirmation gates.** The most dangerous tools (financial transactions, mass updates, destructive operations) require explicit user confirmation that's collected outside the agent loop. The agent proposes the action; a separate flow confirms.
+
+Most production agents have layer 1 (a fixed tool set). Some have layer 2 (basic validation). Few have layer 3 or 4. The teams that handle the most sensitive operations have all four.
+
+## Implementing layer 1: a fixed tool surface
+
+The simplest discipline: the list of tools the agent can call is in code, not in configuration that a prompt could expand.
+
+```python
+AGENT_TOOLS = [
+    get_user_portfolio,
+    get_market_data,
+    get_user_recent_activity,
+    draft_email_to_user,
+]
+```
+
+Adding a tool requires editing this file. The change goes through code review. The reviewer asks: do we want this agent to be able to do this? Is there a less-privileged way?
+
+The result: the agent's capability is bounded by the engineering team's deliberate decisions, not by what the model decides to attempt.
+
+## Implementing layer 2: argument validation
+
+Each tool's handler should validate its arguments against the security context, not just the schema.
+
+```python
+def get_user_portfolio(user_id: str, ctx: AgentContext):
+    # Validate the agent is allowed to access this user
+    if user_id != ctx.authenticated_user_id:
+        raise PermissionError(
+            f"Agent for user {ctx.authenticated_user_id} cannot access "
+            f"portfolio for user {user_id}"
+        )
+    return _fetch_portfolio(user_id)
+```
+
+The agent passes user_id as an argument, but the handler enforces that it matches the agent's actual session. The model can't trick the system by passing a different user_id; the request fails server-side.
+
+Apply this pattern to every tool that operates on user-scoped data. The model is not trusted to constrain itself.
+
+## Implementing layer 3: capability tokens
+
+For tools that perform sensitive operations, use short-lived capability tokens that are scoped to specific operations.
+
+Example: an agent that can draft emails on behalf of the user has a `draft_email` tool. To actually send the email, the user (in a separate UI flow) approves the draft, which mints a `send_email` capability token scoped to that draft. The agent can call `send_email` with the token; without it, the call fails.
+
+This keeps the dangerous capability behind a control the agent doesn't have. The agent can propose; the user (or another system) authorizes.
+
+## Implementing layer 4: confirmation gates
+
+The most dangerous tools should require explicit human confirmation.
+
+The agent doesn't actually call `execute_trade`. It calls `propose_trade`, which queues the trade for user review. The user sees the proposed trade, approves or rejects it in the UI, and only then is the trade actually executed.
+
+The confirmation is outside the agent loop. The agent can't fake it. The prompt can't override it. The user is the gatekeeper for irreversible actions.
+
+This is more friction than a single agent call, and that's the point. Friction is appropriate for irreversible operations.
+
+## Per-tenant credential isolation
+
+If your agent operates on behalf of multiple tenants (users, organizations, customers), each tool call should use credentials scoped to the current tenant.
+
+Bad: the agent uses a service-account credential that has access to all tenants. Argument validation is the only thing keeping the agent on the right tenant.
+
+Good: the agent's credentials are minted per-session for the current tenant. Even if the agent tries to access a different tenant's data, the credentials don't have the access. The boundary is enforced at the auth layer, not just in application code.
+
+## Audit logging for tool calls
+
+Every tool call the agent makes should be logged with:
+
+- The tool name
+- The arguments
+- The agent context (session, user, conversation ID)
+- The result (success/error)
+- A timestamp
+
+This log is the audit trail for "what did the AI actually do." When something goes wrong, the audit trail tells you when, and what tool, and on whose behalf.
+
+The audit log is also the basis for shadow eval: sampled tool call sequences feed back into the trajectory eval bench.
+
+## Read vs write asymmetry
+
+A useful default: read tools have broader scope; write tools have narrower scope.
+
+The agent can read most things (with appropriate per-tenant scoping). Reading doesn't change state, so the worst case is information exposure (mitigated by the scoping). The agent's write capabilities should be restricted to specific, well-defined operations with appropriate validation and (for sensitive ones) confirmation gates.
+
+This asymmetry lets the agent be useful (it can answer questions about lots of data) while limiting the blast radius of any failure (it can't break much).
+
+## What about prompt injection?
+
+Prompt injection is the security threat that gets the most attention. The fix is *not* better prompts. The fix is the permission model.
+
+If a malicious user input convinces the agent to call `delete_all_records`, the question is: was the agent allowed to call `delete_all_records`? If yes, you have a permission problem. If no (because the tool isn't in the surface, or the call fails validation, or the operation requires confirmation), the prompt injection failed regardless of how clever it was.
+
+Defense against prompt injection is mostly architectural. The prompt is a soft layer; the architecture is the hard layer. Invest in the hard layer.
+
+## The take
+
+Agent tool permissions deserve the same care as service account IAM policies. Scoped tool surfaces, per-call argument validation, capability tokens for sensitive operations, confirmation gates for irreversible ones.
+
+The model is not the security boundary. The architecture is. Treating the prompt as a security boundary leads to incidents; treating it as an aspirational policy and the architecture as the enforcement layer leads to safe agents.
+
+Build the permission model first. Add capabilities to the agent only as the model proves it can use them safely. Be willing to remove capabilities when they're not needed. The agent that can do less, but reliably and safely, is the agent that ships.

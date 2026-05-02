@@ -1,0 +1,111 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Multi-agent vs single-agent: when the orchestra is worth it"
+description: "Multi-agent architectures look elegant in diagrams. In production, they're more often a tax than a benefit. Here's when the orchestra actually beats the soloist."
+publishDate: "2026-05-08"
+pillar: agents
+slug: multi-agent-vs-single-agent
+---
+
+Multi-agent architectures look great in conference talks. A planner agent decomposes the task. A researcher agent gathers information. A writer agent drafts the response. A critic agent reviews. Each role is a specialist; together they're more capable than any single agent.
+
+In practice, most multi-agent systems are slower, more expensive, less reliable, and harder to debug than the equivalent single-agent system. The elegance of the architecture doesn't survive contact with production.
+
+That doesn't mean multi-agent is always wrong. It means the bar for using it is higher than the conference talks suggest. This essay is about where the bar actually is.
+
+## The case for multi-agent
+
+Three legitimate reasons to use multiple agents.
+
+**Reason 1: distinct contexts that shouldn't share.** Agent A handles user-facing communication and never sees raw internal data. Agent B has access to the internal data but doesn't talk to users. The separation enforces a security or privacy boundary at the architecture level.
+
+**Reason 2: distinct skill profiles.** Agent A is fine-tuned or deeply prompted for one task (e.g., parsing legal documents). Agent B for another (e.g., explaining concepts to laypeople). Combining them keeps each one focused, smaller, cheaper.
+
+**Reason 3: parallelizable subtasks.** The work splits cleanly into N independent pieces. Multiple agents work on the pieces in parallel. The orchestrator combines results.
+
+If your problem has one of these characteristics, multi-agent earns its complexity. If not, you're paying for an architecture you don't need.
+
+## The case against multi-agent
+
+Several costs that surprise teams.
+
+**Cost 1: coordination overhead.** Each inter-agent handoff is an additional model call. Each handoff has the same context-loss and serialization risks as any communication boundary. If your task has 4 steps and 4 agents, you're at minimum doing 4 model calls; with planning and review you're doing 6-10. The single-agent equivalent might be 4-5 calls.
+
+**Cost 2: error compounding.** If each agent has a 95% reliability rate per step, four agents in sequence have 95%^4 = 81% end-to-end reliability. The errors compound multiplicatively. Single-agent loops have similar issues, but with fewer handoff boundaries to corrupt state.
+
+**Cost 3: debugging complexity.** When something goes wrong, you have to figure out which agent failed and why. Was it the planner's plan? The researcher's research? The writer's writing? The critic's critique? Each agent is its own debugging surface.
+
+**Cost 4: configuration drift.** Each agent has its own prompt, its own tools, its own model. Keeping these in sync (and ensuring they don't accidentally diverge in a problematic way) is real work.
+
+For most teams, these costs outweigh the benefits.
+
+## The single-agent equivalent
+
+For most multi-agent designs, there's a single-agent equivalent that uses internal "modes" or chain-of-thought structure to do the same thing.
+
+Multi-agent design:
+```
+Planner agent → Researcher agent → Writer agent → Critic agent → Output
+```
+
+Single-agent equivalent:
+```
+One agent. System prompt: "First, plan. Then, gather information.
+Then, draft. Then, review your draft and revise if needed."
+```
+
+The single-agent version has fewer handoffs, less coordination overhead, and is easier to evaluate end-to-end. The "modes" still exist; they're just internal phases of one agent's process rather than separate agents.
+
+For tasks where the modes don't have hard boundaries (different tools, different contexts, different model fine-tunes), the single-agent version is almost always better.
+
+## When single-agent loses
+
+A few scenarios where single-agent really does fall short.
+
+**Scenario 1: very long context, distinct phases.** If the planning phase produces a 50K-token plan and the research phase produces 200K tokens of evidence and the writing phase needs all of it plus the original request, you might exceed context limits in a single-agent system. Multi-agent lets each agent have a focused context.
+
+**Scenario 2: privileged access boundaries.** Agent A can read sensitive financial data; Agent B cannot. They communicate through a sanitized interface. The architecture enforces what code-level checks could but more reliably.
+
+**Scenario 3: heterogeneous models.** Agent A uses a fine-tuned small model for a specific task (cheap, fast). Agent B uses a frontier model for reasoning. Routing different work to different models is genuinely an architectural concern.
+
+**Scenario 4: parallel work.** Five agents researching five subtopics simultaneously, then merging. Each is independent. Parallelism is the actual win, not specialization.
+
+For these scenarios, the multi-agent overhead pays for itself. For most other scenarios, it doesn't.
+
+## A common multi-agent antipattern
+
+The pattern: every named role in the team becomes an agent. Product manager agent. Engineering agent. Designer agent. They "collaborate" on a feature spec.
+
+Why it fails: the boundaries between these roles aren't actually distinct in a way the model can usefully exploit. A single agent prompted to "consider the perspectives of PM, eng, and design while drafting the spec" produces similar (often better) output, faster, cheaper.
+
+The role-based decomposition is a nice metaphor for human collaboration. It doesn't transfer directly to AI architecture. The boundaries that matter for AI are about context, model capability, and parallelism, not about job titles.
+
+## The hybrid: routing + agent
+
+A pattern that often works better than either pure single-agent or pure multi-agent: a routing layer in front of one or more agents.
+
+```
+Request → Router (classifier) → Specialized Agent A or B or C → Response
+```
+
+The router is a fast, simple model that decides which agent should handle the request. The specialized agents are each tuned for their domain. There's no inter-agent communication; the request goes to one place.
+
+This gives you the specialization benefit without the coordination overhead. It's not multi-agent in the orchestra sense; it's more like a phone-tree dispatch.
+
+For products with clearly distinct request types (a customer service product handling billing vs technical vs sales), this pattern works well.
+
+## How to know if you should be multi-agent
+
+Three diagnostic questions.
+
+1. **Is there actually a context, capability, or parallelism reason for the split?** If you can't articulate one of these three, single-agent is probably right.
+
+2. **Have you tried the single-agent version first?** Implement the simplest single-agent version. Run your eval. Note the gap between actual quality and target quality. If the gap is in something single-agent could close (better prompt, better tools, better state management), close it that way first.
+
+3. **Are you reaching for multi-agent because it's elegant, or because it's necessary?** Be honest. The elegance is a valid aesthetic preference, but it costs real engineering time and reliability. Make sure you're getting compensating value.
+
+## The take
+
+Default to single-agent. Reach for multi-agent only when you have a concrete reason rooted in context boundaries, model heterogeneity, or parallelism. The architectural elegance of multi-agent is real but rarely worth the production cost.
+
+The teams shipping the most reliable agentic products are mostly running single-agent loops with tight tool surfaces and good state management. The orchestras are flashier, but the soloists ship.

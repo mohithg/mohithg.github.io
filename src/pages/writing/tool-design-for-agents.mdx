@@ -1,0 +1,147 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Tool design for agents: APIs the model can actually use"
+description: "An agent is only as good as the tools you give it. Most teams design tools the way they design APIs for other engineers, and pay for it. Here's the difference that matters."
+publishDate: "2026-05-04"
+pillar: agents
+slug: tool-design-for-agents
+---
+
+When teams move from prompts to agents, they hit a wall they didn't expect. The prompts are fine. The orchestration is fine. The tools the agent calls are technically correct. The agent still does the wrong thing.
+
+The reason, almost always: the tools were designed for human engineers, not for the model. Tools that make perfect sense to a developer browsing the API docs make no sense to a model trying to assemble a multi-step plan. The model picks the wrong tool, calls it with the wrong arguments, misreads the response, and the whole agent run goes off the rails.
+
+This essay is about the principles that make tools easy for models to use correctly.
+
+## The asymmetry of context
+
+When an engineer reads an API, they have hours to read the docs, browse examples, ask colleagues, and try things in a REPL. They have intuition about what should and shouldn't work. They can look up undocumented behavior in the source.
+
+When a model uses an API, it has the tool description in the prompt and whatever guidance you put in the system message. That's it. No external context. No experimentation. The first call has to be right.
+
+This asymmetry has to drive your tool design. If a human needs five paragraphs of context to use the tool correctly, the model needs that context *in the tool description itself*.
+
+## Principle 1: name tools by what they do, not what they are
+
+Bad: `query_user_data`. Vague, ambiguous, doesn't tell the model when to use it.
+
+Good: `get_account_holdings_by_user_id`. Specific, action-oriented, hints at the input shape.
+
+The name is the highest-attention part of the tool description. The model decides whether to call this tool based partly on the name. A vague name leads to vague calls.
+
+A useful heuristic: write the tool name as if it were going to appear in a chain-of-thought: *"I'll use `get_account_holdings_by_user_id` to fetch the user's portfolio."* If that sentence is awkward, the name needs work.
+
+## Principle 2: parameter names should self-document
+
+Bad: `get_data(id, type, opts)`. The model has to guess what each one means.
+
+Good: `get_account_holdings(user_id: str, holding_type: Literal["equity", "bond", "cash"], include_cash_balance: bool = False)`. Each parameter's name says what it expects.
+
+Type annotations and enums help even more than naming. A `Literal["equity", "bond", "cash"]` parameter prevents the model from inventing a fourth value. A typed enum is more constraining than a string and produces fewer errors.
+
+## Principle 3: descriptions explain when to use, not just what it does
+
+The tool description in the prompt is your one chance to tell the model *when this tool is appropriate*. Most descriptions explain only what the tool returns, which the model can usually figure out. The harder question is when to call it.
+
+Bad: `"Returns the user's account holdings."`
+
+Good: `"Returns the user's account holdings. Use this when the user asks about their portfolio composition, current positions, or specific holdings. Do not use this for historical performance (use get_performance_history) or for tax lots (use get_tax_lots)."`
+
+The negative information ("do not use this for X") is often more valuable than the positive. Models confidently use the wrong tool when they don't know which one is right. Telling them when *not* to use a tool prevents this.
+
+## Principle 4: errors should teach the model how to recover
+
+When a tool call fails, the error message becomes part of the model's context for the next call. A well-designed error message helps the model fix the call.
+
+Bad: `Error: invalid input`. The model knows nothing about how to fix it.
+
+Good: `Error: 'holding_type' must be one of 'equity', 'bond', 'cash'. You passed 'stock'. Did you mean 'equity'?` Now the model can correct itself.
+
+Error messages for agent tools are not for human debugging. They are for model recovery. Optimize them for that.
+
+## Principle 5: outputs should be model-readable
+
+If your tool returns a giant blob of JSON with 50 fields, the model has to parse what's relevant. Often it does this badly. The relevant signal is buried.
+
+Better: return only what's relevant for the use case the tool was designed for. If you have multiple use cases, have multiple tools.
+
+Even better: structure the output so the most important information comes first, with explicit field names. *"summary"* and *"key_metrics"* fields up top, raw data below.
+
+If the output is large by necessity (e.g., a list of holdings), include a summary field at the top that the model can use without reading the full list.
+
+## Principle 6: keep the tool count small
+
+Models pick worse tools when there are more options. A tool surface with 80 tools makes the model uncertain which to use. A surface with 8 tools, each well-defined, makes the choice obvious.
+
+When you find yourself adding the 30th tool, ask whether you can:
+
+- Combine related tools (e.g., five `get_X_by_user` tools become one `get_user_data` with a typed `data_type` parameter)
+- Move infrequently-used tools behind a discovery layer (the agent calls a `lookup_tool` first to find the specialized tool it needs)
+- Eliminate tools whose use cases are rare enough that the agent could fall back to a more general tool
+
+The exception: agents that operate on huge tool catalogs (browsers, file systems, etc.) need richer discovery patterns. For most product agents, fewer is better.
+
+## Principle 7: idempotency where possible
+
+The model will sometimes call the same tool twice with the same arguments. Sometimes by accident, sometimes because it's verifying. Idempotent tools (same call → same effect) handle this gracefully. Non-idempotent tools (each call has side effects) require the model to be careful in ways it often isn't.
+
+Read tools should always be idempotent. Write tools should be idempotent where possible. If a write tool is non-idempotent, document this loudly in the description so the model knows to be careful.
+
+For genuinely non-idempotent operations (sending emails, executing trades), require an explicit confirmation parameter the model has to set. *"To actually send the email, set `confirm=True`."* Forces the model to acknowledge the irreversibility.
+
+## Principle 8: clear scope on side effects
+
+The tool description should explicitly say what side effects the tool has. Does it modify state? Send data to a third party? Charge money? Block until completion?
+
+A model that doesn't know a tool has side effects will use it as if it were free. A model that knows will be appropriately cautious.
+
+Format I use: at the top of the description, a single line that summarizes side effects. *"This tool sends an email to the specified address. Cannot be undone. Use cautiously."* The model treats it differently than `get_user_email_address`.
+
+## A worked redesign
+
+Here's a tool I've actually rewritten, before and after.
+
+Before:
+```python
+def query(table: str, filters: dict, limit: int = 100) -> dict:
+    """Query a table."""
+```
+
+After:
+```python
+def get_user_recent_activity(
+    user_id: str,
+    activity_type: Literal["login", "trade", "view", "settings_change"],
+    days_back: int = 7,
+) -> ActivityResult:
+    """
+    Returns the user's recent activity of the specified type.
+    Use this when the user asks 'what have I done recently' or
+    'when did I last X'. Do NOT use this for historical activity
+    older than 30 days (use get_user_activity_history instead).
+
+    Side effects: none (read-only).
+
+    Returns: an ActivityResult with .summary (string), .events
+    (list of Event objects), and .has_more (bool).
+    """
+```
+
+The before-tool is technically more flexible. The after-tool is dramatically more usable by an agent. The agent picks it correctly, calls it correctly, and uses the result correctly. The flexibility is moved into having multiple specific tools rather than one generic one.
+
+## What to test
+
+For each tool, ask:
+
+1. If I gave the agent a relevant user request, would it pick this tool unambiguously?
+2. Would it call it with correct parameters on the first try?
+3. If the call failed, would the error message let it fix itself?
+4. Would it correctly interpret the output and use it in the next step?
+
+If any answer is "probably not," the tool needs design work, not the agent.
+
+## The take
+
+Agents are not slow at picking tools because models are slow. Agents pick tools badly because tools were designed for the wrong reader. Design them for the model: specific names, typed parameters, when-to-use guidance, recoverable errors, model-readable outputs.
+
+The agent's quality is bounded by the quality of its tool surface. Most teams put their effort into the orchestration logic and accept whatever tools the existing API team built. The leverage is in the tools.

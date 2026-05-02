@@ -1,0 +1,127 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Evaluating agents: trajectory matters as much as outcome"
+description: "Eval frameworks for single-prompt LLM features don't translate cleanly to agents. Agents have process. The bench needs to grade the process, not just the result."
+publishDate: "2026-05-09"
+pillar: agents
+slug: agent-evals
+---
+
+Eval is hard for single-prompt LLM features. Eval for agents is harder. The reason: agents don't just produce outputs, they take actions along the way. A correct final output produced by a wildly inefficient or unsafe trajectory is not a passing run. A wrong final output produced by a sensible trajectory is informative in a different way than a wrong output produced by a chaotic trajectory.
+
+This essay is about how to design evals that measure the things that matter about agent runs, not just the final answer.
+
+## What an agent eval needs to measure
+
+Three distinct dimensions, all of which matter in production.
+
+**Outcome correctness.** Did the agent produce the right final output? This is the dimension that's most analogous to single-prompt eval.
+
+**Trajectory quality.** Did the agent take a sensible path to get there? Did it use reasonable tools, in a reasonable order, without redundancy or dead ends?
+
+**Cost and safety.** Did the agent stay within latency, token, and dollar budgets? Did it avoid actions that violate safety constraints (called the destructive tool, modified the wrong record, made unauthorized commitments)?
+
+A good agent eval scores all three. Most agent evals score only the first.
+
+## Designing trajectory checks
+
+Trajectory eval is the part most teams skip because it's harder. Here are patterns that work.
+
+**Check 1: tool call sequences.** For each eval case, define the *set* (or sequence) of tools that should appear. The agent passes if its actual trajectory contains those tools (and ideally not many extras).
+
+```python
+case = {
+    "input": "what's my portfolio worth this month vs last?",
+    "expected_tools_called": ["get_portfolio_value", "get_portfolio_value"],
+    "expected_max_steps": 4,
+}
+```
+
+This catches agents that take wildly indirect routes to simple answers. *"The agent called search_documents to find out what the portfolio value tool was, then called list_users, then finally called get_portfolio_value... it should have just called get_portfolio_value."*
+
+**Check 2: tool argument quality.** For each tool call, validate that the arguments make sense. *"The portfolio_value tool was called for the right user_id, in the right time range, with no extraneous filter."*
+
+This catches agents that call the right tool with wrong arguments. The final answer might happen to be right by coincidence; the trajectory tells you the agent didn't actually understand the question.
+
+**Check 3: no unsafe actions.** A list of actions that should never appear in any trajectory. *"The agent should never call delete_user, never call execute_trade, never call send_email except via send_draft_email_for_review."*
+
+The check is a simple set-membership test against the trajectory. Any unsafe action is an immediate fail regardless of outcome.
+
+**Check 4: no excessive loops.** If the agent calls the same tool with the same arguments more than N times in one run, that's a loop and should fail the case.
+
+These four checks together cover the bulk of trajectory pathologies. Agents that pass all four behave reasonably. Agents that fail one or more have something specific you can investigate.
+
+## Multi-objective scoring
+
+Once you're scoring multiple dimensions, you need a way to aggregate.
+
+Three approaches.
+
+**Approach 1: hard requirements + soft scores.** Some dimensions are pass/fail (no unsafe actions, no infinite loops, no missing required tool). The rest are scored. The case fails if any hard requirement fails; if all hard requirements pass, the soft score determines the case's contribution to the overall pass rate.
+
+**Approach 2: weighted sum.** Each dimension gets a weight. The score for a case is `outcome * 0.5 + trajectory * 0.3 + cost * 0.2`. Easy to compute, less interpretable.
+
+**Approach 3: per-dimension reporting.** Don't aggregate. Report pass rate per dimension over time. Look at all the dimensions when deciding whether to ship.
+
+I prefer Approach 1 for production gating (hard requirements are non-negotiable; soft requirements feed the score) and Approach 3 for ongoing quality tracking (each dimension's trend tells a different story).
+
+## Snapshot eval vs. live eval
+
+Two complementary patterns for actually running these checks.
+
+**Snapshot eval.** Pre-record agent trajectories on the bench. Re-run the trajectories' tool responses through the model. Compare new outputs to expected. Cheap, fast, deterministic.
+
+The catch: snapshot eval doesn't catch trajectory changes. If the agent decides to take a different path this time, the snapshot's recorded tool responses don't apply.
+
+**Live eval.** Actually run the agent against a (possibly mocked) tool environment. Trajectory and outcome are both observed. More expensive, slower, harder to make deterministic.
+
+You want both. Snapshot eval for fast feedback on prompt changes that don't change trajectory shape. Live eval for thorough validation of changes that might.
+
+## Gold trajectories vs. acceptable trajectories
+
+For each eval case, you have a choice: specify a single "gold" trajectory the agent should follow, or specify the *set* of acceptable trajectories.
+
+Gold trajectories are easier to evaluate (exact match). They're also more brittle (if the agent finds a better path, it fails).
+
+Acceptable trajectories are more flexible (any path that satisfies the constraints passes) but require defining the constraints carefully.
+
+I default to acceptable trajectories with hard constraints (must include certain tools, must not include forbidden tools, must complete within step budget) plus soft signals (fewer steps is better, less retrying is better). This gives the agent room to find better solutions while still failing on bad ones.
+
+## What to do when trajectories diverge from expectation
+
+The agent passed the case (correct outcome) but used a totally different trajectory than expected. What do you do?
+
+Three options.
+
+1. *The new trajectory is just as good or better.* Update the expected trajectory; the bench was holding the agent to an outdated standard.
+2. *The new trajectory is worse but still produces the right answer.* Add a soft penalty (longer trajectories score lower) but don't fail the case.
+3. *The new trajectory got the right answer by luck and is dangerous.* Fail the case; the trajectory is what matters here.
+
+The right answer depends on the case. Reviewing trajectory divergences is itself a useful exercise; it surfaces cases where your eval and your actual goals are out of sync.
+
+## Sampling trajectories from production
+
+The most valuable trajectory eval data comes from production. Real users do things you couldn't anticipate; real agent runs surface real trajectory pathologies.
+
+Sample N production runs per day. Have a human or a strong-model judge review the trajectory:
+- Did the agent take a reasonable path?
+- Did it use the right tools?
+- Did it converge or wander?
+
+The reviewer's verdict becomes the ground truth. Bad trajectories become bench cases. Good trajectories become evidence the agent is well-behaved.
+
+Without this practice, your bench tests synthetic trajectories that the agent has long since drifted away from in production. With it, the bench stays grounded.
+
+## The metric that matters
+
+If you have to pick one production metric for agent quality, it's not pass rate on a synthetic bench. It's *trajectory acceptability rate on production-sampled runs*: of the production runs we sampled, what fraction had reasonable trajectories?
+
+This metric is hard to game (you'd have to make production trajectories look good, which is the actual goal). It's directly tied to user experience. It captures what matters about agents: not just whether they succeed, but how they succeed.
+
+## The take
+
+Agent eval is harder than prompt eval because agents have process, not just outputs. The eval has to grade the process.
+
+Define hard constraints (no unsafe actions, no infinite loops, no missing required tools). Define soft signals (fewer steps, less retry, sensible tool choice). Sample production for ground truth. Refresh the bench as the agent evolves.
+
+The agent that passes outcome eval but takes wandering, expensive, or unsafe trajectories will eventually create incidents in production. The bench should catch this before users do.

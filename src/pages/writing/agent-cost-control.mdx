@@ -1,0 +1,159 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Agent cost control: where the money actually goes"
+description: "An agent that costs $0.10 per run becomes a $30K monthly bill at meaningful traffic. Here's where the cost concentrates and which controls keep it sustainable."
+publishDate: "2026-05-13"
+pillar: agents
+slug: agent-cost-control
+---
+
+The first time a team's agent bill arrives, the reaction is usually surprise. The unit cost per run looked tiny in development. Multiplied by production traffic, it's a meaningful budget item. Sometimes the largest line item in the infrastructure bill.
+
+Agent costs scale differently than chat-completion costs. A single chat call has a known token count and a predictable price. An agent has variable steps, variable tool calls, variable trajectories. The cost distribution is wide and the average misleads.
+
+This essay is about where agent costs concentrate, how to measure them, and which controls keep them sustainable without hurting product quality.
+
+## Where the cost goes
+
+Three sources, in approximate order of impact.
+
+**Source 1: long trajectories.** A typical agent might average 5 steps per run, but the long tail might be 20+ steps. Each step is a model call. The long-trajectory runs are 4x more expensive than average and contribute disproportionately to the bill.
+
+**Source 2: large per-step contexts.** Each step's prompt includes the conversation so far, plus tool descriptions, plus tool results. As the trajectory grows, the per-step prompt grows, and the cost per step grows. Late steps in long trajectories can be 10x more expensive than the first step.
+
+**Source 3: model choice.** Frontier models cost 10-50x what mid-tier models cost. If every step uses the most expensive model, you're paying for capability you may not need on every step.
+
+Most agent bills are dominated by Sources 1 and 2: the runs that go long. A small fraction of runs eats most of the budget.
+
+## How to see this in your data
+
+Track per-run cost. Plot the distribution. You'll see something like:
+
+- Median: small
+- p90: 3-5x median
+- p99: 10-30x median
+- Top 1%: hundreds of x median
+
+The long tail isn't a small contributor. The top 5% of runs by cost often account for 30-40% of total spend.
+
+Once you can see this, the optimizations target the tail rather than the average.
+
+## Optimization 1: cap trajectory length
+
+Set a hard maximum on agent steps. If the agent reaches the cap without completing, return what it has and stop.
+
+A typical cap: 10-15 steps for a chat agent, 30-50 for a research agent.
+
+The cap saves cost on the long tail and prevents runaway loops. It also forces honest measurement: any time the cap fires, that's a case the agent didn't handle well, and the bench should grow to cover it.
+
+## Optimization 2: use cheaper models for cheaper steps
+
+Not every step needs the same model. A few patterns:
+
+- **Routing/classification steps:** small fast model. Picking which tool to call doesn't need frontier reasoning.
+- **Reasoning steps:** frontier model. The hard thinking is where the model matters.
+- **Summarization/formatting steps:** mid-tier model. Compressing or restructuring content is well within mid-tier capability.
+
+Hybrid orchestration: the agent's main loop uses a frontier model; specific sub-tasks call out to cheaper models for the work that fits.
+
+Done well, this cuts cost 3-5x with minimal quality impact. Done poorly, it introduces inconsistency between models and the agent gets confused. Test the boundary before deploying broadly.
+
+## Optimization 3: cache prompt prefixes
+
+Modern model APIs support prompt caching: if the prefix of your prompt is identical to a recent call, you pay reduced cost on the cached portion.
+
+For agents, the static parts of the prompt (system message, tool descriptions, few-shot examples) are the same on every call. Cache them. Each step pays for the cache hit (cheap) plus the per-step deltas (the conversation so far) at full price.
+
+In well-cached agents, the cached portion is 70-90% of the prompt. Cost per call drops 3-5x.
+
+This is the single highest-ROI optimization for most agents. It's also one of the easiest to implement.
+
+## Optimization 4: trim the conversation as it grows
+
+Long conversations grow the per-call cost as their history accumulates. Trim it.
+
+Two patterns:
+
+- **Sliding window:** keep the last N turns; drop earlier ones. Risk of losing important context.
+- **Summarization:** compress earlier turns into a summary. Keeps the gist; loses some detail.
+
+For most agents, periodic summarization works well. The agent's task state (separately persisted) holds the load-bearing facts. The conversation summary holds the contextual flavor.
+
+This bounds the per-call cost no matter how long the conversation gets.
+
+## Optimization 5: pre-compute expensive tool results
+
+If the agent reliably needs certain data on most runs (e.g., the user's portfolio), don't have the agent fetch it during the run. Pre-fetch it before the agent starts and inject it into the initial context.
+
+Costs: one extra pre-fetch per agent run.
+Saves: a tool call (and the model's deliberation about whether to make it) per run.
+
+For high-frequency agents, pre-fetching the obvious data is a net cost reduction even though it adds work upfront.
+
+## Optimization 6: short-circuit obvious cases
+
+Before starting the full agent loop, check if the request matches a pattern you can handle with a single LLM call or even a static response.
+
+```python
+def handle(request):
+    if is_simple_question(request):
+        return single_call_answer(request)  # cheap
+    return run_full_agent(request)  # expensive
+```
+
+The classifier `is_simple_question` is itself usually a cheap model call. The savings: every simple question avoids the full agent overhead.
+
+For chat agents that handle a mix of simple and complex queries, this can cut cost 30-50% with no quality impact on the complex side.
+
+## Budget alerts and circuit breakers
+
+Beyond optimization, install spend safeguards.
+
+**Per-run budget cap.** Each agent run has a maximum dollar budget. If the run hits the cap, abort and return what you have. Prevents runaway runs from eating the budget.
+
+**Per-user rate limit.** A single user can't trigger more than N agent runs per minute. Prevents one user from running up the bill.
+
+**Daily spend alerts.** When daily spend is on track to exceed the monthly budget, alert. Catches overspend before the end of month.
+
+**Circuit breaker on cost-per-run trend.** If the average cost per run starts climbing day-over-day, alert. A regression in trajectory length or prompt size will show up here.
+
+These are not optimizations; they're safety nets. The optimizations reduce expected cost; the safety nets bound worst-case cost.
+
+## What "good" looks like
+
+A cost-disciplined agent might have:
+
+- p50 cost per run: under $0.05
+- p99 cost per run: under $0.50
+- Average steps per run: 3-6
+- Cache hit rate on prompt prefix: >70%
+- Daily spend: stable or trending down per fixed traffic
+
+A cost-undisciplined agent might have:
+
+- p50 cost per run: $0.20
+- p99 cost per run: $5
+- Average steps per run: 8-12
+- No prompt caching
+- Daily spend: climbing 5-10% per week without traffic increase
+
+The difference is mostly engineering hygiene, not capability tradeoffs. The cost-disciplined version performs about as well; it's just been optimized.
+
+## When cost matters more vs less
+
+Be honest about which agents need aggressive cost discipline.
+
+- *High traffic, low margin:* yes, optimize aggressively.
+- *Low traffic, high value per run:* maybe not. If the agent runs 10 times a day and each run is worth $100 to the user, paying $0.50 is fine.
+- *Internal tooling:* usually fine to spend more for capability. The cost is bounded by usage.
+- *Demo/POC:* don't over-optimize. The agent might not survive to production.
+
+Match the optimization effort to the actual cost surface. Some agents need every trick; others can run unoptimized for years.
+
+## The take
+
+Agent costs are heavy-tailed. The long-trajectory, large-context runs eat the budget. Cap trajectory length, cache prompt prefixes, trim conversations, use cheaper models where appropriate, short-circuit easy cases.
+
+Track per-run cost distribution, not just totals. Set per-run budgets and circuit breakers. Match optimization intensity to traffic and margin.
+
+The teams whose agents stay financially sustainable did the cost work. The teams whose agents grow into surprising bills usually didn't measure where the cost was going.

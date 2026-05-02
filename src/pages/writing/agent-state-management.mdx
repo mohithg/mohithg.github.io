@@ -1,0 +1,179 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Agent state management: the part nobody writes about"
+description: "Most agent tutorials skip past the question of where state lives. In production, state management is half the work. Here's the model that scales."
+publishDate: "2026-05-05"
+pillar: agents
+slug: agent-state-management
+---
+
+Agent tutorials usually read like this: the model receives a request, calls a tool, reads the result, calls another tool, and eventually gives an answer. Implicit in the example is that state is the conversation history. Each turn carries everything the agent knows.
+
+This works for demos. It falls apart in production.
+
+Real agents need to manage state across long-running tasks, across user sessions, across tools that have their own state, and across failures. The state model the demo agent uses (everything in the conversation) doesn't scale. You need something better.
+
+This essay is about the state model that does scale.
+
+## The four kinds of state in an agent
+
+To reason about this, separate the categories.
+
+**Conversation state.** The literal back-and-forth between the user and the model. What the user said, what the model said back. Lives in the message history.
+
+**Working memory.** What the model is "thinking about" within the current task. The intermediate observations from tool calls, the partial plan, the things the model has noticed but not yet acted on. Lives across tool calls within one task.
+
+**Task state.** The structured representation of what task is being done, its progress, its expected outputs. *"User asked for a portfolio review; we're 3 of 5 steps in; here's what we've gathered."*
+
+**External state.** The state in the systems the agent is acting on. Database rows, email drafts, calendar events. Lives outside the agent entirely.
+
+Most agent code conflates these. Conversation, working memory, and task state all end up in the message history. External state is queried fresh every time. The result is fragile.
+
+## Why message-history-as-state breaks
+
+Three failure modes.
+
+**Context window runs out.** Long conversations or long task sequences accumulate too many tokens. The model loses earlier context. It starts forgetting things from the beginning of the task.
+
+**Forking is impossible.** If the user wants to "go back" or "try a different approach," the linear conversation history can't represent that. The agent has to either restart or carry awkward branching context.
+
+**Recovery is impossible.** If the agent crashes mid-task, the conversation history alone isn't enough to resume. You don't know which steps had been completed.
+
+The fix is to externalize the state that needs to outlive the conversation.
+
+## The state model that works
+
+```
+Conversation: the messages exchanged with the user. Stored.
+Working memory: scoped to the current model call. Built fresh each time.
+Task state: a separate record. Persisted. Updated as the task progresses.
+External state: queried from source systems as needed.
+```
+
+The key insight: **task state is a first-class entity, not a side effect of the conversation**. It has its own schema, its own persistence, its own lifecycle.
+
+A task record might look like:
+
+```python
+class TaskState:
+    task_id: UUID
+    user_id: UUID
+    task_type: str  # "portfolio_review", "tax_optimization", etc.
+    created_at: datetime
+    status: Literal["pending", "in_progress", "awaiting_user", "completed", "failed"]
+    plan: list[Step]
+    observations: dict[str, Any]
+    final_output: Optional[dict]
+```
+
+When the agent starts a task, it creates a TaskState. As it executes steps, it updates the TaskState. When it needs to remember something from earlier in the task, it reads from TaskState rather than scrolling back through the message history.
+
+## What goes in working memory vs. task state
+
+A useful rule: **anything the model needs across more than one model call goes into task state.** Anything used within a single model call can live in working memory.
+
+Examples of task state:
+- The user's stated goal
+- The plan the agent decided on
+- Intermediate facts gathered from tool calls
+- Decisions the agent has made (and why)
+- Errors encountered and how they were handled
+
+Examples of working memory:
+- The current tool call's response (used immediately, then folded into task state if relevant)
+- The model's chain-of-thought for the current step
+- Temporary calculations
+
+The distinction matters because working memory can be ephemeral; task state has to survive crashes, restarts, and conversation gaps.
+
+## The benefit: replayable, resumable agents
+
+Once task state is first-class, you get powerful properties.
+
+**Replayability.** You can re-run the same task from a snapshot. Useful for debugging: "show me what the agent saw at step 3."
+
+**Resumability.** If the agent crashes at step 4, the next process can pick up at step 4 because step 1-3 results are in the task state.
+
+**Forkability.** You can branch a task: snapshot state, try one approach, snapshot again, try another approach, compare. Useful for some kinds of agent design.
+
+**Auditability.** The task state is the audit trail. You know exactly what the agent did, in what order, with what observations.
+
+None of these are possible with conversation-as-state.
+
+## Persistence options
+
+Three patterns, increasing in sophistication.
+
+**Pattern 1: file or row per task.** Simplest. Each task gets a UUID. State is a JSON blob written to a file or a database row. Updated as the task progresses.
+
+Works for: most product agents. Cheap. Easy to reason about.
+
+**Pattern 2: event-sourced state.** Each step's effect is an event appended to a log. State is a fold of the events. The current state can be reconstructed by replaying events.
+
+Works for: agents where audit and replay are critical. More complex; pays off for long-running tasks.
+
+**Pattern 3: durable workflow engine.** Use Temporal, Inngest, or similar. The framework handles state, retries, and resumption. Your agent code is "workflow code" that the engine persists between steps.
+
+Works for: enterprise-grade agents with strict reliability requirements. Most overhead; most reliability.
+
+Most teams should start with pattern 1 and migrate to 2 or 3 only when they need the extra properties.
+
+## The conversation-history compaction pattern
+
+Even with externalized task state, the conversation can grow long. A useful pattern: periodically *compact* the conversation by summarizing earlier turns.
+
+```
+[conversation]
+User: ... (turn 1)
+Assistant: ... (turn 2)
+... 30 more turns ...
+User: ... (turn 32)
+
+[after compaction]
+[Summary of conversation up to turn 30: User asked about X. Assistant did Y, Z. Key facts: ...]
+User: ... (turn 31)
+Assistant: ... (turn 32)
+```
+
+The compacted summary is generated by an LLM call. The original messages are kept in storage but don't enter the prompt. The model sees only the summary plus recent turns.
+
+This keeps context windows manageable on long tasks. Compaction is lossy, but with a good summary prompt, the loss is rarely material to the agent's next step.
+
+## Don't put external state in the agent
+
+Tempting mistake: copy external state into the agent's task state. *"I have the user's portfolio in my task state, no need to fetch it again."*
+
+The portfolio changes. By the time the agent uses the cached version, it's stale.
+
+Rule: external state should be queried fresh, or queried with a TTL, or invalidated on writes. It should not be cached in agent task state for longer than its rate of change.
+
+What *can* live in task state: derived facts the agent computed from the external state. *"As of step 3, the user's risk score was 6.8."* That's a snapshot the agent can reason about even if the underlying score changes later. The task state captures the agent's epistemic state, not the world's state.
+
+## Sessions and conversations
+
+If your agent is conversational (chat-like), sessions and conversations are layered on top of task state.
+
+A session is a unit of user engagement. A conversation is the message exchange within a session. A session may include multiple tasks. A conversation may span multiple tasks.
+
+The session has an ID. Each task within the session has an ID. The conversation links to both. This three-layer model lets you reason about user activity at the right granularity.
+
+## What to build first
+
+If you're starting an agent today, build in this order:
+
+1. Define the task schema. What types of tasks does this agent run? What does each task's state look like?
+2. Build the persistence layer. Each task gets stored, reads/writes are atomic.
+3. Build the agent loop. At each step, read task state, decide next action, execute, update task state.
+4. Add conversation handling on top. Conversations link to sessions; sessions own tasks.
+
+This is the opposite order most tutorials teach. They start with the agent loop. State management is bolted on later, badly.
+
+If state management is the foundation, the agent loop is straightforward. If it's an afterthought, the agent loop becomes a tangle of "where did this variable come from" and "why is this state inconsistent."
+
+## The take
+
+Agents are state machines. The state has to live somewhere durable, structured, and addressable. The conversation is part of that state, but it's not all of it.
+
+Externalize task state. Treat it as a first-class entity with its own schema and persistence. Query external state fresh; cache only derived facts. Compact conversations when they grow long. Build the state model first; the agent loop is easy once the state is right.
+
+The agents that survive contact with production are the ones whose state models survive contact with production. Most agents fail not because the model is bad but because the state management was an afterthought.

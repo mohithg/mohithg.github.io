@@ -1,0 +1,150 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Observability for agents: what to instrument from day one"
+description: "An agent without observability is a black box that occasionally produces output. Here's what to instrument, what to alert on, and what to keep out of your dashboards."
+publishDate: "2026-05-12"
+pillar: agents
+slug: agent-observability
+---
+
+A regular service has request rate, error rate, and latency. Those are necessary for an agent service too, but they're nowhere near sufficient. Agents have *trajectories*: sequences of steps with branching behavior. The metrics that capture agent health are different from the metrics that capture HTTP service health.
+
+This essay is about what to instrument for an agent from day one, what alerts to set, and what to leave out so the dashboards don't become noise.
+
+## What's different about agent observability
+
+Three differences from regular service observability.
+
+**Difference 1: variable per-request work.** A regular service's work per request is approximately constant. An agent might take 1 step on a simple request and 15 on a complex one. Latency, cost, and token usage vary by 10x or more across requests. Aggregate metrics don't capture this.
+
+**Difference 2: trajectory shape matters.** Two requests with the same input and the same final output might have wildly different trajectories. The trajectory is information you'd never have for a regular HTTP service.
+
+**Difference 3: quality is part of health.** A regular service is healthy if it returns 200s. An agent is healthy if it returns 200s *with good output*. Quality has to be a first-class operational metric.
+
+Adapting standard observability to these realities is the work.
+
+## What to instrument: the essentials
+
+For every agent run, log:
+
+```
+run_id            UUID
+session_id        UUID
+user_id           UUID nullable
+created_at        timestamp
+agent_type        string  -- which agent
+input_summary     text  -- one-liner of what was asked
+total_steps       int  -- how many model+tool steps
+total_duration_ms int
+total_tokens      int
+total_cost_usd    numeric
+trajectory        jsonb  -- array of steps with type, tool, args, duration
+final_output      jsonb
+status            enum  -- 'completed', 'errored', 'timed_out', 'aborted'
+quality_signals   jsonb  -- any post-hoc quality metrics
+```
+
+The trajectory field is the most important. It contains the full sequence of model calls and tool calls. From this, you can reconstruct the agent's behavior on any specific run.
+
+## Dashboards that earn their place
+
+A handful of dashboards I'd build day one.
+
+**Run rate and status.** Runs per minute, broken down by status. The "errored" line should be near zero; the "timed_out" line tells you about long-running cases.
+
+**Latency distribution.** Not just average; full percentiles. p50, p90, p99. Agent latency is heavy-tailed; the average misses it.
+
+**Steps per run distribution.** Histogram of trajectory lengths. The shape tells you how often the agent does deep work vs. quick answers.
+
+**Tool call frequency.** Which tools are getting called, how often, with what success rate. Reveals which tools are most leveraged and which might be unused.
+
+**Cost per run distribution.** Same as latency: percentiles matter. The expensive tail is where your bill is.
+
+**Quality signal trend.** Some quality metric (LLM-as-judge sample, user thumbs, human-reviewer agreement) tracked over time. Without this, you can't tell if quality is regressing.
+
+That's six dashboards. Each one gives you actionable information. Avoid building 30 dashboards; nobody will look at them.
+
+## Alerts that are worth pager
+
+Three categories.
+
+**Category 1: hard failures.** Error rate above threshold. Timeout rate above threshold. Tool call failure rate above threshold. Standard SRE stuff.
+
+**Category 2: trajectory pathology.** Average steps per run above some threshold (suggests the agent is wandering). Specific tools called more than expected (suggests a loop). These need investigation but aren't necessarily user-facing yet.
+
+**Category 3: quality drops.** The shadow eval / sample-based quality metric drops below a threshold. The first two categories tell you the agent is broken; this one tells you the agent is misbehaving.
+
+Setting thresholds is hard; start permissive and tighten as you learn the baseline. Alerts that page on noise get ignored; alerts that page on real problems get respected.
+
+## What to keep out of dashboards
+
+Some metrics seem useful but become noise.
+
+**Average latency alone.** Agent latency is heavy-tailed. The average is meaningless without the distribution. If you must show one number, show p95.
+
+**Total tokens or total cost.** Useful for the bill, not for operational health. Budget monitoring is a separate concern.
+
+**Per-step LLM call detail.** Too granular for top-level dashboards. Useful when drilling into a specific run.
+
+**Per-user breakdowns.** Probably not on the main dashboard; useful in investigation.
+
+A dashboard with everything on it is the same as no dashboard. Keep it focused.
+
+## Trace UI that earns its keep
+
+The single highest-leverage observability tool for agents is a trace UI: given any run_id, show the full sequence of steps with their inputs and outputs.
+
+Minimum features:
+
+- Tree view of the trajectory (steps, tool calls, sub-results)
+- Full input and output for each step
+- Latency and cost per step
+- Diff view: "show this run side-by-side with another"
+
+The diff view is the killer feature for debugging "why did this run produce a different result than that one." Without it, you're staring at two long traces trying to spot the difference.
+
+Most off-the-shelf trace UIs do the tree view well. They do the diff badly. If you're building your own, prioritize diff. If you're buying, evaluate it specifically.
+
+## Sampling and retention
+
+You don't need to keep full traces forever. Reasonable defaults:
+
+- Keep full traces for 30 days
+- Keep summary metrics (run-level aggregates) for 6-12 months
+- Keep specific tagged traces longer (incident investigations, eval cases)
+
+Storage is cheap but not free. Most traces never get looked at. The old ones are usually too stale to be useful by the time you'd want them.
+
+For the most-recent N days, you want full fidelity. For longer-term trends, summaries suffice.
+
+## Connecting observability to the eval bench
+
+Production observability and the eval bench should share data.
+
+**Direction 1: production findings become eval cases.** When the trace UI surfaces a problematic trajectory, that becomes a regression case in the bench. The bench grows from production reality.
+
+**Direction 2: bench failures become observability targets.** When a bench case starts failing, the trace UI helps you understand what changed. Why did this case start failing? What did the trajectory look like before vs. now?
+
+The two systems are complementary. Treating them as separate concerns leads to a bench that drifts from production and observability that doesn't catch regressions.
+
+## What to do on day one
+
+If you're starting an agent today, build observability before building features.
+
+1. Decide on the trace schema. What fields do you log per run? Per step?
+2. Set up the persistence (Postgres, ClickHouse, dedicated trace storage; doesn't matter much, pick one).
+3. Build the trace UI minimum: list of recent runs, click into one, see the trajectory.
+4. Build the dashboards: run rate, latency, steps per run, cost, quality.
+5. Set up alerts: error rate, timeout rate, trajectory pathology.
+
+This sounds like a lot. It's an afternoon of work each, two days of work total. Once it exists, every later debugging session is hours instead of days.
+
+The teams that ship agents reliably built their observability first. The teams that ship agents and then add observability spend the intermediate weeks debugging blind.
+
+## The take
+
+Agent observability is different from HTTP service observability. Trajectory is the unit of work; quality is part of health; latency and cost are heavy-tailed.
+
+Build the trace UI. Build the six dashboards. Set up the three alert categories. Connect observability to the eval bench. Do this on day one.
+
+You can debug an agent without observability. It just takes 10x as long. The investment in observability pays for itself the first time you can answer "why did the agent do that?" by clicking on the run instead of digging through logs.
