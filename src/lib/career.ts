@@ -64,6 +64,7 @@ export const CAREER: readonly CareerNode[] = [
     summary:
       'Cancer second-opinion platform connecting patients in India with oncologists at top US institutions. Shipped most of the patient and clinician surfaces.',
     tags: ['Healthcare', 'Full-stack', 'React', 'Node.js'],
+    href: 'https://navyanetwork.com',
   },
   {
     id: 'rippling',

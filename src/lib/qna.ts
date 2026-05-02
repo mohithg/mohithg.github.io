@@ -84,7 +84,7 @@ export const QNA: readonly QnA[] = [
     questions: ['How many years of experience does he have?', 'How long has he been doing this?'],
     keywords: ['years', 'experience', 'long', 'how', 'old', 'seniority'],
     answer:
-      '**11+ years** of professional engineering, since 2014. Started at AthenaHealth, then Codebrahma (where he shipped his first production React app and got the Dan Abramov tweet), then Rippling via Codebrahma, then Navya.Care, then founding engineer at IntuitionAI (acquired by Domino), three years at Domino, then first engineer at PortfolioPilot from June 2021.',
+      '**11+ years** of professional engineering, since 2014. Started at AthenaHealth, then Codebrahma (where he shipped his first production React app and got the Dan Abramov tweet), then Rippling via Codebrahma, then [Navya](https://navyanetwork.com), then founding engineer at IntuitionAI (acquired by Domino), three years at Domino, then first engineer at PortfolioPilot from June 2021.',
   },
   {
     id: 'ai-products',
