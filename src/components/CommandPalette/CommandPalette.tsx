@@ -49,7 +49,7 @@ function buildCommands(): Cmd[] {
       },
     },
     { id: 'mail', label: 'Email Mohith', group: 'actions', icon: Mail, href: 'mailto:mohithgm@gmail.com', external: true },
-    { id: 'resume', label: 'Download résumé', group: 'actions', icon: FileText, href: '/resume.pdf', external: true },
+    { id: 'resume', label: 'Open LinkedIn (résumé)', group: 'actions', icon: FileText, href: 'https://www.linkedin.com/in/mohithg', external: true },
     { id: 'src', label: 'View site source', group: 'actions', icon: Code2, href: 'https://github.com/mohithg/mohithg.github.io', external: true },
 
     { id: 'gh', label: 'GitHub', group: 'social', icon: BookOpen, href: 'https://github.com/mohithg', external: true },
