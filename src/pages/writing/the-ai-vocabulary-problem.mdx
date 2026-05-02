@@ -1,0 +1,117 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The AI's vocabulary is a hidden API contract"
+description: "Every word your LLM is allowed to say imposes obligations on the systems beneath it. Treat the prompt's vocabulary like an interface or pay for it later."
+publishDate: "2026-05-03"
+pillar: prompts
+slug: the-ai-vocabulary-problem
+---
+
+The first time I noticed the contract was a Tuesday.
+
+A user had asked our agent something like *"should I rebalance my account into more conservative holdings?"* and the agent answered with a clean, multi-paragraph response that recommended specific allocation shifts. The reasoning was good. The user was happy. Six hours later, our compliance review caught that the agent had used the phrase *"more conservative"* without anywhere in the reasoning trace tying that phrase to the engine's actual definition of conservatism (the volatility band, not the asset-class label, in our system). The phrase made sense to a human. It did not correspond to a quantity our backend could justify on demand.
+
+Our backend could compute the recommendation. Our backend could not defend the *word*. The word and the computation were technically about the same thing, but they had been arrived at independently, and a regulator asking *"what does 'conservative' mean to your AI"* would have received two different answers depending on which engineer you asked.
+
+That bug, and ten more like it that month, taught me a thing I now look for in every AI product I touch.
+
+**The vocabulary an LLM is allowed to use is itself an interface.**
+
+It is an interface between the team that ships the surface (the prompt, the chat, the streaming UI) and the team that ships the substance (the engine, the database, the ML model). The interface is invisible. It is enforced by no compiler. It is documented in nobody's repo. It exists in the prompt template, in the example outputs, in the tools the model has access to, in the disclaimers the model is told to attach. And every word you let the model say obligates the system beneath it to do something defensible when asked.
+
+This essay is about what happens when you don't recognize that contract, and what changes when you do.
+
+## What the contract looks like in practice
+
+Take the simplest possible LLM feature: a chatbot that summarizes a user's data.
+
+You prompt the model with the user's account snapshot and ask it to write a friendly summary. The model writes:
+
+> *Your account is mostly invested in technology stocks, with a small position in bonds. You're more aggressive than the average investor your age.*
+
+Three claims, three contracts.
+
+1. *"Mostly invested in technology stocks."* The system has to be able to compute "mostly" the same way every time, and "technology" the same way every time. If your sector tagging changes (you start classifying NVIDIA as semiconductors but not technology), the summary changes for the same data. The user notices. The user asks why. You owe an answer.
+
+2. *"A small position in bonds."* What is "small"? Less than 10% of portfolio? Less than 5%? It depends on context. The model picked a threshold the model was comfortable with. You are now obligated to defend that threshold, because the user will ask why their *5%* bond position is "small" and their friend's *6%* position is described as "modest."
+
+3. *"More aggressive than the average investor your age."* This is the dangerous one. The model has just made a comparative claim against a reference distribution. Does that distribution exist anywhere in your system? Can you reproduce it? Is it weighted by user count, by AUM, by region? If the answer is "the model made it up by analogy from training data," you have shipped financial advice that is not backed by any data your system computes. Regulators do not love this.
+
+Each of these claims is a *vocabulary commitment*. You are letting the model speak in concepts that you did not formally define elsewhere.
+
+## Why this is bigger than evals
+
+The instinct, when this kind of bug surfaces, is to throw an eval at it. Add the bad case to the bench. Write a rubric. Have an LLM judge check that future outputs don't make the same mistake.
+
+This works for the specific bug. It does not work for the class.
+
+The class is **definitional drift between the surface and the substance**, and you can write a thousand-case eval bench and still have it. The eval bench tests outputs against a rubric you wrote. The rubric encodes one team's notion of what the output should mean. If the engine team's notion of "conservative" diverges from the prompt team's notion of "conservative," your eval bench will happily pass outputs that the engine cannot defend. The bench is checking the wrong thing.
+
+The fix is not more evals. The fix is **a shared, version-controlled definition of every concept the AI is permitted to use**.
+
+## The contract document
+
+The simplest version of this is a single file. Mine looks something like:
+
+```yaml
+# concepts.yaml — the AI's permitted vocabulary
+
+conservative:
+  user_facing_phrasing: ["conservative", "more conservative", "low risk"]
+  engine_signal: portfolio_volatility_band
+  signal_definition: |
+    "conservative" maps to the lowest tertile of annualized
+    volatility across the engine's risk model, currently
+    implemented in models/risk/volatility_bands.py:24
+  disclaimers_required:
+    - "Risk descriptions are based on historical volatility..."
+  regulatory_constraints:
+    - sec_iaa_rule_206_4_1  # advertising rule
+
+aggressive:
+  user_facing_phrasing: ["aggressive", "high risk", "growth-oriented"]
+  engine_signal: portfolio_volatility_band
+  signal_definition: |
+    "aggressive" maps to the top tertile of annualized
+    volatility across the engine's risk model.
+  disclaimers_required:
+    - "Risk descriptions are based on historical volatility..."
+
+# ... fifty more concepts
+```
+
+This file is owned by the prompt team and the engine team jointly. Neither side can ship a change without updating it. The prompt template reads from it (interpolating the `disclaimers_required` into the system prompt). The engine team's CI checks that every `engine_signal` referenced in the file actually exists in code.
+
+The file is boring. The file is the most important code in the system.
+
+## Why nobody writes this file
+
+Three reasons.
+
+**The file feels like documentation, not code.** Engineers don't reach for documentation when they're under pressure to ship. They reach for code. The first six months of an AI product, every team I've watched skip this step has the same conversation around month four: *"why are we shipping inconsistent advice." "I don't know, the prompt and the engine drifted." "How did they drift." "Nobody noticed."*
+
+**The file requires the prompt team and the engine team to talk to each other.** This is a coordination cost. In the early days of an AI product, the prompt team is one person who's also the eng team and also the founder. The contract is in their head. It works. Then the team grows to three people. The contract is no longer in everyone's head. It still kind of works because everyone read the same prompt template last week. Then the team is ten people across two countries and the contract has been in nobody's head for months.
+
+**The file looks expensive up front.** Writing down fifty concepts with their definitions, disclaimers, and signal mappings is a week of work. A team that hasn't been bitten yet doesn't see the value. A team that has been bitten will pay almost any price.
+
+The lesson, generalized: **you write the contract before you need it, or you write it after you've shipped a bug serious enough to motivate it.** Both teams that I've watched do this in the second order have wished they'd done it in the first.
+
+## What to do today
+
+If you are building an AI product right now, three concrete steps.
+
+**1. Make the list.** Open a doc. List every word, phrase, comparative claim, and recommendation type your AI is currently allowed to produce. Read your last fifty production outputs and your last fifty test cases. Group by concept. You will end up with somewhere between thirty and a hundred entries. This will take an afternoon. It will be the most useful afternoon you spend this quarter.
+
+**2. For each entry, mark the source of truth.** What signal in your engine corresponds to this word? If the answer is "nothing, the model made it up," highlight it in red. Those are your worst bugs waiting to happen. Either define the signal in the engine, or remove the word from the AI's vocabulary. Both options are fine. Doing nothing is not.
+
+**3. Bake the file into the prompt.** Generate the disclaimers, the constraints, and the permitted vocabulary list directly from the file at build time, and inject them into the system prompt. This means a prompt team change to the disclaimers and an engine team change to the signal mapping both flow through the same file. Drift is impossible by construction.
+
+The result: the chain stays coherent. The macro signal, the engine output, the recommendation, and the AI translation all say the same thing about the same user at the same moment. That coherence is the product. It does not show up in any one piece of code. It shows up in the file that both teams own.
+
+## The generalized lesson
+
+This pattern recurs everywhere two teams compose into one user-visible artifact. The team that ships the substance and the team that ships the surface implicitly share a vocabulary. That vocabulary becomes an API between them. The API exists whether or not you write it down. Writing it down is just the difference between an API you can iterate on safely and an API that will mug you in production.
+
+I now hunt for the contract every time I join an AI product. I ask: *where is the file that lists every concept your AI is allowed to use?* The answer is almost always the same: *we don't have one.* My follow-up is the same too: *what's the bug that finally convinced you to write one.*
+
+Build the file before that bug.

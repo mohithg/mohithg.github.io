@@ -1,0 +1,121 @@
+---
+import Base from './Base.astro';
+import { ArrowLeft, ArrowUpRight } from 'lucide-react';
+import { SITE } from '../lib/site';
+import { pillarById, type Pillar } from '../lib/writing';
+
+type FM = {
+  title: string;
+  description: string;
+  publishDate: string;
+  pillar: Pillar['id'];
+  ogImage?: string;
+};
+type Props = FM & { frontmatter?: FM };
+
+const fm: FM = (Astro.props as Props).frontmatter ?? (Astro.props as FM);
+const { title, description, publishDate, pillar } = fm;
+const pillarMeta = pillarById(pillar);
+const accentText =
+  pillarMeta.accent === 'mint'
+    ? 'text-mint'
+    : pillarMeta.accent === 'pink'
+    ? 'text-pink'
+    : 'text-violet-soft';
+const accentBg =
+  pillarMeta.accent === 'mint'
+    ? 'bg-mint/10'
+    : pillarMeta.accent === 'pink'
+    ? 'bg-pink/10'
+    : 'bg-violet/10';
+
+const slug = Astro.url.pathname.replace(/^\/writing\//, '').replace(/\/$/, '');
+const ogImage = fm.ogImage ?? `/og/writing-${pillar}.png`;
+const canonicalUrl = new URL(Astro.url.pathname, SITE.url).toString();
+
+const formattedDate = new Date(publishDate).toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+
+const articleJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: title,
+  description,
+  image: new URL(ogImage, SITE.url).toString(),
+  author: { '@type': 'Person', name: SITE.name, url: SITE.url },
+  publisher: { '@type': 'Person', name: SITE.name, url: SITE.url },
+  datePublished: publishDate,
+  dateModified: publishDate,
+  mainEntityOfPage: canonicalUrl,
+  articleSection: pillarMeta.title,
+};
+---
+
+<Base title={title} description={description} image={ogImage} jsonLd={articleJsonLd}>
+  <article>
+    <!-- Hero -->
+    <header class="relative isolate overflow-hidden pt-32 pb-12 sm:pt-40 sm:pb-16">
+      <div class:list={['pointer-events-none absolute -top-32 right-0 h-[420px] w-[420px] rounded-full blur-3xl opacity-50', accentBg]}></div>
+      <div class="grid-bg pointer-events-none absolute inset-0 -z-10 opacity-15 [mask-image:radial-gradient(ellipse_at_top_right,black_30%,transparent_70%)]"></div>
+
+      <div class="mx-auto max-w-3xl px-5 sm:px-8">
+        <a href="/writing" class="group inline-flex items-center gap-1.5 font-mono text-xs text-paper-dim transition-colors hover:text-paper">
+          <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+          all writing
+        </a>
+
+        <p data-reveal style="--i: 0" class:list={['mt-8 font-mono text-xs uppercase tracking-[0.3em]', accentText]}>
+          / writing · {pillarMeta.title.toLowerCase()}
+        </p>
+        <h1 data-reveal data-reveal-blur style="--i: 1" class="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl text-balance">{title}</h1>
+        <p data-reveal style="--i: 2" class="mt-6 max-w-2xl text-lg text-paper-dim text-pretty sm:text-xl">{description}</p>
+        <p data-reveal style="--i: 3" class="mt-5 font-mono text-xs text-paper-muted">
+          {formattedDate} · by Mohith G
+        </p>
+      </div>
+    </header>
+
+    <!-- Body -->
+    <div class="mx-auto max-w-3xl px-5 pb-20 sm:px-8">
+      <div class="prose prose-invert max-w-none
+        prose-headings:font-display prose-headings:tracking-tight prose-headings:text-balance
+        prose-h2:mt-14 prose-h2:text-2xl prose-h2:font-semibold sm:prose-h2:text-3xl
+        prose-h3:mt-10 prose-h3:text-lg prose-h3:font-semibold
+        prose-p:text-paper-dim prose-p:text-pretty prose-p:leading-relaxed
+        prose-strong:text-paper prose-strong:font-semibold
+        prose-em:not-italic prose-em:text-mint
+        prose-a:text-paper prose-a:underline prose-a:decoration-violet/40 prose-a:underline-offset-4 hover:prose-a:decoration-violet
+        prose-code:text-violet-soft prose-code:font-normal prose-code:bg-ink-2/60 prose-code:rounded prose-code:px-1.5 prose-code:py-0.5 prose-code:before:content-[''] prose-code:after:content-['']
+        prose-pre:bg-ink-2 prose-pre:border prose-pre:border-white/5 prose-pre:rounded-xl
+        prose-li:text-paper-dim prose-li:marker:text-violet/60
+        prose-blockquote:not-italic prose-blockquote:border-l-violet/60 prose-blockquote:text-paper prose-blockquote:font-normal
+        prose-hr:border-white/10
+        ">
+        <slot />
+      </div>
+
+      <!-- Footer / CTA -->
+      <footer class="mt-16 border-t border-white/5 pt-10">
+        <div class="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="font-mono text-[10px] uppercase tracking-[0.3em] text-paper-muted">/ author</p>
+            <p class="mt-2 max-w-md text-sm text-paper-dim">
+              Mohith G is a Product Engineer with 11+ years building AI products at YC-backed startups. He writes when he has something useful to say and not before.
+            </p>
+            <a href="/about" class="mt-3 inline-flex items-center gap-1 font-mono text-xs text-paper-dim transition-colors hover:text-paper">
+              read more about him
+              <ArrowUpRight className="h-3 w-3" />
+            </a>
+          </div>
+          <div class="flex flex-col gap-2 sm:items-end">
+            <a href="/writing" class="font-mono text-xs text-paper-dim transition-colors hover:text-paper">← all writing</a>
+            <a href="/writing/rss.xml" class="font-mono text-xs text-paper-dim transition-colors hover:text-paper">subscribe via RSS</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </article>
+</Base>

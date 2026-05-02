@@ -1,0 +1,124 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The economics of running an LLM agent at scale"
+description: "Napkin math for the unit cost of an AI feature: tokens, latency, caching, model routing, and the surprising line items nobody publishes."
+publishDate: "2026-04-30"
+pillar: economics
+slug: economics-of-llm-in-production
+---
+
+The first time I had to explain LLM economics to a finance team, the conversation lasted three hours. None of the cost was where they expected it to be, and most of the savings were in places they didn't think to look. The exercise convinced me that the real economics of LLMs in production is mostly hidden behind the per-1k-token sticker price, and that anyone building an AI product owes themselves a closer reading of the unit economics.
+
+This essay is a napkin-math tour. The numbers are 2026 numbers. The patterns will outlive any specific number.
+
+## Start with one query
+
+The cleanest way to understand LLM economics is to price a single user query end to end. Not a token. Not an API call. A *query*: one user pressing enter once and getting an answer back.
+
+Let's pick a representative one. A user asks a chat-style AI assistant to summarize a 5-page document and answer two follow-up questions. This is a deliberately ordinary task because that's where most production cost lives. The interesting cost questions are not at the head of your distribution, they are in the bulk.
+
+Token budget for this query, conservatively:
+
+- System prompt: ~2000 tokens (with examples, tool definitions, vocabulary contract)
+- User document: ~3500 tokens (5 pages at ~700 words each)
+- User question: ~50 tokens
+- Assistant first answer: ~400 tokens
+- Two follow-up questions: ~100 tokens each
+- Two follow-up answers: ~250 tokens each
+- Conversation history overhead between turns: substantial
+
+Total *input* tokens across all three turns, with conversation accumulating: roughly 2000 + 3500 + 50 + (2000 + 3500 + 50 + 400 + 100) + (similar again with both follow-ups in context). Call it ~15,000 input tokens by the third turn.
+
+Total *output* tokens: 400 + 250 + 250 = 900.
+
+At Claude Sonnet 4.6 prices ($3 per million input, $15 per million output, give or take depending on the cycle):
+
+- Input: 15,000 × $3 / 1,000,000 = $0.045
+- Output: 900 × $15 / 1,000,000 = $0.014
+- **Total: about $0.06 per query.**
+
+At Haiku 4.5 prices ($0.80 / $4 per million):
+
+- Input: 15,000 × $0.80 / 1,000,000 = $0.012
+- Output: 900 × $4 / 1,000,000 = $0.004
+- **Total: about $0.016 per query.**
+
+So your per-query cost ranges from one to six cents depending on which model you pick. At a million queries a month (a real number for a real product), you're spending $16,000 to $60,000 on inference.
+
+This is the headline number. It is also the least interesting number, because almost nobody actually pays it.
+
+## Why nobody actually pays the headline
+
+Three structural discounts on the sticker price.
+
+**Prompt caching.** Most LLM APIs now offer prompt caching, where the system prompt and other prefix-stable content is cached at the model provider's end and re-billed at a steep discount on subsequent requests within a TTL window (5 minutes for Anthropic's basic cache, longer for the extended cache, similar for OpenAI). Your 2000-token system prompt gets paid for in full once, then billed at roughly 10% of the input rate for the next thousand requests. If your traffic is more than a few queries per minute, you're paying 10% of input cost on the prompt portion most of the time.
+
+**Conversation context overhead.** This is a hidden tax in our example above. When the user asks a follow-up question, you have to re-send the entire conversation history to the model. That history grows. By the third turn, you're paying for all the input from turns one and two again. Mitigation: use the conversation cache (most providers offer this in 2026), summarize older turns, or just truncate aggressively.
+
+**Output is 5x more expensive than input.** This is universal across providers. Implication: brevity is a cost optimization. If you can prompt your model to produce a 200-token response instead of a 400-token response without losing meaningful information, you cut output cost in half. Most teams overpay for prose because they didn't think about it.
+
+The realistic cost of our example query, after caching and basic optimization:
+
+- System prompt cached: 2000 input tokens at 10% rate = $0.0006 instead of $0.006
+- Document and conversation: $0.04
+- Output: $0.014
+- **Realistic total: ~$0.05 per query on Sonnet, ~$0.012 on Haiku.**
+
+For a million queries: $12,000 to $50,000. Still meaningful. Still not the whole picture.
+
+## The surprising line items
+
+Now the line items that don't show up on the model invoice but show up on the engineering bill.
+
+**Eval costs.** If you're running a serious eval bench, you are calling the model many times for every prompt change. A bench of 1,000 cases with an LLM judge against your production model plus a different judge model can cost $10-50 per run. You run it weekly at minimum. Over a year that's a few thousand dollars, easy. Most teams underbudget for this.
+
+**Embedding costs.** RAG systems generate embeddings for every document you index. Embedding API calls are cheap per token but can add up if you reindex frequently or have a large corpus. A 100k-document corpus at 1k tokens per document is 100M tokens. At $0.10 per million for embeddings, that's $10. Once. But if you reindex weekly because you're tuning your chunking strategy, that's $520 a year. Across multiple environments, multiple iterations, this is real money.
+
+**Retrieval infrastructure.** Vector databases are not free. Pinecone, Weaviate, Qdrant, pgvector running on a beefy Postgres, all cost money. For a portfolio-sized AI product (millions of vectors, low query rate), expect $50-200 a month. For a real production product (hundreds of millions of vectors, high QPS), thousands a month or more.
+
+**Streaming and connection overhead.** If your product streams responses (it should), you are holding HTTP connections open longer than a typical API. This is fine on serverless until you start hitting concurrency limits and need provisioned compute. The price difference between burst-capable serverless and provisioned compute can be 3-10x at the same throughput.
+
+**Logging and observability.** You are logging every model input, every model output, every tool call, every eval result. At a million queries a month, that's gigabytes of structured logs. Log storage is cheap but not free. Search and analysis tooling is more expensive. Budget $100-1000 a month for observability infrastructure on a small AI product, more at scale.
+
+The real all-in cost of running a small-to-medium AI product in 2026 is rarely just the inference bill. It's inference plus eval plus retrieval plus observability plus the occasional surprise (rate limit retries that cost double, an agent that loops 8 times instead of 2 because of a prompt regression).
+
+## Where the savings are
+
+Once you see the cost shape, the savings are obvious.
+
+**Model routing.** Cheap model for cheap queries. Most queries do not need your most expensive model. A simple classifier (or a cheap model) routes incoming queries: easy ones to Haiku, hard ones to Sonnet, only the most complex to Opus. A well-tuned router can cut average per-query cost by 60-80% with no observable quality degradation.
+
+**Aggressive caching.** Cache the system prompt always. Cache full responses for queries that recur (you'd be surprised how many user queries are near-duplicates). Cache embeddings for documents that don't change. Build a deterministic key for each cached unit. Make cache hits free.
+
+**Token budgeting.** Set a hard token budget per query at the runtime level. Reject or summarize when you exceed it. This protects you from the runaway agent and the user who pastes War and Peace into your chat.
+
+**Cheap evals.** Most evals don't need an LLM judge. Many can be done with regex, structured-output validation, or simple classifiers. Use the LLM judge for the cases that genuinely need judgment. Run it less often.
+
+**Batch where you can.** If you have a non-realtime workload (overnight document processing, weekly report generation), use batch APIs. Most providers offer 50% discount on batch requests with 24-hour latency.
+
+## A planning template
+
+When I'm sizing an AI feature for production, I work through this checklist.
+
+1. What's the input token shape? (System + context + history at peak.)
+2. What's the output token shape? (Average and worst case.)
+3. What's the model choice? (Default to the cheapest that meets quality bar; route up only when needed.)
+4. What's the cache hit rate? (System always; conversation if multi-turn; responses if recurring queries.)
+5. What's the iteration count? (1 for chat, N for agents.)
+6. Multiply through, multiply by query volume, multiply by 1.3 for headroom.
+7. Add 20% for eval costs, 10% for retrieval, 5% for observability.
+
+The output of this exercise is a number you can defend to your finance team. It is also a number you can use to make engineering decisions: *"this feature would cost $200k a month at expected scale, which is more than its expected revenue uplift, so we're not building it."*
+
+The teams I see succeed at this don't have any secret. They have done the math, they have the discount levers wired in, and they revisit the numbers every quarter as model prices change. Which they do, often, in both directions.
+
+## The number that matters
+
+The single number I track for any production AI feature is **cost per active user per month**. Not cost per query. Not cost per token. Cost per user, monthly, all-in.
+
+If that number is under $1, the feature is cheap enough to ship for free in a free tier.
+If it's $1-5, the feature can subsidize a paid tier or be metered.
+If it's $5-25, you need direct revenue tied to the feature.
+If it's over $25, you need to either dramatically cut cost or dramatically raise prices.
+
+Most product decisions about AI features come back to that single number. Calculate it. Track it. Optimize it. The rest is implementation.

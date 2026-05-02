@@ -1,0 +1,112 @@
+---
+import Base from '../../layouts/Base.astro';
+import { ArrowUpRight } from 'lucide-react';
+import { PILLARS, pillarById } from '../../lib/writing';
+
+// Discover all writing posts at build time. Each post is an .mdx file
+// in this directory.
+const all = import.meta.glob<any>('./*.mdx', { eager: true });
+const posts = Object.entries(all)
+  .map(([path, mod]) => {
+    const slug = path.replace(/^\.\//, '').replace(/\.mdx$/, '');
+    return {
+      url: `/writing/${slug}`,
+      title: mod.frontmatter.title as string,
+      description: mod.frontmatter.description as string,
+      publishDate: mod.frontmatter.publishDate as string,
+      pillar: mod.frontmatter.pillar as 'prompts' | 'evals' | 'agents' | 'economics' | 'product',
+    };
+  })
+  .filter((p) => p.title)
+  .sort((a, b) => (a.publishDate < b.publishDate ? 1 : -1));
+
+const byPillar = PILLARS.map((pillar) => ({
+  pillar,
+  posts: posts.filter((p) => p.pillar === pillar.id),
+}));
+
+const accentClass = (a: 'violet' | 'mint' | 'pink' | 'paper') =>
+  a === 'mint'
+    ? 'text-mint'
+    : a === 'pink'
+    ? 'text-pink'
+    : a === 'paper'
+    ? 'text-paper'
+    : 'text-violet-soft';
+---
+
+<Base
+  title="Writing"
+  description="Essays on AI product engineering, LLM evals, agents, prompts, and the napkin math of running models in production. Opinionated, specific, no AI-clichés."
+  image="/og/writing.png"
+>
+  <article>
+    <header class="relative isolate overflow-hidden pt-32 pb-16 sm:pt-40 sm:pb-24">
+      <div class="pointer-events-none absolute inset-0 -z-10 opacity-50">
+        <div class="mesh-bg absolute -inset-40 [animation:var(--animate-mesh)]"></div>
+      </div>
+      <div class="grid-bg pointer-events-none absolute inset-0 -z-10 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]"></div>
+
+      <div class="mx-auto max-w-5xl px-5 sm:px-8">
+        <p data-reveal style="--i: 0" class="font-mono text-xs uppercase tracking-[0.3em] text-mint">/ writing</p>
+        <h1 data-reveal data-reveal-blur style="--i: 1" class="mt-3 font-display text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl text-balance">
+          Notes on building <span class="gradient-text-anim">AI products</span>.
+        </h1>
+        <p data-reveal style="--i: 2" class="mt-6 max-w-2xl text-lg text-paper-dim text-pretty sm:text-xl">
+          Essays on the parts that don't show up in the launch tweet. Eval rubrics, prompt design, agent loops, the math of running a model at scale, and the difference between a demo and something a user can rely on.
+        </p>
+        <p data-reveal style="--i: 3" class="mt-3 font-mono text-xs text-paper-muted">
+          {posts.length} essays · <a href="/writing/rss.xml" class="underline decoration-white/20 underline-offset-4 hover:text-paper hover:decoration-violet">RSS</a>
+        </p>
+      </div>
+    </header>
+
+    <div class="mx-auto max-w-5xl px-5 pb-32 sm:px-8">
+      {
+        byPillar.map(({ pillar, posts: pp }, i) => (
+          <section class="mb-16" id={pillar.id}>
+            <header class="mb-6 flex items-baseline justify-between gap-4 border-b border-white/5 pb-4">
+              <div>
+                <h2 class:list={['font-mono text-xs uppercase tracking-[0.3em]', accentClass(pillar.accent)]}>
+                  / {pillar.id}
+                </h2>
+                <p class="mt-2 font-display text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+                  {pillar.title}
+                </p>
+                <p class="mt-2 max-w-2xl text-sm text-paper-dim text-pretty">
+                  {pillar.blurb}
+                </p>
+              </div>
+              <span class="font-mono text-[11px] text-paper-muted whitespace-nowrap">
+                {pp.length} essay{pp.length === 1 ? '' : 's'}
+              </span>
+            </header>
+            <ol class="divide-y divide-white/5">
+              {pp.map((p) => (
+                <li>
+                  <a href={p.url} class="group flex flex-col gap-1 py-4 transition-colors hover:bg-white/[0.02] sm:flex-row sm:items-baseline sm:gap-6">
+                    <span class="shrink-0 font-mono text-[10px] uppercase tracking-widest text-paper-muted sm:w-28">
+                      {new Date(p.publishDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                    <span class="flex-1">
+                      <span class="block font-display text-base font-medium text-paper transition-colors group-hover:text-violet-soft sm:text-lg">
+                        {p.title}
+                      </span>
+                      <span class="mt-1 block text-sm text-paper-dim text-pretty">
+                        {p.description}
+                      </span>
+                    </span>
+                    <ArrowUpRight className="hidden h-4 w-4 text-paper-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-paper sm:inline" />
+                  </a>
+                </li>
+              ))}
+              {pp.length === 0 && (
+                <li class="py-4 font-mono text-xs text-paper-muted">(coming soon)</li>
+              )}
+            </ol>
+          </section>
+        ))
+      }
+    </div>
+  </article>
+</Base>

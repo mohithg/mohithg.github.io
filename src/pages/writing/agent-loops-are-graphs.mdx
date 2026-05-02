@@ -1,0 +1,138 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Agent loops are just function-call graphs"
+description: "Strip away the agent terminology and you're left with a graph of function calls with conditional edges. The patterns that ship treat them that way."
+publishDate: "2026-05-01"
+pillar: agents
+slug: agent-loops-are-graphs
+---
+
+The most useful mental model I have for AI agents is that they are not agents at all. They are a particular kind of function-call graph, where the nodes are functions, the edges are dictated at runtime by an LLM, and the graph is allowed to fold back on itself a bounded number of times.
+
+That sentence is unfashionable in 2026. The current vocabulary around agents leans heavily on terms borrowed from artificial intelligence research papers, which is fine for marketing and unhelpful for engineering. The engineering reality is that you are building a runtime that calls functions, and the patterns that ship are the patterns that have always shipped for runtimes that call functions, with a few twists.
+
+This essay is about those patterns, and the framing that makes them easier to see.
+
+## The strip-away
+
+Take any agent system you've seen. Strip away the prompts, the persona, the system messages. What you're left with is:
+
+- A set of *tools* (functions the agent can call)
+- A *loop* (the runtime calls the LLM, gets back a tool call or a final answer, executes the tool call if any, feeds the result back to the LLM, repeats)
+- A *terminator* (a condition that stops the loop, usually max iterations or a final answer)
+- Some *state* (the conversation history, the tool call results, sometimes a scratchpad)
+
+That's it. That's an agent. The LLM is a single component that decides which edge to traverse next in a graph whose nodes are your tools.
+
+If you've built a workflow engine before, this should look familiar. If you've built a finite state machine, this should look familiar. If you've built a Lisp interpreter, this *especially* should look familiar. Agents are old wine in new bottles, and the bottle's label is "AI."
+
+The reason this framing matters is that it tells you what's hard. The hard parts of building an agent are not the parts that are new (the LLM picking edges). They are the parts that are the same as every other workflow runtime you've ever built (state management, error handling, observability, idempotency, cost control). The team that recognizes this builds the runtime. The team that doesn't builds a thin wrapper around an LLM and gets surprised when the wrapper doesn't survive contact with production.
+
+## The graph view
+
+Draw your agent as a graph.
+
+- One node per tool.
+- One node for the LLM itself.
+- Edges from the LLM to each tool (the LLM can decide to call any of them).
+- Edges from each tool back to the LLM (the tool's result feeds into the next LLM call).
+- A terminal node ("final answer").
+
+This graph has interesting properties.
+
+**It's almost-but-not-quite a DAG.** The cycles are bounded by the iteration limit. Within an iteration limit of 10, the graph has exactly 10 levels of depth. Each level is the LLM picking the next tool.
+
+**The graph is sparse at design time, dense at runtime.** You define five tools. The runtime might call any sequence of those five tools. The actual *execution graph* for a given query is a path through the design graph. Different queries produce different paths.
+
+**Tools are not equal.** Some tools are reads (cheap, idempotent). Some tools are writes (expensive, side-effecting). Some tools are reads-of-writes (you call the same tool a second time and get a different answer because the world changed). The runtime needs to know the difference. Most don't.
+
+Once you see the graph, the patterns that ship become obvious.
+
+## Pattern 1: tools have types
+
+If you're not type-checking your tool definitions, you're shipping bugs.
+
+The LLM decides what arguments to pass to a tool based on the tool's *description* (a natural-language string) and *parameter schema* (typed). Both have to match. If your description says *"this tool takes a stock ticker"* but your schema says `symbol: str`, the LLM might pass `"AAPL"` or `"Apple"` or `"$AAPL"` and you have to handle all three.
+
+The pattern: schema-first tool definitions, with the description generated from the schema, and runtime validation that rejects malformed calls cleanly back to the LLM.
+
+```python
+@tool(description_template="Look up the current price of {symbol_format} stock {symbol}")
+def get_stock_price(symbol: Ticker) -> Price:
+    """Returns latest price for the given ticker."""
+    return _engine.lookup(symbol)
+```
+
+`Ticker` here is a typed primitive that your validation can enforce. The LLM gets a clear schema. The runtime gets a typed function. The two stay in sync because the description is generated from the schema.
+
+## Pattern 2: tool failures are first-class
+
+Tools fail. Network errors, rate limits, validation rejections, missing data. The agent runtime has to handle each.
+
+The mistake teams make is treating tool failure as an exception to be raised. The runtime catches it, panics, returns "I encountered an error." This is bad because the LLM is *capable of recovering* from many tool failures if you let it. *"The price lookup tool returned an error: rate limited. Try again with a different tool, or wait."* is information the LLM can use.
+
+The pattern: tool errors are normal tool results. They get serialized back to the LLM as part of the conversation. The LLM decides whether to retry, switch tools, or give up.
+
+```
+{
+  "tool": "get_stock_price",
+  "args": { "symbol": "AAPL" },
+  "result": {
+    "ok": false,
+    "error": "rate_limited",
+    "retry_after_seconds": 30,
+    "alternatives": ["get_stock_price_cached"]
+  }
+}
+```
+
+The LLM sees this, says *"the user can wait 30 seconds for fresh data, or I can use the cached price. Given the user just asked 'roughly how is AAPL doing today,' the cached price is fine."*
+
+This is the agent doing what only an agent can do: reading the situation and routing.
+
+## Pattern 3: state is the runtime's responsibility
+
+Many agent frameworks make the conversation history the only state. This works for chatbots. It does not work for agents that do real things.
+
+A real agent has:
+- Conversation history (messages between user and assistant)
+- Tool results (what each tool returned, attached to which tool call)
+- Working memory (intermediate computations the LLM accumulated)
+- Side effects log (a record of every write the agent has performed, for audit and rollback)
+
+The runtime owns this state. The LLM gets a *view* of the state in its context window. The view is curated: maybe the full conversation, maybe a summary, maybe the last N tool results plus a digest of older ones.
+
+The pattern: state is structured, not just appended. You own the schema. You decide what the LLM sees. You log everything you don't.
+
+## Pattern 4: cost is dimensioned by depth
+
+Every iteration of the loop is one LLM call plus the cost of whatever tool it picks.
+
+Iteration limits exist for a reason. The reason is not that the model loops forever (it usually doesn't). The reason is that cost compounds. A 10-iteration agent on Claude Haiku 4.5 is cheap. A 10-iteration agent on Claude Opus 4.7 with 128k context filled by tool results is not.
+
+The pattern: cost-aware termination. Don't just cap iterations, cap *cost*. Track tokens consumed in the loop's state. When you cross a threshold, terminate cleanly with a *"this query is too expensive for the system to answer fully, here's a partial"* message instead of letting the loop run.
+
+This sounds boring. It saves you from the day a single user's query costs $40 in production because the LLM kept asking for more data.
+
+## Pattern 5: observability is the entire game
+
+Debugging an agent in production without traces is debugging blind.
+
+The minimum bar: every loop iteration logs the LLM's input, the LLM's chosen tool call (or final answer), the tool's result, and the next LLM input. With timestamps. Searchable. Linked to the user's session.
+
+The better bar: you can replay any production conversation through the agent's runtime locally, with the original tool results, and watch the LLM make different decisions when you change the prompt.
+
+The pattern: build the trace viewer first. Build the agent second. Teams that don't do this end up debugging by reading raw logs at 2am.
+
+## What this framing buys you
+
+When you start treating agents as function-call graphs:
+
+- You start asking the right questions. *"What does my graph look like? How dense is it? Which paths are common? Which tools are expensive?"*
+- You start writing the right code. *"My runtime needs to handle tool failures, track cost, manage state, emit traces."*
+- You stop being surprised by the parts that have always been hard about runtimes that call functions.
+- You start being surprised by what is genuinely new (the LLM as a router) and put your engineering attention there.
+
+Agents will keep getting more capable. The runtime around them will keep mattering more, not less. The team that builds a real runtime for the LLM-router will still be shipping in five years. The team that wraps the LLM in a hundred lines of glue will be debugging in production for the next month.
+
+Build the runtime. The agent terminology will age out. The runtime won't.

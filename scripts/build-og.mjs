@@ -86,6 +86,56 @@ const PAGES = [
     headlineColor: { 0: '#F5F5F0', 1: '#A088FF', 2: '#9B9B9B' },
     sub: 'Founding engineer for AI products. Bengaluru.',
   },
+
+  // Writing index + per-pillar OGs
+  {
+    out: 'og/writing.png',
+    accent: 'paper',
+    eyebrow: '/  WRITING',
+    headline: ['Notes on building', 'AI products.', 'No clichés.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#A088FF', 2: '#9B9B9B' },
+    sub: 'Essays on prompts, evals, agents, economics, product engineering.',
+  },
+  {
+    out: 'og/writing-prompts.png',
+    accent: 'violet',
+    eyebrow: '/  WRITING  /  PROMPTS',
+    headline: ['Prompts as', 'API contracts.', 'Treat words like APIs.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#A088FF', 2: '#9B9B9B' },
+    sub: 'The hidden interface between your AI and your engineers.',
+  },
+  {
+    out: 'og/writing-evals.png',
+    accent: 'mint',
+    eyebrow: '/  WRITING  /  EVALS',
+    headline: ['LLM eval', 'engineering.', 'Catch the real bugs.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#00E5A0', 2: '#9B9B9B' },
+    sub: 'Test benches for AI features that catch bugs you actually care about.',
+  },
+  {
+    out: 'og/writing-agents.png',
+    accent: 'pink',
+    eyebrow: '/  WRITING  /  AGENTS',
+    headline: ['Agent', 'architecture.', 'Patterns that ship.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#FF5C8A', 2: '#9B9B9B' },
+    sub: 'Loops, tool calls, state, observability. The patterns that ship in production.',
+  },
+  {
+    out: 'og/writing-economics.png',
+    accent: 'mint',
+    eyebrow: '/  WRITING  /  ECONOMICS',
+    headline: ['Napkin math', 'for AI in prod.', 'The numbers nobody publishes.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#00E5A0', 2: '#9B9B9B' },
+    sub: 'Cost per request, latency budgets, when caching wins.',
+  },
+  {
+    out: 'og/writing-product.png',
+    accent: 'violet',
+    eyebrow: '/  WRITING  /  PRODUCT',
+    headline: ['AI product', 'engineering.', 'Substance, then surface.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#A088FF', 2: '#9B9B9B' },
+    sub: 'Building things people use, not demos that wow.',
+  },
 ];
 
 function svgFor(page) {

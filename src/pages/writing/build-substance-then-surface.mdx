@@ -1,0 +1,106 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Build the substance, then the surface"
+description: "Most AI product failures are LLM wrappers shipped before there's anything underneath worth wrapping. The hard part of an AI product is almost never the prompt."
+publishDate: "2026-04-29"
+pillar: product
+slug: build-substance-then-surface
+---
+
+A product manager I respect once told me: *"if you can't draw the architecture without mentioning the LLM, you don't have a product yet."*
+
+This sounded harsh at the time. I now believe it might be the most useful single sentence I've heard about AI product engineering. The closer I look at the AI products that have shipped and survived versus the ones that launched and faded, the more clearly the pattern resolves: the survivors built **a real system underneath the LLM**, and the LLM was the layer that made the system usable. The casualties built an LLM wrapper, called it a product, and got bitten the first time someone needed it to do something the underlying training data didn't already cover.
+
+This essay is about that pattern, and a working principle that follows from it.
+
+## What "substance" means
+
+The substance is whatever your product does that doesn't depend on the LLM existing.
+
+For a financial advisor product, the substance is the analysis engine. The macro models, the risk forecasts, the recommendation logic. The LLM is the layer that turns those outputs into language a user can act on. If the analysis engine is bad, the prettiest prompt in the world won't save you.
+
+For a customer support product, the substance is the knowledge base, the ticket system, the routing rules, the integrations to your CRM. The LLM is the layer that lets a user phrase their question naturally instead of clicking through a decision tree. If your knowledge base is incomplete, the LLM will improvise to fill the gap, and the user will get wrong information delivered confidently.
+
+For a coding assistant, the substance is the static analysis, the project context, the build system integration, the diff generation. The LLM is the layer that turns *"refactor this to use the new pattern"* into a sequence of changes. If the static analysis can't tell whether a change is safe, the LLM will write changes that compile and silently break the app.
+
+The pattern is consistent across categories. **The LLM is a translation layer over a domain system.** When the domain system is strong, the LLM amplifies it. When the domain system is weak or missing, the LLM is an expensive way to ship the appearance of functionality.
+
+## What "shipping a wrapper" looks like
+
+The wrapper anti-pattern has a recognizable shape. You can spot it within ten minutes of looking at any AI product.
+
+**The architecture diagram has the LLM in the middle and arrows going out to APIs.** No analysis layer. No domain model. The LLM calls third-party APIs and synthesizes their responses. The LLM is the brain because there is no other brain.
+
+**The system prompt is doing the work that should be code.** The prompt enumerates business rules, edge cases, formatting requirements, calculations the LLM should perform. The prompt is 5,000 tokens long because the entire product logic lives in it.
+
+**The team can't answer "what does the system do when the LLM is wrong."** Because the LLM is the system. There is no fallback. There is no detection. There is no "right" to compare against.
+
+**The product demos beautifully and breaks weirdly.** The demos hit the happy path the prompt was designed for. Production hits the long tail the prompt didn't anticipate, and the LLM hallucinates plausible-sounding wrong answers because that's what LLMs do when they don't have grounding.
+
+I am not making a moral argument against wrapper products. They have a place. They are appropriate when the LLM genuinely is the entire value proposition (a writing assistant, a brainstorming tool, a tutoring chatbot). They are inappropriate when the value proposition is something the LLM can only convincingly *describe* but not actually *deliver* (financial advice, medical diagnosis, code generation that has to compile and run).
+
+The mistake is using a wrapper architecture for a product that needs substance underneath.
+
+## The principle
+
+The working principle that comes out of all this:
+
+**Build the substance, then the surface.**
+
+The substance is whatever solves the user's problem when the LLM is unavailable. The surface is whatever makes the substance accessible.
+
+This sequence is not a hard rule. You can build them in parallel. You can prototype the surface to validate user demand before investing in substance. The principle is about *priorities*, not order.
+
+The priority lens looks like this. When you have to make a call about where to invest the next sprint:
+
+- If the surface is fine but the substance is weak, invest in the substance.
+- If the substance is fine but the surface is rough, invest in the surface.
+- If you're not sure, invest in the substance. The substance compounds. The surface decays.
+
+I have not seen a product that invested in substance and regretted it later. I have seen many that invested in surface, hit a quality ceiling, and had to retrofit substance under huge time pressure to avoid a brand-damaging incident.
+
+## The objection
+
+The standard objection: *"but LLMs keep getting better. Why not just wait for the model to subsume the substance work I'd have to do?"*
+
+This is a real argument. LLMs do keep getting better. There are categories where they have absorbed work that used to require dedicated systems (basic translation, transcription, image classification). It is reasonable to ask whether your domain logic is also going to be absorbed.
+
+My answer, having watched this for several years: **the layer that doesn't get absorbed is the integration layer between the LLM and your specific data, your specific compliance regime, your specific user.** That layer is the substance. The model getting better doesn't subsume it. The model getting better just makes the substance more important, because the model becomes more confident in its assertions, and you need stronger ground truth to keep it correct.
+
+The categories where wrappers thrive are categories where there is no specific data, compliance, or user constraint. *"Help me brainstorm names for my dog."* No domain. The LLM is the whole product. Fine.
+
+The categories where wrappers fail are categories where the right answer to a user's question depends on data the LLM doesn't have. *"Should I rebalance my portfolio?"* The LLM doesn't have your portfolio. The LLM doesn't have current market data. The LLM doesn't have the regulatory framework you operate in. Without those things, the LLM is improvising, and improvisation is fine for brainstorming and dangerous for advice.
+
+## What "substance first" looks like in practice
+
+Concretely, the substance-first approach has four components.
+
+**A typed domain model.** You define the entities your product operates on (in the financial example: portfolios, accounts, holdings, recommendations, signals). They have schemas. They have invariants. They live in code, not in the prompt.
+
+**A computation layer.** Code that takes inputs from the domain model and produces outputs (analysis results, recommendations, classifications). Test it like any other code. Version it like any other code.
+
+**A translation layer.** The LLM, with a tightly scoped role: read structured outputs from the computation layer, produce natural-language renderings of those outputs. The LLM does not invent. The LLM does not compute. The LLM translates.
+
+**A coherence layer.** The thing that ensures the computation layer's notion of a concept matches the translation layer's vocabulary. (I wrote a longer essay about this; the short version is: write down the vocabulary, treat it as an API contract.)
+
+A product built this way has a recognizable property: when the LLM is wrong, you can tell, because the structured output is auditable. When the structured output is wrong, you can tell, because the inputs are auditable. The chain is debuggable. The chain has fallbacks. The chain ships.
+
+## The sequence question
+
+When I have a week to start a new AI feature, I work in this order.
+
+**Day 1-2.** Define the domain model. Write the types. Write the invariants. Write the test cases. No LLM yet.
+
+**Day 3-4.** Implement the computation layer. Make the test cases pass. No LLM yet.
+
+**Day 5.** Wire up the LLM as a translation layer. Pass it structured inputs from the computation layer, ask for a specific output format. Check the output against the structured inputs.
+
+**Day 6.** Build the eval bench. Read failures. Fix the computation layer or the prompt as appropriate.
+
+**Day 7.** Ship to internal users. Watch them use it. Listen to what's wrong.
+
+The opposite order (LLM first, substance later) almost always means the LLM has been making things up to fill in for the substance you didn't build. By the time you go back to add the substance, the LLM has set user expectations that don't match what your real system can actually deliver. You're now deflating expectations *and* shipping a worse-feeling product. Hard place to recover from.
+
+Build the substance. Then the surface. Then iterate.
+
+The pattern doesn't require any particular framework, model, or architecture. It just requires resisting the temptation to ship the LLM first because it's the part that demos.

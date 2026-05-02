@@ -1,0 +1,103 @@
+---
+layout: ../../layouts/Writing.astro
+title: "What an LLM eval bench actually needs to do"
+description: "Most eval frameworks measure whether the model returned a string. Production eval benches measure whether shipping the change is safe. The gap is everything."
+publishDate: "2026-05-02"
+pillar: evals
+slug: llm-eval-bench-actually-needs
+---
+
+I have read at least a dozen blog posts in the last year that purport to teach you how to build an LLM eval bench. They are mostly the same blog post. They tell you to write a list of test cases, run the model on them, score the outputs against a rubric, and ship when the score crosses a threshold.
+
+This is the eval bench equivalent of *"to fly a plane, accelerate to takeoff speed and pull back on the yoke."* Technically correct. Useless if you are actually trying to fly a plane.
+
+What follows is the longer answer. It is the playbook I use when I'm building or auditing an eval bench for an AI product that has to keep working when the model upgrades, when the prompt changes, when the data drifts, and when the regulator calls. It is not exhaustive. It is the parts that are usually missing.
+
+## What an eval bench is for
+
+The most useful question to ask, before you build anything, is **what decision will this bench inform**.
+
+Most eval benches answer the question *"is the model good."* This is the wrong question, because the answer is always *"good at what."* The right question is **is it safe to ship this change.** A change being a new prompt template, a model upgrade, a new tool added to the agent's toolbox, a refactor of a retrieval pipeline.
+
+Once you reframe the eval bench as *"shipping safety check"* instead of *"model quality measurement,"* a lot of the design follows. You are not building a thermometer. You are building a circuit breaker.
+
+## The three jobs
+
+A production eval bench has three jobs, each with different requirements.
+
+**Job 1: catch obvious regressions on every PR.** This is the fast, cheap, narrow tier. It runs in the CI pipeline. It exists to prevent a developer from shipping a change that breaks the most-loaded paths. It needs to run in under five minutes. It needs to be cheap enough that running it on every commit is not a budget event.
+
+**Job 2: deeply evaluate every prompt and model change.** This is the slow, expensive, broad tier. It runs when a prompt template changes meaningfully or a model bumps versions. It exercises the long tail of edge cases. It involves an LLM judge against a structured rubric, plus human spot-check on disagreements.
+
+**Job 3: monitor production for drift you didn't expect.** This is the shadow tier. It runs against (anonymized) live traffic. Its job is to surface failure modes you didn't put in the bench because you didn't think of them.
+
+Most teams build job 1 (because it's cheap), kind of build job 2 (because it's the obvious one), and never build job 3 (because it requires production traffic and a logging pipeline). The team that has all three has a real bench. The team that has only job 1 has a smoke test.
+
+## The case set
+
+The cases on the bench are the most important thing. Almost every eval bench failure mode I've seen comes from the case set, not the rubric.
+
+Three rules for the case set.
+
+**The case set must include every bug you've ever shipped.** The day production catches a bug, the same day, you add it as a case to the bench. Without exception. This is the single highest-leverage habit in eval engineering. Most teams skip it because the bug is already fixed and adding the case "feels like backdating." Add the case anyway. The case is not for catching the bug you fixed. It is for catching the bug's *cousin* in three months when somebody refactors the prompt.
+
+**The case set must reflect the actual distribution of production traffic.** If 80% of your queries are simple summaries and 20% are complex multi-step reasoning, your bench should be close to 80/20. If your bench is 50/50 because the complex cases are more interesting to write, your bench will overfit to the rare path and underfit to the common one. The model that wins on your bench will lose for your users.
+
+**The case set must include adversarial cases the model will never see in normal traffic.** Not for "is it good," but for "does it fail safely." Inject prompt injections, malformed inputs, contradictory instructions, requests for things you don't permit. The bench catches the regression where someone refactored the safety logic out of the prompt and forgot.
+
+## The rubric
+
+The rubric is what you grade outputs against. The rubric is half the work in eval engineering, and the half nobody talks about.
+
+A bad rubric: *"the output should be helpful and correct."*
+A good rubric, for the same case: *"the output must (1) recommend an action only if the engine's signal supports it, (2) cite the signal it relied on, (3) include the standard risk disclaimer, (4) not use the words 'guaranteed' or 'safe' in any context, (5) not exceed 200 words."*
+
+You see the pattern. A good rubric is **enumerated, falsifiable, and concrete**. Each criterion is something a human reviewer could check in five seconds. Each criterion is something an LLM judge could be asked yes/no.
+
+**The rubric is the work.** I cannot stress this enough. The framework you use to run the eval is irrelevant. Pick whatever works. The rubric is what determines whether your bench catches the bugs you care about.
+
+The way you discover good rubric criteria is by reading every transcript where the AI was wrong. You distill the failure into a rule. You add the rule. You re-run the bench. This is unglamorous and irreplaceable. It is also the only way I have ever seen a team end up with a bench that actually catches things.
+
+## The judge
+
+If you are running automated evals at any scale, you are using an LLM as judge for at least some of the criteria. There are three traps here.
+
+**Trap 1: the judge model is the same as the production model.** The judge will be biased toward outputs that "look like" outputs the production model would generate, because they share the same distribution. Use a different model family for the judge if you can.
+
+**Trap 2: the judge is asked to score on a 1-10 scale.** Don't. Use binary or three-point scales. *"Did this satisfy criterion X: yes / no / unclear."* LLM judges are bad at fine-grained calibration. They are decent at binary classification with clear criteria.
+
+**Trap 3: the judge is the only voice.** Whenever the judge marks something as "unclear" or whenever two judges disagree, that case must escalate to a human reviewer. The point of the judge is to handle the easy 80%, not to remove humans from the loop entirely.
+
+## The shadow tier
+
+This is the tier most teams never build, and the one that catches the bugs you didn't think of.
+
+The setup: every (anonymized) production request gets replayed through your latest prompt + model combination, in shadow mode. The shadow output is compared to the production output by your judge. When they disagree, the case is logged for human review.
+
+This finds three classes of bugs your offline bench won't.
+
+1. Distribution shift in the inputs. Your bench has cases from a year ago. Production has cases from this morning, with new product surfaces, new query patterns, new edge cases.
+2. Subtle prompt-model interactions. A model upgrade looks fine on the bench, then turns out to be slightly worse at one specific query type that wasn't well represented.
+3. Tail behavior that's only visible at scale. You can't write 100,000 hand-crafted cases. Production gives you 100,000 cases for free.
+
+The shadow tier costs money to run (you're calling the model for every production request, twice). For most teams it is worth it. For the teams that argue it isn't, the most common reason is that the bench has been giving them false confidence and they don't yet know it.
+
+## What I would build first
+
+If you have one week to build a serious eval bench from scratch, here is the order.
+
+**Day 1.** Pick the 50 most common production query types. Write one case for each. Write a 5-criterion rubric for the 5 most loaded query types.
+
+**Day 2.** Wire up the runner. Pick a framework or write a hundred-line script. Make it run all 50 cases and produce a report. The report should be checked into the repo on every CI run.
+
+**Day 3.** Add the LLM judge for the 5 rubric'd query types. Use binary criteria. Use a different model than your production model.
+
+**Day 4.** Read the last month of production transcripts. For every case where the AI was wrong, add the case to the bench and write a rubric criterion that would have caught it.
+
+**Day 5.** Set up shadow mode against 10% of production traffic. Log disagreements between production and shadow. Don't act on them yet, just collect them.
+
+**Day 6.** Review the disagreements from day 5. For every real disagreement, add a case to the bench and a criterion to the rubric.
+
+**Day 7.** Make passing the bench a release gate. Document the gate. Tell the team. Ship.
+
+This is the minimum viable eval bench. It will not be perfect. It will catch the next bug you would have shipped without it. That is the only test that matters.
