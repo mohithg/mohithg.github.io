@@ -21,8 +21,8 @@ export const CAREER: readonly CareerNode[] = [
     end: 'present',
     location: 'Remote',
     summary:
-      'First engineer on the team. Built the AI financial advisor end-to-end. SEC-registered, from the early ChatGPT-plugin era through GPTs through today\'s agent stack.',
-    tags: ['AI', 'SEC-registered', 'LLMs', 'Python', 'TypeScript', 'AWS', 'Eval', 'Real-time'],
+      'First engineer on the team. Built the SEC-registered AI financial advisor ground-up. Hedge-fund-grade quantitative engine underneath; AI on top is the layer that turns dense statistical output into language a user can act on.',
+    tags: ['Quant infra', 'SEC-registered', 'AI', 'LLMs', 'Python', 'TypeScript', 'AWS', 'Real-time'],
     href: 'https://portfoliopilot.com',
     caseStudy: '/work/portfoliopilot',
     flagship: true,

@@ -14,11 +14,11 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
     title: 'AI features in production',
     iconName: 'sparkles',
     blurb:
-      'Real LLM features, evaluated and shipped, not demos. Tool-using agents, RAG over real data, evals as first-class infrastructure.',
+      'Real LLM features that sit on real systems, not LLM wrappers around someone else\'s engine. Tool-using agents, streaming UIs, end-to-end coherence between substance and surface.',
     examples: [
-      'PortfolioPilot AI advisor: agent stack, evals, guardrails',
+      'PortfolioPilot AI translation layer over a hedge-fund-grade quant engine',
       'Early ChatGPT plugins → GPTs migration → custom agent runtime',
-      'Streaming UIs over LLM tool calls',
+      'Streaming UIs over LLM tool calls, citing the source the engine ran on',
     ],
   },
   {
@@ -38,10 +38,10 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
     title: 'Data pipelines & DAGs',
     iconName: 'workflow',
     blurb:
-      'Daily ETL, financial-data ingestion, eval pipelines: the unglamorous plumbing that makes everything else possible.',
+      'Daily ETL, financial-data ingestion, multi-vendor normalization. The unglamorous plumbing that the entire quant engine sits on.',
     examples: [
-      'Multi-source financial data ingestion at PortfolioPilot',
-      'Eval pipelines that run on every model + prompt change',
+      'Multi-source financial data ingestion at PortfolioPilot, normalized into one canonical model',
+      'Macro-signal pipelines feeding multi-model orchestration',
       'Celery, Airflow-style DAGs, idempotency, replay safety',
     ],
   },
@@ -77,7 +77,7 @@ export const BUILD_SURFACES: readonly BuildSurface[] = [
       'AWS, Kubernetes, observability, cost. I can stand it up, scale it, and pay for it.',
     examples: [
       'K8s deployments, GitOps, blue/green',
-      'Observability (traces, metrics, structured logs, evals as telemetry)',
+      'Observability (traces, metrics, structured logs, end-to-end annotated outputs)',
       'Cost-aware architecture; choosing managed vs. self-hosted with eyes open',
     ],
   },

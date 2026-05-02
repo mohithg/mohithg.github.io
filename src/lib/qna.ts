@@ -31,20 +31,19 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['portfoliopilot', 'pilot', 'global', 'predictions', 'financial', 'advisor', 'first', 'engineer', 'ai', 'currently', 'today', 'now', 'job', 'role', 'sec'],
     answer:
-      'I\'m the **first engineer** at PortfolioPilot (Global Predictions), since June 2021. PortfolioPilot is an **SEC-registered AI financial advisor**: a real fiduciary, not a chatbot pretending. I bootstrapped the codebase, built the financial-data ingestion DAGs, the recommendation engine, and the AI advisor stack. That includes one of the **first wave of ChatGPT plugins** in 2023, the GPTs migration, and the custom agent runtime we run today. I own the **eval & guardrail layer** that catches bad financial advice before it ships.',
+      'I\'m the **first engineer** at PortfolioPilot (Global Predictions), since June 2021. PortfolioPilot is an **SEC-registered AI financial advisor**: a real fiduciary, not a chatbot pretending. I built it ground-up. Underneath is a **hedge-fund-grade quantitative engine** (macro views, multi-model risk and return forecasting, the kind of analysis a private wealth manager runs). On top is the **AI translation layer** I ship: it turns dense statistical output into a few paragraphs of plain English a user can act on. The headline AI moments (one of the first wave of **ChatGPT plugins** in 2023, the GPTs migration, the custom agent runtime today) are real, but the substance underneath them is the engine.',
     citations: [{ label: 'PortfolioPilot case study', href: '/work/portfoliopilot' }],
   },
   {
-    id: 'evals',
+    id: 'coherence',
     questions: [
-      'How do you think about AI evals?',
-      'What\'s your eval philosophy?',
-      'evaluation systems',
-      'guardrails for AI',
+      'How do you ship AI advice safely?',
+      'How do you keep AI financial advice correct?',
+      'Eval / guardrail philosophy',
     ],
-    keywords: ['eval', 'evals', 'evaluation', 'guardrail', 'guardrails', 'rubric', 'judge', 'shadow', 'production', 'rag', 'safety', 'correctness', 'hallucination', 'hallucinations'],
+    keywords: ['eval', 'evals', 'evaluation', 'guardrail', 'guardrails', 'safe', 'safety', 'correct', 'correctness', 'coherence', 'rubric', 'hallucination', 'hallucinations'],
     answer:
-      '"**Evals before features** in any AI product." Every team I\'ve watched ship LLM features has had the same six-month epiphany. They should have built the eval bench *first*. At PortfolioPilot the eval system runs in three modes: **continuous** (every PR), **deep** (every prompt or model change, with an LLM judge plus human spot-checks), and **production shadow** (against anonymized real traffic). The hard part isn\'t the framework. It\'s the **rubric**, which I discover by reading every transcript where the AI was wrong and distilling failure modes into rules.',
+      'The honest answer is that "evals" are *one* of the things that keep PortfolioPilot\'s advice correct, not the whole story. The bigger discipline is **end-to-end coherence**: every layer of the chain (macro signals → multi-model output → personalized recommendation → AI translation) annotates the *why*, so the chain stays consistent about the same portfolio at the same moment. On top of that, yes, there\'s a serious test bench: continuous evals on every PR, deep evals on every prompt or model change with an LLM judge plus human spot-checks, and shadow evals against anonymized production traffic. But evals are the visible part. Coherence is the invisible part, and it\'s what actually ships.',
     citations: [{ label: 'See: PortfolioPilot: a hard problem, solved', href: '/work/portfoliopilot' }],
   },
   {
@@ -117,7 +116,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['ai', 'llm', 'gpt', 'plugin', 'plugins', 'agent', 'agents', 'rag', 'retrieval', 'chatgpt', 'openai', 'claude', 'anthropic', 'model', 'models', 'prompt', 'prompts'],
     answer:
-      'At PortfolioPilot: I built one of the **first ChatGPT plugins** (financial Q&A over portfolio data, early 2023), then the **GPTs migration**, then the **custom agent runtime** we run today (tool-calling, streaming UI, evals). Plus the in-product daily AI advisor and the recommendation engine. At IntuitionAI: model monitoring as a product (drift, data quality, prediction logging), productized for enterprise ML teams.',
+      'At PortfolioPilot: I shipped one of the **first ChatGPT plugins** (financial Q&A over portfolio data, early 2023), the **GPTs migration**, and the **custom agent runtime** we run today (tool-calling, streaming UI, ground-truth-citing answers). The AI sits on top of a hedge-fund-grade quant engine; its job is making the engine\'s statistical output legible, not generating analysis itself. At IntuitionAI: model monitoring as a product (drift, data quality, prediction logging), productized for enterprise ML teams.',
     citations: [{ label: 'PortfolioPilot case study', href: '/work/portfoliopilot' }],
   },
   {
@@ -165,7 +164,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['hire', 'hiring', 'founding', 'fit', 'good', 'available', 'open', 'looking', 'recruit', 'job', 'position', 'opportunity'],
     answer:
-      'Three signals worth weighting: **(1)** I\'ve done it before: founding engineer at IntuitionAI through acquisition, first engineer at PortfolioPilot for five years and counting. **(2)** I ship AI in production, not demos. The eval layer I built at PortfolioPilot is what separates AI features that survive from ones that get rolled back. **(3)** I span the entire stack with judgment, which is what early-stage teams actually need. I\'m open to **founding-engineer or first-AI-engineer roles at AI-forward seed-to-Series-A teams**.',
+      'Three signals worth weighting: **(1)** I\'ve done it before: founding engineer at IntuitionAI through acquisition; first engineer at PortfolioPilot for five years and counting, where I built a hedge-fund-grade quant engine ground-up plus the AI surface on top. **(2)** I build the *substance*, not just the demo. The AI products I ship sit on real systems I\'ve architected, not LLM wrappers around someone else\'s engine. **(3)** I span the entire stack with judgment, which is what early-stage teams actually need. I\'m open to **founding-engineer or first-AI-engineer roles at AI-forward seed-to-Series-A teams**.',
     citations: [
       { label: 'Reach out', href: 'mailto:mohithgm@gmail.com' },
       { label: 'About', href: '/about' },
@@ -241,7 +240,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['who', 'about', 'intro', 'introduction', 'background', 'profile', 'overview', 'summary', 'biography', 'bio'],
     answer:
-      'I\'m **Mohith G**, a Product Engineer with 11+ years building products at YC-backed startups. Currently the first engineer at **[PortfolioPilot](https://portfoliopilot.com)** (an SEC-registered AI financial advisor). Previously founding engineer at **[IntuitionAI](https://intuition.ai)** (acquired by Domino Data Lab), and shipped early at Rippling and AthenaHealth. I ship the entire stack: design → DAGs → frontend → backend → DB → infra → AI. The full story is on [/about](/about), drawn as a DAG on the home page.',
+      'I\'m **Mohith G**, a Product Engineer with 11+ years building products at YC-backed startups. Currently the first engineer at **[PortfolioPilot](https://portfoliopilot.com)** (an SEC-registered AI financial advisor), where I built a hedge-fund-grade quant engine ground-up plus the AI translation layer on top. Previously founding engineer at **[IntuitionAI](https://intuition.ai)** (acquired by Domino Data Lab), and shipped early at Rippling and AthenaHealth. I ship the entire stack: design → DAGs → frontend → backend → DB → infra → AI. The full story is on [/about](/about), drawn as a DAG on the home page.',
     citations: [{ label: 'About', href: '/about' }],
   },
 ];
