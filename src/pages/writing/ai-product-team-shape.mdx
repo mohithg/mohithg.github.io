@@ -1,0 +1,168 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Team shapes for AI products: who owns what"
+description: "Building AI products requires combinations of skill that don't fit traditional team structures. Here's the team shape that actually works and the dysfunction patterns to avoid."
+publishDate: "2026-05-30"
+pillar: product
+slug: ai-product-team-shape
+---
+
+Most product teams have a stable shape: PM, designer, engineers (frontend, backend, mobile as needed), maybe a data scientist or ML engineer for analytics. The roles map to traditional product work cleanly.
+
+AI products break the mapping. The work involves prompt engineering, eval design, model selection, agent architecture, and coordination with model providers. These don't sit cleanly with any of the traditional roles. Teams that try to layer "AI work" onto an existing structure end up with the AI work being nobody's job.
+
+This essay is about the team shapes that work for AI products and the dysfunction patterns that show up when the team isn't structured for it.
+
+## The skills the team needs
+
+For an AI product, beyond traditional product engineering, the team needs people who can:
+
+1. Design and iterate on prompts
+2. Build and maintain eval pipelines
+3. Reason about model behavior, capability, and limits
+4. Choose between models and tune routing
+5. Architect agent flows
+6. Handle the operational specifics (cost, rate limits, observability)
+7. Integrate with foundation model APIs and watch for changes
+
+Some of these are technical (eval pipelines, agent architecture). Some are nuanced and domain-specific (prompt design for a particular use case). Some are operational (cost management).
+
+A traditional team has none of these as named roles. The work happens in the cracks between roles.
+
+## Team shape 1: AI specialist on a product team
+
+A product team has one or two people whose primary job is the AI specifics. Title varies: AI engineer, applied AI engineer, prompt engineer, AI ML engineer.
+
+The specialist owns:
+- Prompt design and iteration
+- Eval bench
+- Model selection and routing
+- AI architecture decisions
+
+The rest of the team does product engineering as usual but defers AI-specific decisions to the specialist.
+
+When this works: the team has a real specialist with experience, the specialist works closely with PM and engineers, and the AI work is isolated enough that it can be owned by one person.
+
+When this fails: the specialist is treated as a service organization (engineers throw requests at them), the AI work creeps into every part of the product (one person can't keep up), or the specialist makes AI decisions in isolation from product reality.
+
+Best fit: small to medium teams (5-15 people) where AI is a meaningful but not dominant part of the work.
+
+## Team shape 2: AI as a horizontal team
+
+A dedicated AI team supports multiple product teams. The AI team owns the platform: model APIs, prompt management, eval infrastructure, cost controls. The product teams own their feature-specific AI work.
+
+When this works: the AI team is a real platform team (not a service team), product teams have AI literacy to do their own work, and the platform is well-designed.
+
+When this fails: the AI team becomes a bottleneck (every product team waiting for AI team support), product teams don't develop AI literacy (depend on AI team for everything), or the platform becomes generic in ways that don't fit any product team's actual needs.
+
+Best fit: larger orgs (multiple product teams) where shared infrastructure makes sense.
+
+## Team shape 3: every engineer is an AI engineer
+
+There are no AI specialists. Every engineer learns enough about prompts, evals, and AI architecture to do their own AI work. The team treats AI like any other technology in the stack: every engineer is expected to have working knowledge.
+
+When this works: the team is small and capable, the AI work is bounded, and the team commits to the up-skilling investment.
+
+When this fails: the team is too large to up-skill consistently, the AI work has high enough specialization that universal knowledge is shallow, or specific deep expertise (eval design, agent architecture) is needed and nobody has it.
+
+Best fit: small teams (1-10 people) where everyone is senior and willing to learn.
+
+## The dysfunction patterns
+
+Three patterns I see when team structure isn't working.
+
+**Dysfunction 1: prompt-engineering-as-a-side-task.** Nobody owns the prompts. Engineers ship features; the prompts are written quickly, never iterated, never evaluated. Quality degrades over time. When something breaks, nobody knows whose code to look at.
+
+Fix: someone owns the prompts. Could be a specialist; could be the engineer who wrote them initially. There's a name on each prompt.
+
+**Dysfunction 2: PM doesn't understand the AI capability.** The PM commits to features that the model can't reliably do. Engineers push back; PM thinks engineers are sandbagging. Friction grows.
+
+Fix: PM literacy. The PM should be able to evaluate whether a feature is feasible by playing with the model directly. AI products without an AI-fluent PM ship features that don't work.
+
+**Dysfunction 3: eval is QA's problem.** The team treats evals as quality assurance: write the prompt, throw it over the wall, QA writes the eval. The prompt author and the eval author are different people. The evals don't reflect what the prompt is actually trying to do.
+
+Fix: the prompt author owns the eval. Prompts and evals are written together as a unit. QA can review and add cases, but the foundation is owned by the prompt author.
+
+## Roles that emerge
+
+Across the team shapes, certain functional roles tend to emerge regardless of how they're titled.
+
+**Prompt owner.** Owns the prompt and its evolution. Often the engineer who wrote it; sometimes a specialist.
+
+**Eval owner.** Owns the eval bench. Could be the same as the prompt owner, or a separate role for shared eval infrastructure.
+
+**Model gatekeeper.** Decides what models are used and when to upgrade. Watches model releases. Often a specialist or AI lead.
+
+**Cost owner.** Watches the bill, drives optimization. Could be eng lead, infra lead, or a dedicated role at scale.
+
+**Observability owner.** Maintains the trace pipeline, dashboards, alerts. Usually overlaps with general SRE/ops.
+
+These roles aren't necessarily named on the org chart. They're functions that need clear owners. Teams without clear owners for each have things falling between the cracks.
+
+## The PM-engineer relationship for AI
+
+Traditional PM-engineer relationship: PM specifies; engineer builds; iterate.
+
+AI PM-engineer relationship is different. The PM specifies the user value, but the *feasibility* depends on what the model does. The engineer can't fully scope without prototyping. The PM can't fully spec without seeing what the model produces.
+
+A pattern that works:
+- PM specs the user problem and success criteria
+- Engineer prototypes (a few prompt iterations, sees what's possible)
+- Together: agree on what to ship, what to defer, what's not feasible
+- Engineer builds; PM helps refine the eval rubric
+- Ship; iterate based on production behavior
+
+This is more iterative than traditional product development. Specs that are decided before the prototype usually need rewriting after. Skip the up-front overinvestment.
+
+## When to hire vs train
+
+If you don't have AI specialists today, you have two options.
+
+**Hire.** Bring in someone with AI experience. They become the specialist or the lead. They can move fast on the AI work.
+
+Pro: faster ramp on the AI work.
+Con: they're new to the product and domain; they need ramp time; they might bring patterns that don't fit your team.
+
+**Train.** Pick an existing engineer (or several) and have them up-skill on AI work.
+
+Pro: domain knowledge stays with the team; no integration challenges.
+Con: slower ramp on the AI work; the engineer is also doing other work.
+
+Most successful teams do both. Hire one or two AI-native engineers; train the rest of the team to be AI-fluent. The hired specialists set the patterns; the trained engineers carry the patterns into product work.
+
+## The senior-junior question
+
+Should AI work be done by senior engineers or distributed across the team?
+
+The work involves judgment (when to use which model, when to add a workaround, when to ship despite imperfection). Senior engineers handle this better. A team of all junior engineers doing AI work usually produces fragile features.
+
+But you don't want only seniors touching AI either. The patterns need to be teachable; the team's overall AI literacy has to grow.
+
+The pattern: seniors lead, juniors learn. Code review and pairing are how the patterns spread. Don't put juniors on the most critical AI features without senior coverage; do put them on smaller features where they can learn.
+
+## What's working in the orgs I see
+
+A pattern that's emerged in several orgs: the AI work is a "feature team" responsibility (each product team owns its AI), supported by a small AI platform team that maintains shared infrastructure.
+
+The platform team:
+- Maintains the prompt management system
+- Owns the eval framework
+- Builds the trace UI
+- Handles the model API integrations and cost dashboards
+- Sets the patterns and standards
+
+The product teams:
+- Write their own prompts
+- Maintain their own evals
+- Ship their own AI features
+- Use the platform team's tools and follow their patterns
+
+This separates concerns: shared infrastructure scales; product-specific work stays close to the product. Both grow capability over time.
+
+## The take
+
+Team structure for AI products needs to account for AI as real work that someone owns. Specialist on each product team, dedicated AI horizontal team, or every engineer up-skilled. None of "AI work happens in the cracks."
+
+Match the shape to the team size and AI scope. Small team, narrow AI: every engineer learns. Larger org, broader AI: platform team plus product team specialists.
+
+Whatever shape, name the owners: prompt owner, eval owner, model gatekeeper, cost owner, observability owner. When ownership is implicit, the work doesn't happen.

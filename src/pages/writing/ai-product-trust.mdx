@@ -1,0 +1,161 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Building user trust in AI features"
+description: "AI features have a trust problem most software features don't. Users have learned to be skeptical. The features that earn trust do specific things. Here's the list."
+publishDate: "2026-05-28"
+pillar: product
+slug: ai-product-trust
+---
+
+Software features generally start with a small amount of user trust and build from there. The user clicks the button; if it does what they expected, they trust it more next time.
+
+AI features start with negative trust for many users. They've used AI products that hallucinated, misunderstood, or interrupted. They come to your AI feature already skeptical. The default is "this is going to be wrong, I'd better double-check."
+
+Earning trust under those conditions takes deliberate work. The features that do it have a few patterns in common. This essay is the list.
+
+## Pattern 1: cite sources
+
+For any AI output that makes factual claims, cite where the claim came from. The user can verify; the AI is on the hook for accuracy in a way that's checkable.
+
+The mechanics:
+- Inline citations that link to the source ([1], [2])
+- Hover or click to see the source content
+- The source is the actual source, not paraphrased
+
+Citations transfer some of the trust burden to the source. Users can decide whether the source is credible; they don't have to take the AI's word for it.
+
+The other benefit: knowing it has to cite makes the AI behave better. Models with citation-required prompting hallucinate less because they know the claim has to be backed by retrievable content.
+
+## Pattern 2: show confidence
+
+Not every AI output deserves the same confidence. Some are highly certain; some are speculative. Showing this in the UI helps users calibrate.
+
+Patterns:
+- Highly confident outputs presented prominently, without hedging
+- Less confident outputs presented with hedging language ("This might be...", "I think...")
+- Multiple options when confidence is low (here are 2-3 possibilities)
+- Explicit "I don't know" when the AI can't answer
+
+Users learn to treat the confident outputs differently from the tentative ones. They trust the system more because it's honest about its uncertainty.
+
+The opposite pattern (confident-sounding output regardless of actual confidence) is what produces the "AI is always confident even when wrong" complaint. Once users notice this, the feature loses trust on every output.
+
+## Pattern 3: undo and revise
+
+Make it easy for users to undo or modify AI actions. The lower the cost of reversing, the more willing users are to try.
+
+Patterns:
+- Drafts that the user can edit before sending
+- Suggestions that the user can accept, reject, or modify
+- Actions that have a quick "undo" within a window
+- Multi-step changes presented as previews before commit
+
+Trust grows when users feel in control. Removing reversibility makes every AI interaction feel high-stakes; users avoid the feature.
+
+## Pattern 4: explain (briefly) what the AI did
+
+When the AI takes a non-trivial action, explain it briefly.
+
+*"I summarized the last 5 emails from Acme Corp. I focused on the deal terms and the proposed timeline."*
+
+Two sentences. The user understands what was done, why, and what to look for in the output.
+
+The opposite pattern: a paragraph of opaque AI output. The user has to figure out what the AI was even trying to do. Even if the output is correct, it feels uncertain because the process is invisible.
+
+The brevity matters. A long explanation is worse than no explanation; users skip over walls of text. One or two sentences are read.
+
+## Pattern 5: graceful refusal
+
+When the AI can't or shouldn't do something, refuse clearly and explain what to do instead.
+
+Bad: "I'm sorry, I can't help with that."
+
+Good: "I can't make trades on your behalf. If you'd like to execute this trade, you can do it through your broker by [link]. I can help you analyze whether the trade aligns with your goals if you'd like."
+
+Specific refusal teaches the user the boundary. Vague refusal leaves them confused.
+
+The trust angle: a system that refuses clearly is a system that knows its limits. A system that vaguely brushes off requests feels like it's hiding something or doesn't know.
+
+## Pattern 6: don't pretend to be a human
+
+When users are interacting with AI, don't disguise it as human. Even if the experience is nominally smoother, the eventual realization erodes trust permanently.
+
+The acceptable boundary: AI can be conversational, friendly, even informal. It shouldn't claim to be a person, claim emotions it doesn't have, or play roles that aren't honest.
+
+Users tolerate AI being AI. They don't tolerate AI pretending to be human and then being caught.
+
+## Pattern 7: visible feedback loops
+
+Show users that their feedback is shaping the system.
+
+If a user thumbs-down a response, the next response on a similar query should be different (and ideally better). If the user explicitly tells the AI "don't do that," the AI should remember.
+
+When users see their feedback affecting future behavior, they trust the system more and provide more feedback. When their feedback seems to disappear, they stop providing it.
+
+This requires actually doing something with the feedback (a non-trivial engineering effort) and surfacing the change to the user. Both halves matter.
+
+## Pattern 8: acknowledge mistakes
+
+When the AI is caught in a mistake, acknowledge it directly.
+
+*"You're right, I had the date wrong. The meeting is on Wednesday, not Tuesday."*
+
+Don't double down. Don't make excuses. Don't ignore the correction.
+
+Users trust systems that admit error more than systems that deny or deflect. The first interaction where the AI gracefully admits being wrong is often the moment trust starts to build.
+
+## Pattern 9: predictable behavior
+
+Trust grows when behavior is predictable. The AI should respond similarly to similar inputs. It shouldn't have wildly different behavior between sessions.
+
+This is hard with LLMs (they're inherently non-deterministic). But you can constrain it:
+
+- Lower temperature for outputs where consistency matters
+- Cache common queries so the same input produces the same output
+- Stable system prompts (don't constantly change them)
+- Versioned features so users in a session see consistent behavior
+
+The user's mental model of "what this AI does" needs to match reality across uses. Constant variation breaks the mental model and trust with it.
+
+## Pattern 10: privacy that's visible
+
+AI features handle user data. Users know this. Make it visible what data is being used and how.
+
+Patterns:
+- Show the AI's "context" when relevant: "I'm using your last 30 days of activity to make this recommendation."
+- Provide controls: "Adjust what data the AI uses in [settings]."
+- Audit log: "See what the AI has accessed about you."
+
+Transparency about data use builds trust. Opacity (the AI knows everything but you don't know what) erodes it.
+
+## What erodes trust quickly
+
+A few things that lose trust fast.
+
+- Confident hallucination (especially on facts the user can verify)
+- Repeating the same mistake after being corrected
+- Vague refusals
+- Pretending to be human
+- Privacy surprises (using data the user didn't realize was being used)
+- Inconsistent behavior across sessions
+- Long, opaque outputs the user can't easily verify
+
+Each of these is a fixable design choice. The product team often makes them not from malice but from default; building trust requires deliberate counter-action.
+
+## The trust budget
+
+Users have a finite tolerance for AI mistakes. Each mistake spends some of the budget. When the budget is exhausted, the user stops using the feature.
+
+The feature can extend the budget with:
+- Sources and citations (lower the cost of each mistake by making it verifiable)
+- Confidence indicators (mistakes on uncertain outputs cost less than mistakes on confident ones)
+- Undo (mistakes that can be undone cost less than ones that can't)
+- Acknowledgment (mistakes acknowledged cost less than ones denied)
+
+The features that build durable trust spend the budget wisely. Each interaction makes the user more confident that the system is honest about its limits and recoverable when wrong.
+
+## The take
+
+AI features need to earn trust the user doesn't extend by default. The patterns that earn it: cite sources, show confidence, allow undo, explain briefly, refuse gracefully, don't pretend to be human, close feedback loops, acknowledge mistakes, behave predictably, be transparent about data use.
+
+None of these are AI-specific exactly; they're principles of trustworthy software with extra weight because AI starts from a trust deficit. The features that succeed in 2026 do them deliberately. The ones that fail skip the trust work and wonder why users don't come back.

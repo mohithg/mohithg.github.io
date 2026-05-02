@@ -1,0 +1,146 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Measuring AI product success: which metrics actually mean something"
+description: "Most AI product dashboards track the wrong things. Engagement is misleading; AI-feature usage is decoration. Here are the metrics that actually tell you whether your AI feature is working."
+publishDate: "2026-05-27"
+pillar: product
+slug: measuring-ai-product-success
+---
+
+A product team I was advising had a dashboard for their AI feature. It tracked: number of AI conversations per day, average length per conversation, total tokens consumed, model hit rate. All numbers were trending up. The team was pleased.
+
+The feature was actually failing. Users were having long conversations because the AI wasn't getting them to a useful answer. They were engaging more because they were *struggling* more. The dashboard was measuring activity, not success. Activity was up; success was down.
+
+This essay is about the metrics that actually mean something for AI products and the ones that look meaningful but mislead.
+
+## What "success" means for an AI feature
+
+A useful frame: an AI feature is successful when it makes the user's task easier, faster, or better in a measurable way. Not when users use it more; not when they engage with it longer; not when the model is "good." Those can be symptoms of success or symptoms of struggle.
+
+The success metric should be tied to the user's actual goal:
+- Search feature: did the user find what they were looking for?
+- Drafting feature: did the user accept (or lightly edit) the draft?
+- Recommendation feature: did the user act on the recommendation?
+- Triage feature: did the user agree with the triage decision?
+
+If you can't articulate the user's goal, you can't measure success. You can only measure activity.
+
+## The misleading metrics
+
+Three metrics that look meaningful and aren't.
+
+**Misleading metric 1: AI feature usage.** "X% of users used the AI feature this week." High usage is interpreted as success.
+
+But high usage might mean the feature is solving real problems, OR it might mean users are getting stuck and trying repeatedly, OR it might mean the AI feature is the only path to the underlying functionality. You can't tell from usage alone.
+
+**Misleading metric 2: time spent.** "Users spend an average of 5 minutes per AI session." Interpreted as engagement.
+
+Time can mean engagement. It can also mean the feature is slow, or the user is iterating because the first attempt failed. Long sessions in an AI product are often a bad sign, not a good one.
+
+**Misleading metric 3: total queries.** "We process 1M AI queries per month." Interpreted as scale.
+
+Total queries is a vanity metric. It tells you about volume, not value. A million unsuccessful queries is worse than a thousand successful ones.
+
+## The metrics that mean something
+
+Three metrics that actually correlate with user success.
+
+**Metric 1: task completion rate.** Of the users who started using the AI feature, what fraction completed their task? Defined as: the user took whatever the next step was after the AI's output (clicked the result, accepted the draft, used the answer in their work).
+
+Completion is the closest single metric to "success." It captures whether the AI feature actually helped.
+
+**Metric 2: iteration depth.** How many times does a user iterate (rephrase, retry, refine) before accepting the result? Lower is better.
+
+Iteration measures friction. A user who gets a useful answer in one query is succeeding faster than a user who gets there in five. Track the distribution; aim for the median to drop over time.
+
+**Metric 3: explicit user signal (when available).** Thumbs up/down, "this was helpful" buttons, ratings. Direct user feedback on whether the AI's output worked.
+
+The honest version of this signal: it's noisy and biased toward extremes (most users don't rate; the ones who do are either delighted or frustrated). Track the trend, not the absolute level.
+
+## Comparison to non-AI baseline
+
+A subtle but important pattern: measure the AI feature's success relative to whatever the user would have done without it.
+
+Examples:
+- Search with AI vs. search without AI: which leads to higher click-through-to-result?
+- AI draft vs. blank-page composition: which leads to faster send time and higher acceptance?
+- AI triage vs. manual triage: which leads to faster customer resolution?
+
+Without a baseline, you can't tell if the AI feature is adding value or just being used in lieu of the alternative. With a baseline, you have evidence: "users who used AI search converted 15% more often than users who used regular search."
+
+Run this comparison for at least the first few months. If AI doesn't beat the baseline, the AI feature isn't actually helping; it's just present.
+
+## Cohort and segment cuts
+
+Aggregate metrics can hide that the feature works for some users and fails for others.
+
+Useful cuts:
+- **Power users vs casual users.** AI features often disproportionately help power users who know what to ask. Measure both.
+- **By user intent type.** If your product handles multiple kinds of tasks, AI may help on some and fail on others.
+- **By language or geography.** Quality often varies; this surfaces it.
+- **By onboarding cohort.** New users vs. tenured users. New users have weaker mental models of what to ask.
+
+When the aggregate looks fine but a segment is failing, you have a fixable problem. When you only see the aggregate, the segment problems are hidden.
+
+## What "AI quality" is and isn't
+
+A common dashboard tile: "AI quality score" derived from LLM-as-judge or some internal eval.
+
+This number is useful but limited. It tells you the model's outputs are passing your eval rubric. It doesn't tell you that users are succeeding.
+
+The two often correlate, but they can diverge:
+- Eval passes, users still fail (rubric doesn't capture what matters)
+- Eval fails, users still succeed (rubric is testing the wrong thing)
+
+Use the eval score as a leading indicator, not the source of truth. The source of truth is the user's downstream behavior.
+
+## Cost-adjusted success
+
+Don't measure success in isolation from cost.
+
+A feature that has 80% completion at $0.10 per use is great. A feature that has 90% completion at $5 per use might not be. The cost makes some completion rates economically unviable.
+
+The unified metric: cost per successful task. (Total cost) / (count of successful tasks). Lower is better.
+
+This metric rewards both increasing success and reducing cost. It penalizes features that work but burn money. It's a more honest measure than success alone.
+
+## What to put on the executive dashboard
+
+When summarizing AI feature performance for leadership:
+
+1. *Task completion rate* (the success metric)
+2. *Cost per successful task* (the efficiency metric)
+3. *Iteration depth* (the friction metric)
+4. *Comparison to non-AI baseline* (the value metric)
+5. *Trend lines on each over time*
+
+Five numbers. Each one tells you something actionable. Not 30 charts that nobody reads.
+
+## What not to put on the executive dashboard
+
+- Total query count
+- Average session length
+- AI feature adoption rate (without context)
+- Token consumption
+- Eval score (alone)
+- Number of AI conversations
+
+These are operational metrics, useful internally for tuning and debugging. They don't tell leadership whether the feature is succeeding.
+
+## The narrative metric
+
+For each AI feature, you should be able to fill in this sentence:
+
+*"This feature helps users [task]. We measure success by [completion metric]. The current rate is [number]; the baseline rate (without AI) is [number]. The cost per successful use is [number]."*
+
+If you can't fill this in, you don't have the right metrics. Define them.
+
+If you can fill it in but the numbers aren't moving in the right direction, that's the problem to solve. The dashboard is just instrumentation; the work is in the underlying feature.
+
+## The take
+
+Most AI product dashboards measure activity, not success. Activity is misleading because struggling users are also active.
+
+Measure task completion. Measure iteration depth. Measure cost per successful task. Compare against a non-AI baseline. Cut by cohort and intent.
+
+The teams shipping AI features that actually help users are the ones whose dashboards reflect user success, not feature usage. The metrics aren't sophisticated; the discipline of picking the right ones and ignoring the misleading ones is what's hard.

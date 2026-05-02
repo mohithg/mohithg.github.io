@@ -1,0 +1,126 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Onboarding for AI products: setting expectations the model can meet"
+description: "First-touch experience determines whether users come back. AI products have a unique onboarding problem: managing expectations the model may or may not meet. Here's the playbook."
+publishDate: "2026-05-25"
+pillar: product
+slug: ai-product-onboarding
+---
+
+The hardest moment in an AI product is the first ten seconds after the user types something. The model produces an answer. The user's reaction to that answer determines whether they keep using the product.
+
+Get the first answer right, and the user develops trust quickly. Get it wrong, and the user concludes the product is broken (or worse, that AI is broken). Recovering from a bad first impression is hard.
+
+This essay is about the onboarding patterns that maximize the chance of a good first impression and recover gracefully when the first impression is mediocre.
+
+## The expectations problem
+
+Users come to AI products with wildly varying expectations. Some have read the marketing and expect magic. Some have used a 2023-era chatbot and expect failure. Some have specific tasks in mind that may or may not be in the product's scope.
+
+The product can't predict which user is in front of it. It has to handle all of them.
+
+Two failure modes from mismatched expectations:
+
+**Failure mode 1: user expects more than the product can do.** *"Plan my entire vacation, including booking everything"* when the product is a research assistant. The product fails the user; the user blames the product.
+
+**Failure mode 2: user expects less than the product can do.** User asks a tentative, narrow question because they're not sure what's possible. The product gives a great answer to a narrow question. The user thinks "oh, that was useful" but doesn't realize the product could have done much more.
+
+Onboarding has to address both. Show the user what's possible without overpromising; calibrate expectations to what the product actually does well.
+
+## Pattern 1: examples that match real use
+
+The most effective onboarding for an AI product I've used was a list of example prompts on the empty-state screen. Not "Try saying hello!" Examples that demonstrated the product's actual capabilities:
+
+- "Summarize my last 10 emails from Acme Corp"
+- "Find any times this week when I have a 30-minute gap between meetings"
+- "Draft a follow-up to the conversation from yesterday"
+
+Each example showed: the kind of task the product is good at, the level of specificity that works, the language to use. The user could see, before typing anything, what they should expect.
+
+The user clicks an example, sees the product handle it well, and forms a mental model: this product does X, Y, Z. They start adapting their own queries to fit that shape. Success rate goes up.
+
+## Pattern 2: progressive capability disclosure
+
+Don't show the user everything at once. Reveal capabilities as the user grows comfortable.
+
+First session: the basics. The user gets familiar with the core interaction.
+
+Second session: a hint at deeper capabilities. *"Did you know you can also...?"* Surfaces a useful but non-obvious thing.
+
+Third session: the power features. Once the user is comfortable, introduce the multi-step or advanced capabilities.
+
+This is standard onboarding wisdom adapted for AI. The mistake AI teams often make is dumping the full capability surface on the user immediately, which is overwhelming and leads to the user using only the surface they understood first.
+
+## Pattern 3: handle ambiguity by asking
+
+When the user's first query is ambiguous, the product can either guess and risk being wrong, or ask a clarifying question.
+
+Asking is usually the right call in onboarding. *"I can interpret that a couple of ways. Did you mean (a) X or (b) Y?"* The user gets a clear answer to a clear question; the product gets information to handle the actual request.
+
+The risk of asking too much: the user feels like the product is interrogating them. The right balance: ask once for clarification on truly ambiguous inputs; for clear inputs, just do the work.
+
+The risk of guessing: getting it wrong, user concludes product is broken. In onboarding, when the cost of a bad first answer is high, lean toward asking.
+
+## Pattern 4: show the work
+
+For non-trivial AI tasks, showing intermediate steps helps users trust the result.
+
+*"Looking at your inbox..."*
+*"Found 47 emails from Acme..."*
+*"Filtering to the last 10..."*
+*"Summarizing..."*
+*"Here's what I found:"*
+
+The user sees the product working. If something seems wrong (only 3 Acme emails when the user expected 10), they can spot it before getting a misleading answer.
+
+This is especially important for tasks where the user can't easily verify the output. Showing the work creates verification opportunities that the final answer alone doesn't provide.
+
+## Pattern 5: clear failure modes
+
+When the product can't do something, say so clearly. Not "I'm sorry, I don't understand that" (vague), but "I don't have access to your calendar yet. To do that, you'd need to connect your calendar in settings."
+
+Specific failure messages teach the user the product's actual scope. They learn what to retry differently, what to abandon, what to set up.
+
+Vague failure messages teach the user nothing. They retry the same input, hoping for a different result. The product feels broken even when it's working as designed.
+
+## What to avoid in onboarding
+
+A few patterns that backfire.
+
+**Antipattern 1: a long tour.** *"Welcome! Let me show you around. Here's the chat. Here's where you can change settings. Here's the help menu..."* Users want to try the product, not watch a guided tour. Get out of their way.
+
+**Antipattern 2: forcing AI vocabulary.** *"Try entering a prompt in the prompt box."* Users don't think in terms of "prompts." They think in terms of their task. Use task language.
+
+**Antipattern 3: capability theater.** A demo that's much more capable than the actual product. The user is impressed in onboarding, disappointed in real use. Trust collapses.
+
+**Antipattern 4: the empty state.** A blank chat box with no examples or guidance. Users don't know what to type. They type something tentative; the product handles it adequately; they leave without seeing the real value.
+
+## The user's first failure
+
+At some point in early use, the AI will fail. The user's first failure shapes how they perceive the rest of the product.
+
+A few patterns that recover well.
+
+**Acknowledge the failure clearly.** *"I wasn't able to do that because [specific reason]."* Not a vague apology.
+
+**Offer a path forward.** *"Try [alternative phrasing] or [adjacent feature]."* Give the user something to try next.
+
+**Learn from the failure.** Log it. Use it as a bench case. The first user's failure shouldn't recur for the second user.
+
+If the product handles the first failure well, users develop a robust mental model: this product has limits, but it's honest about them, and there's usually a workaround. That mental model is more durable than any onboarding tour.
+
+## Measuring onboarding for AI
+
+Standard onboarding metrics (activation, day-1 retention, time to first value) apply. AI-specific metrics that matter:
+
+- **Successful first interaction rate.** Of new users, what fraction's first interaction produces a result they engage with (didn't immediately abandon)?
+- **Iteration depth.** How many times do new users iterate on a query before getting an acceptable result?
+- **Range of tasks attempted.** New users who only ever try one type of task have probably misunderstood the product's scope.
+
+Watch these for the first week or two of users. They tell you whether onboarding is teaching the right mental model.
+
+## The take
+
+Onboarding for AI products is about expectation calibration as much as feature discovery. Show examples that match real capability. Reveal advanced features over time. Ask when ambiguous, do when clear. Show the work for non-trivial tasks. Be specific about failures.
+
+The user's first impression is durable. Get it right the first time. The patterns that work for AI onboarding are mostly the patterns that work for any onboarding, with extra attention to managing the mental model the user is building of what your product can and can't do.

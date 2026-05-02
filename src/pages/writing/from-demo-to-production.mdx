@@ -1,0 +1,216 @@
+---
+layout: ../../layouts/Writing.astro
+title: "From AI demo to production: the gap is bigger than it looks"
+description: "A working AI demo is maybe 20% of the work. The other 80% is everything that makes it survive contact with real users. Here's the punch list."
+publishDate: "2026-05-31"
+pillar: product
+slug: from-demo-to-production
+---
+
+The demo works. The team built the prototype in a few days. The PM and engineers are excited. The decision is: ship it.
+
+Several months later, the feature is in production but it's not working well. Users are complaining about quality. Costs are higher than expected. The team is fighting fires instead of shipping new features.
+
+The gap from a working demo to a production-ready AI feature is bigger than it looks. The demo demonstrates capability. Production requires reliability, observability, cost discipline, eval coverage, error handling, fallbacks, and ongoing maintenance. Most of the demo-to-production work is none of the things that made the demo cool.
+
+This essay is the punch list.
+
+## The demo vs. production gap
+
+A demo:
+- Works on hand-picked inputs
+- Shows the happy path
+- Has acceptable latency in the demo conditions
+- Is observed only by the demo audience
+- Is debugged by re-running the demo
+- Has no cost concerns at demo scale
+- Is allowed to fail occasionally
+
+Production:
+- Has to work on the full distribution of real inputs
+- Has to handle all the edge cases
+- Has to meet SLOs on latency
+- Is observed by users with no patience for failure
+- Has to be debugged from logs (you can't reproduce the user's exact session)
+- Has cost that scales with usage
+- Failures become user-visible incidents
+
+The work to bridge this gap is the bulk of building an AI product.
+
+## The punch list
+
+What demo-to-production looks like, in rough order.
+
+### Eval bench
+
+The demo passed three test cases. Production needs a bench of dozens to hundreds.
+
+Build the bench:
+- Real production-like inputs (mine from your existing product if you have one, synthesize otherwise)
+- Adversarial inputs (cases designed to break the model)
+- Happy-path representative inputs
+- Pass/fail criteria for each
+- Automated runner
+
+Without this, you can't tell whether changes (model upgrades, prompt updates) are improvements or regressions.
+
+### Observability
+
+The demo showed one trace. Production needs to log every call.
+
+- Per-call logging: prompt, response, latency, cost, metadata
+- Trace UI to drill into specific runs
+- Dashboards for aggregate metrics
+- Alerts on errors, latency, cost
+
+Without this, debugging a production issue takes days instead of hours.
+
+### Cost controls
+
+The demo cost almost nothing. Production at meaningful traffic costs real money.
+
+- Cost per call measurement
+- Per-user / per-feature attribution
+- Budget alerts
+- Caching enabled
+- Model routing if appropriate
+- Trajectory and context caps if it's an agent
+
+Without this, your bill grows unpredictably and finance asks uncomfortable questions.
+
+### Rate limit handling
+
+The demo never hit a rate limit. Production might, especially during traffic spikes.
+
+- Quota planning (do you have enough?)
+- Backpressure / queue when approaching limits
+- Multi-provider failover if reliability matters
+- Alerts before you hit the limit, not at it
+
+Without this, traffic spikes become outages.
+
+### Failure handling
+
+The demo's failures were retried by re-running. Production failures need automated recovery.
+
+- Retry logic with backoff for transient failures
+- Fallbacks for permanent failures (template response, classical algorithm, error message)
+- Distinguishing user-fault errors (bad input) from system errors
+- Graceful degradation (smaller model? cached response? "try again later"?)
+
+Without this, every transient failure is a user-facing error.
+
+### Input validation
+
+The demo accepted clean input. Production gets malformed, malicious, or extreme input.
+
+- Length limits
+- Schema validation for structured inputs
+- Sanitization for inputs that flow into the prompt
+- Rejection of prompts that violate policy
+
+Without this, edge inputs cause crashes or unexpected behavior.
+
+### Output validation
+
+The demo's outputs looked good. Production outputs need validation before they're shown.
+
+- Structural validation (matches expected schema)
+- Content validation (doesn't include forbidden content)
+- Confidence checks (if the model is uncertain, what do we do?)
+- Refusal handling (if the model refuses, what does the user see?)
+
+Without this, bad outputs reach users.
+
+### Privacy and security
+
+The demo used a test account. Production handles real user data.
+
+- Per-tenant credential isolation
+- PII handling in logs
+- Audit trail for sensitive operations
+- Data residency if applicable
+- Threat modeling for prompt injection
+
+Without this, you have a security incident waiting to happen.
+
+### Documentation
+
+The demo was demonstrated. Production needs documentation for the people who'll maintain it.
+
+- How the prompt is structured and why
+- What the eval covers and what it doesn't
+- How to debug common issues
+- What the costs are and what drives them
+- What the fallbacks are
+
+Without this, the next engineer can't maintain the feature, and you have a single point of human failure.
+
+### Production rollout
+
+The demo was shown to a controlled audience. Production rollout has to handle the full user base.
+
+- Feature flag for the rollout
+- Stratified rollout (start with low-stakes users, expand)
+- Shadow mode before live (if applicable)
+- Quality monitoring during rollout
+- Rollback plan ready
+
+Without this, problems found at 100% rollout require emergency rollback.
+
+## How long the gap takes
+
+For a non-trivial AI feature, the demo-to-production gap is usually 4-12x the work of the demo itself. A demo built in a week takes 1-3 months to get to production-ready.
+
+This shocks teams who saw the demo working in a week. They thought the work was 80% done. It was 15-20% done.
+
+Plan for this. The PM should be told the production timeline up front. Engineers should not be pressured to skip the gap work. Each item on the punch list earns its time.
+
+## The shortcuts that hurt
+
+Common shortcuts I see and the consequences.
+
+**Shortcut 1: ship without an eval bench.** "We'll add evals later."
+Consequence: every prompt change is a roll of the dice. You ship regressions. Quality degrades over time without anyone noticing.
+
+**Shortcut 2: ship without observability.** "We have basic logs."
+Consequence: every user complaint becomes a multi-day debugging session. You can't tell why anything happened.
+
+**Shortcut 3: ship without cost discipline.** "We'll optimize when the bill gets big."
+Consequence: bill gets big. Optimization is harder retroactively. Some early architectural choices are now baked in.
+
+**Shortcut 4: ship without rate-limit planning.** "We're not at scale yet."
+Consequence: first real traffic spike causes outage. Quota request takes days. Users see the outage.
+
+Each shortcut is appealing because the work is invisible at demo time. Each becomes painful in production. Investing in them upfront is cheaper than fixing them under fire.
+
+## What can be deferred
+
+A few things genuinely can be deferred.
+
+- *Multi-provider failover* until you've outgrown a single provider's reliability or pricing.
+- *Self-hosted models* until you've exhausted the API option.
+- *Fine-tuning* until you've established that the prompt engineering option doesn't work.
+- *Advanced agent orchestration* until simpler patterns prove insufficient.
+
+These are the genuinely advanced topics. Most teams don't need them at launch. Some teams never need them.
+
+The ones above (eval, observability, cost, rate limits, failures, validation, security, docs, rollout) are not advanced. They're table stakes.
+
+## The team conversation
+
+When the team is excited about a working demo, the demo-to-production gap conversation is hard. It feels like dragging on the excitement. The team wants to ship.
+
+A useful framing: the demo proved the *idea*. Now we have to build the *product*. The product is the demo plus everything that makes it survive real users.
+
+The demo took a week. The product takes three months. The product is what users get; the demo is what we prove to ourselves. Both are valuable; neither replaces the other.
+
+Teams that internalize this ship products. Teams that ship demos and call them products end up with demos in production and a long backlog of "things we'll fix later."
+
+## The take
+
+A working AI demo is the start of the work, not the finish. The demo-to-production gap is bigger than it looks. Eval, observability, cost, rate limits, failure handling, validation, security, documentation, rollout. Each is real work; all of it is necessary.
+
+Plan for the gap. Communicate it to stakeholders. Don't take shortcuts on the items that catch fire later.
+
+The teams shipping AI products that work are the ones who do the gap work. The teams shipping AI demos in production are the ones who didn't, and they're the ones with the production incidents.

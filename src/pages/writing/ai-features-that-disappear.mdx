@@ -1,0 +1,122 @@
+---
+layout: ../../layouts/Writing.astro
+title: "AI features that disappear (and why that's the goal)"
+description: "The best AI features in 2026 don't have an 'AI' label. They're invisible improvements to existing flows. Here's why most AI-branded features fail and the disappearing ones succeed."
+publishDate: "2026-05-24"
+pillar: product
+slug: ai-features-that-disappear
+---
+
+When AI features were new, slapping an "AI" label on a button made it more interesting. Users clicked because they wanted to see what AI could do. Engagement was high; novelty drove adoption.
+
+That window has closed. In 2026, "AI" as a feature label is increasingly suspicious. Users have been burned: AI features that promised magic and delivered chatbots, AI summaries that hallucinated, AI assistants that interrupted workflows.
+
+The features that succeed now are different. They don't announce their AI-ness. They work invisibly inside existing flows, making the flow better. Users don't notice they're using AI; they notice the flow is faster, smarter, or more accurate.
+
+This essay is about why disappearing AI is the right design and how to build it.
+
+## What "disappearing" means
+
+A disappearing AI feature has three properties.
+
+**Property 1: integrated into an existing flow.** It's not a new "AI panel" or "AI chat" or "AI button." It's an improvement inside something the user was already doing.
+
+**Property 2: doesn't require AI vocabulary.** The user doesn't have to learn what "prompts" or "agents" are. They use the feature in the language of their domain.
+
+**Property 3: degrades gracefully when AI is unavailable or wrong.** If the AI part fails, the underlying flow still works. The user's task isn't blocked.
+
+A search box that uses AI to understand intent is disappearing. A "Search with AI" button next to the regular search box is not.
+
+## Why the labeled AI features struggle
+
+Several reasons.
+
+**Reason 1: they shift cognitive load to the user.** "AI" is a meta-feature. Users have to decide: do I want AI for this? They have to think about which feature to use, when, why. The labeled AI feature is one more thing to learn.
+
+**Reason 2: expectations are unstable.** Users have wildly different mental models of what AI can do. The "AI" label invites projection: some users expect magic; some expect failure. Neither matches reality.
+
+**Reason 3: failure is more visible.** When the AI feature fails, users notice the failure as "the AI was wrong." When the underlying feature was AI-powered all along and one specific call failed, users see a normal product issue, not an AI failure.
+
+**Reason 4: trust gets attached to the label.** If the AI feature has been wrong before, the label triggers skepticism. Users avoid it. The unlabeled improvement faces no such resistance.
+
+The cumulative effect: labeled AI features have a higher bar to clear and a steeper trust deficit to overcome. The disappearing version starts from a much friendlier baseline.
+
+## What a disappearing feature looks like
+
+A few concrete examples I've seen done well.
+
+**Email triage.** An email client that uses AI to surface the few emails likely to need attention. There's no "AI" toggle; the inbox is just smarter. Users notice less email noise; they don't necessarily know AI is doing the sorting.
+
+**Form auto-completion.** A form that pre-fills fields based on context. Users see "this is faster than I expected." They don't think "this is using AI."
+
+**Search with intent understanding.** A search box that handles natural-language queries gracefully. No special "AI search" mode; the search just works for more queries.
+
+**Code review suggestions.** Inline suggestions in a code review tool. Surfaced like a colleague's comment. The author addresses or ignores them like any other comment.
+
+In each case, the AI is doing real work. The user's interaction with the work is in the existing UX language.
+
+## When labels are the right choice
+
+There's a counterargument: sometimes the AI label is necessary because the feature genuinely requires the user to engage in AI-specific behavior.
+
+A chat assistant *is* a chat. Users have to know they're chatting with AI vs. a human. Labeling is honest.
+
+A creative tool that generates images *is* obviously generative. The user expects AI; labeling it as such matches expectation.
+
+A research agent that does deep multi-step work asynchronously needs a label so the user understands what they're triggering.
+
+For these, labels are the right call. The point isn't to never label; it's to not label everything.
+
+## The "AI everywhere" UX problem
+
+Some products have tried to add AI to every part of the interface. Every button has an AI variant. Every panel has an AI assistant.
+
+The result is overwhelming. Users don't know which AI to use for what. The product feels like a demo of AI capabilities rather than a tool for getting work done.
+
+The disappearing-AI approach inverts this. Instead of "AI as a feature add-on everywhere," it's "AI as an invisible improvement to the things users already do." The product feels like a product, not a demo.
+
+## Designing for disappearance
+
+A few patterns that help.
+
+**Pattern 1: AI runs before user input.** The AI does work in advance, prepping the page or the response or the suggestion, so when the user arrives the relevant intelligence is already there. Users see results, not waits.
+
+**Pattern 2: AI suggests, user decides.** Instead of "AI does the thing," it's "AI suggests; user accepts, modifies, or rejects." The user is in control; the AI is helpful but not autonomous in user-visible ways.
+
+**Pattern 3: Confidence shapes presentation.** When the AI is highly confident, present its output prominently. When uncertain, present it tentatively or with alternatives. The user sees the AI's confidence translated into UX, not as a probability number.
+
+**Pattern 4: Failures look like product failures, not AI failures.** When the AI's suggestion is wrong and the user corrects it, the experience is "I changed it" not "the AI was wrong." Same outcome; very different user perception.
+
+## The trust accumulation
+
+A disappearing AI feature builds trust through use. The user doesn't actively trust or distrust AI; they trust the product. Each successful interaction strengthens the product's reputation. Each failed interaction is a product issue, not an AI issue.
+
+Over time, the user's trust in the product grows. The AI is humming inside, doing more useful work as the user relies on the product. The label was never needed.
+
+A labeled AI feature has the opposite trajectory. Each failure is a referendum on AI: "see, AI doesn't really work." Trust accumulates in the negative direction. The user ends up avoiding the labeled feature.
+
+## When you do need to be transparent
+
+Disappearing isn't deception. There are cases where the AI's role should be acknowledged:
+
+- When the user is making a decision that the AI suggested (acknowledge the suggestion came from AI)
+- When the output may be wrong in non-obvious ways (acknowledge AI uncertainty)
+- When the user might have privacy concerns about how AI was involved (acknowledge what data was used)
+
+The principle: be transparent in the moments that matter for the user's decisions or trust. Don't be performatively transparent at every interaction.
+
+## The metric that matters
+
+For a disappearing AI feature, the success metric is usually a downstream product metric: completion rate, time to task, satisfaction with the underlying flow. Not AI-specific metrics like "AI feature usage."
+
+If AI feature usage is a tracked metric, you've labeled the feature in your tracking even if not in the UI. That tracking will tilt your decisions toward visibility (more clicks on the AI feature) instead of effectiveness (more successful task completions).
+
+Track the user task, not the AI surface. The AI surface is implementation detail; the user task is the product.
+
+## The take
+
+Stop labeling everything as AI. The features that succeed in 2026 are the ones that do real work invisibly inside flows users already have.
+
+Make AI an improvement to existing UX, not a separate UX. Make failures look like product issues, not AI issues. Track downstream task success, not AI feature usage.
+
+The "AI" label was a 2023 marketing instinct. The 2026 instinct is the opposite: build features that are obviously useful and never have to mention the technology behind them.

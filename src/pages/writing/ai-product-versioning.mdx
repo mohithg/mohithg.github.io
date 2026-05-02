@@ -1,0 +1,151 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Versioning AI products: who pays when behavior changes"
+description: "AI product behavior changes when models change. Users notice. The versioning model determines who absorbs the change. Get this wrong and your users feel like the product is randomly different."
+publishDate: "2026-06-01"
+pillar: product
+slug: ai-product-versioning
+---
+
+A user opens an AI feature on Tuesday. They get a particular kind of response. They open it on Friday. The response is different. The product hasn't shipped any change. The model has been updated by the provider.
+
+Who absorbs this change?
+
+In most products today, the user does. The team didn't deliberately ship a change; the provider's model upgrade silently shifted behavior; the user is left wondering why "the AI feels different."
+
+This is a versioning problem. The product's behavior depends on a substrate that the team doesn't fully control. Every change in that substrate propagates to users unless something deliberately catches it.
+
+This essay is about the versioning patterns that handle this and the tradeoffs each one makes.
+
+## The default: rolling latest
+
+Most products start here. The API call requests the model by family ("Claude Sonnet" or "GPT-4-class") and gets whatever the current version is. When the provider releases a new version of that model, your traffic moves automatically.
+
+Pro: you ride the improvements without doing work.
+Con: you ride the *changes*, including ones that aren't improvements for your specific use case. Quality might drop on some inputs. Cost might rise. The change is invisible to you and your users until something breaks.
+
+For early-stage products, rolling latest is fine. The cost of pinning isn't justified by the savings yet.
+
+For products with real users and meaningful traffic, rolling latest is risky. The first time a model upgrade silently breaks a feature you depend on, the business cost is real.
+
+## The pattern: pin the model version
+
+The discipline: explicitly request a specific model version (e.g., `claude-sonnet-4-6-20251020`). The provider's family rolls forward; your traffic stays on the version you've validated.
+
+You upgrade the pinned version on your schedule:
+- New model version is announced
+- Run your eval bench against it
+- If it passes, schedule an upgrade
+- If it doesn't, stay on the old version (until you've fixed the issues or the provider deprecates it)
+
+This is the pattern most production AI teams use in 2026. It gives you control. The cost is doing the upgrade work yourself.
+
+## The tradeoffs of pinning
+
+Pinning has costs:
+
+- You miss improvements until you upgrade
+- You have to track when models will be deprecated
+- You have to do upgrade work (eval, testing, rollout)
+- You might fall behind in capability
+
+Pinning has benefits:
+
+- Behavior is stable. Changes you ship are intentional.
+- Bugs introduced by model upgrades are caught in your eval, not by users.
+- Users see a consistent experience.
+- You can correlate behavior changes with your own ship dates.
+
+For a serious product, the benefits dominate. The work is bounded; the alternative is much worse when something breaks silently.
+
+## Versioning prompts alongside models
+
+If you're versioning models, you should also version prompts. Both are part of the system's behavior.
+
+Pattern: each prompt has a version (semantic or hash). Each LLM call records (model_version, prompt_version) as part of its trace. When behavior changes, you can identify whether the model or the prompt was the cause.
+
+This is mechanical to set up and pays off the first time you debug a regression. *"This response was generated with prompt v23 on model 4-6. The current production version uses prompt v25 on model 4-7. Let me check what changed."* Compare the two; find the difference.
+
+Without prompt versioning, you're stuck guessing.
+
+## When the user-facing version matters
+
+For some products, the AI feature has a user-facing version. The user knows they're using "Assistant v2" or "Smart Search." When you upgrade the underlying model, the user-facing version may or may not change.
+
+Two patterns:
+
+**Pattern 1: silent model upgrades behind a stable user-facing version.** The user always sees "Assistant v2"; behind the scenes, the model upgrades when you've validated the new version. Users don't see the change.
+
+**Pattern 2: version bumps when the model changes.** The user sees "Assistant v3" when you upgrade. The version bump signals that behavior may differ.
+
+Silent works when users don't have stable expectations of specific behaviors. Version bumps work when users have built workflows around specific behaviors and need to know when those might change.
+
+Choose deliberately. Most consumer products go silent; some power-user products (developer tools, prompt-engineering platforms) version-bump.
+
+## The grandfather problem
+
+When you upgrade the model and behavior changes, what about users who liked the old behavior?
+
+Two options.
+
+**Option 1: everyone moves to the new version.** Simplest. Some users will be unhappy. Most adjust.
+
+**Option 2: some users stay on the old version.** More flexibility. More complexity. You're now maintaining two versions in parallel.
+
+For most consumer products, option 1 is right. The maintenance overhead of multiple versions outweighs the benefit of user choice. For enterprise products with explicit version commitments in contracts, option 2 may be required.
+
+## Communicating model changes to users
+
+When you do change behavior, communicating it matters.
+
+Bad: silent change. Users notice the difference but don't know why. They suspect bugs.
+
+Good: explicit changelog. *"We upgraded the model on April 15. You may notice the assistant is more concise in its responses and better at code analysis."* Sets expectations.
+
+Even better: pre-announce. *"On April 15, we'll be upgrading the model. Expect changes in tone and capability. Let us know if you spot regressions."* Gives users time to prepare.
+
+The communication doesn't have to be marketing-grade. A changelog post or in-app notification is enough. The discipline is acknowledging the change rather than hoping users don't notice.
+
+## Provider deprecation cycles
+
+Providers deprecate model versions. Yours will be deprecated eventually.
+
+Plan for it:
+
+- Track deprecation dates from your provider
+- Schedule upgrades well in advance of deprecation
+- Have a fallback model identified (in case the upgrade has unexpected issues and you have to roll back)
+- Don't be in a position where you have to upgrade in 48 hours because deprecation is imminent
+
+This is operational hygiene. Most providers give months of notice; you have time. The teams that get caught are the ones who weren't tracking deprecation calendar.
+
+## The "every model behaves differently" reality
+
+Even within the same family, model versions can behave noticeably differently. Sonnet 4.6 vs Sonnet 4.7 might disagree on some specific outputs that look identical to users until they don't.
+
+Your eval bench is what catches this. Without it, you can't tell whether the new version is "the same" or "subtly worse on the cases you care about."
+
+Run the bench on every candidate version. Decide ship/don't-ship based on the results. Don't ship a version you haven't tested.
+
+## The rollback decision
+
+When you upgrade and something breaks:
+
+1. Detect quickly (monitoring catches it)
+2. Roll back quickly (model_version is just a config flag)
+3. Investigate the regression
+4. Decide: fix the prompt to work on the new model, or stay on the old one until provider patches
+
+The first three are operational. The fourth is strategic. Sometimes the new model is genuinely worse for your use case; staying on the old one until alternatives emerge is fine.
+
+The teams that handle this gracefully have rollback as a one-line config change. The teams that struggle have model versions baked into multiple places and rollback requires a deploy.
+
+## The take
+
+AI product behavior depends on a substrate the team doesn't fully control. Versioning is how you absorb the change instead of pushing it to users.
+
+Pin model versions. Version your prompts. Version your evals. Decide whether user-facing versions bump with model changes. Communicate changes when they ship. Plan for provider deprecation.
+
+The teams that do this have AI products that feel stable to users. The teams that don't have AI products that randomly change behavior, leaving users confused and the team scrambling.
+
+Build the versioning discipline before you have a stability incident. The discipline is cheap; the incident is expensive.

@@ -1,0 +1,134 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Feature flags for AI features: rolling out the unpredictable"
+description: "AI features fail differently from regular features. Standard rollout patterns leave you exposed to model regressions and traffic-driven failures. Here's the gating model that fits."
+publishDate: "2026-05-26"
+pillar: product
+slug: ai-feature-flags
+---
+
+Feature flags for regular software ship a binary on/off. The rollout is gradual: 5% of users, then 25%, then 100%. Watch the metrics; rollback if they drift; otherwise complete the rollout.
+
+AI features need more than this. The model can regress on certain inputs even when the code hasn't changed. Traffic patterns can shift the cost or quality picture overnight. The standard rollout doesn't capture these dynamics.
+
+This essay is about the gating patterns that fit AI features specifically.
+
+## What's different about AI rollouts
+
+Three properties of AI features that demand more sophisticated gating.
+
+**Property 1: input-conditional quality.** A regular feature works equally well for all users. An AI feature works well for some inputs and badly for others. A 10% rollout might happen to land on inputs where the feature works (false positive on the metrics) or where it doesn't (false negative). The randomness has higher variance.
+
+**Property 2: provider-driven changes.** Even with no code changes on your side, the underlying model can change. Provider updates the model; previous behavior shifts. Your "stable" AI feature is now subtly different.
+
+**Property 3: long-tail failure modes.** Some failures only manifest on specific user inputs that may not appear in early traffic. By the time you ramp to 100%, you're in production with a failure mode you didn't see at 25%.
+
+The gating pattern has to account for these.
+
+## Pattern 1: stratified rollout
+
+Instead of random sampling, stratify your rollout by user cohort or input type.
+
+Examples:
+
+- *Roll out to power users first.* They're more likely to push the feature in interesting ways and more likely to give specific feedback.
+- *Roll out to specific input types first.* If your feature handles 5 types of queries, ramp on the simplest type before extending to harder ones.
+- *Roll out by geography or language.* English-only first, then add languages.
+
+Stratified rollout finds failure modes earlier because the early users are likelier to surface them.
+
+## Pattern 2: parallel-run shadow mode
+
+Before exposing the feature to users, run it in shadow: the feature processes the request, but the user sees the existing (non-AI) experience. The feature's output is logged for offline review.
+
+This lets you compare the new AI feature's output against the actual user experience, on real production traffic, with no risk to users. You see how often the AI agrees with the existing flow, where they diverge, and what the divergence looks like.
+
+After a few days of shadow, you have evidence of whether the feature is ready to expose. The evidence is much richer than what a 5% live rollout would give you.
+
+## Pattern 3: per-user opt-in before opt-out
+
+Two staged exposure:
+
+1. **Opt-in:** the feature is available, users have to enable it. Early adopters try it; you get feedback from people who chose to try.
+2. **Opt-out:** the feature is on by default, users can turn it off. Standard rollout pattern.
+
+The opt-in stage finds the bugs and shapes the feature. The opt-out stage measures the feature's actual impact at scale.
+
+Opt-in to opt-out is a slower rollout than going straight to opt-out, but it surfaces problems earlier, when they're cheaper to fix.
+
+## Pattern 4: kill switch by failure type
+
+Beyond the rollout flag, have orthogonal kill switches for specific failure modes.
+
+```
+Flag: ai_feature_enabled
+Flag: ai_feature_use_expensive_model (turn off if cost spikes)
+Flag: ai_feature_strict_safety (turn on if safety concerns arise)
+Flag: ai_feature_async_fallback (route to async if latency degrades)
+```
+
+Each flag addresses a specific potential issue. When monitoring detects a problem, the right flag flips, and the feature continues operating in a degraded but acceptable mode rather than being entirely rolled back.
+
+This is more flag complexity than most regular features need. AI features warrant it because there are more dimensions of potential failure.
+
+## Pattern 5: time-bounded experiments
+
+For AI features, run as time-bounded experiments rather than open-ended rollouts.
+
+*"This feature is enabled for 4 weeks. At the end of that period, we'll evaluate against the success criteria and either confirm it for all users, iterate, or roll back."*
+
+The time bound forces evaluation. Without it, AI features sit at 50% rollout indefinitely, with nobody owning the decision to complete or kill.
+
+The success criteria should be specific: not "improve user satisfaction" but "increase task completion rate by 5%, with no more than 1% increase in support contacts." Measurable, falsifiable.
+
+## Monitoring during rollout
+
+The standard product metrics (engagement, retention) apply. AI-specific metrics that matter during rollout:
+
+- **Quality metrics from shadow eval.** How often does the AI feature produce acceptable output on real traffic?
+- **Cost per active user.** Is the feature within the cost envelope you planned for?
+- **Latency distribution.** Is the AI feature meeting latency expectations? Especially p95/p99.
+- **Specific failure modes.** Track the failure modes you anticipated. New failure modes deserve immediate attention.
+- **Abandonment.** Do users abandon the AI flow at higher rates than the existing flow?
+
+Set thresholds on each. When a threshold is crossed, alert. The rollout is iterative; fix issues before ramping further.
+
+## Rollback discipline
+
+If something goes wrong during rollout, you need to roll back fast. Two things to have in place:
+
+- **One-click rollback.** Toggling the flag back to "off" should take seconds, not require a deploy.
+- **Communication.** When rollback happens, communicate (internally, and externally if users were exposed). *"We noticed an issue with feature X and have temporarily disabled it. We're investigating and will share an update soon."*
+
+The discipline isn't avoiding rollbacks (they're going to happen). It's handling them well so the next rollout can proceed with confidence.
+
+## The "we shipped it but didn't know" pattern
+
+A subtle failure mode: a feature is at 100% rollout but the team forgot, so when something goes wrong, nobody knows the AI feature is involved.
+
+Avoid this by:
+
+- Maintaining a clear list of what AI features are live, at what rollout percentages
+- Reviewing the list periodically (monthly) to confirm intentional state
+- Having a clear owner per feature
+
+This sounds like basic ops. It's surprising how often AI features get into a state where nobody on the team can confidently say what's enabled vs. not.
+
+## What makes AI rollouts feel different
+
+Compared to regular feature rollouts, AI rollouts feel scarier. Reasons:
+
+- The output is generative, so failures are harder to predict
+- The cost is variable, so a feature can become more expensive than planned at 100%
+- User feedback is qualitative ("the AI feels different"), not just quantitative
+- The model can change underneath you
+
+The gating patterns above don't eliminate the scariness. They make the scariness manageable. You roll out with eyes open, with the ability to pause or roll back, with clear criteria for moving forward.
+
+## The take
+
+AI features need more nuanced gating than the standard percent-rollout. Stratify the rollout, shadow before live, opt-in before opt-out, kill-switch on specific failure modes, time-bound experiments.
+
+The patterns aren't novel; they're the patterns serious teams have been using for any high-risk feature. AI features are high-risk by default; treat them that way.
+
+The teams that ship AI features successfully do this. The teams that ship AI features and have to roll back (or worse, ship to all users a feature that's silently degrading) usually skipped the more careful gating because "we just want to launch."

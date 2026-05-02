@@ -1,0 +1,143 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Setting the quality bar for AI features: how good is good enough"
+description: "AI features are non-deterministic. They will make mistakes. The product question is how often, on which inputs, with what user-visible consequences. Here's the framework."
+publishDate: "2026-06-02"
+pillar: product
+slug: ai-product-quality-bar
+---
+
+A frequent question in AI product reviews: *"Is this good enough to ship?"* The team has run their eval. The pass rate is 87%. Some shipped products are at 92%. Some are at 80%. What's the right number?
+
+The honest answer: there's no universal threshold. The right quality bar depends on the cost of mistakes, the user's tolerance, the alternatives, and the specifics of the use case. Setting the bar deliberately for your situation, rather than picking a number that "feels right," is the work.
+
+This essay is the framework.
+
+## The factors that set the bar
+
+Five factors that determine how good "good enough" is.
+
+**Factor 1: cost of a wrong output.** What happens when the AI is wrong? Range:
+
+- Trivial: user notices, retries, slightly annoyed (autocomplete suggestion, search result reranking)
+- Moderate: user wastes time, misses something, has to redo work (summary that misses key point, draft that needs heavy editing)
+- High: user makes wrong decision based on it, business-impacting (financial advice, medical information, legal interpretation)
+- Severe: regulatory or safety incident, lasting harm (clinical decision, automated trades, high-stakes triage)
+
+The bar scales with the cost. Trivial mistakes can be 70% pass rate; severe ones need 99.9%+.
+
+**Factor 2: user verification ability.** Can the user check the AI's output? If yes, mistakes are caught. If no, mistakes propagate.
+
+A code suggestion is verifiable (the user reads it, decides to accept). A summary of a long document is partially verifiable (the user can spot-check). A confident factual claim about something the user doesn't know is essentially unverifiable.
+
+The bar is lower when verification is easy and higher when it's not.
+
+**Factor 3: alternatives the user has.** What does the user do if the AI feature isn't there? Range:
+
+- Better alternative exists (Google search, manual process, ask a colleague): AI feature has to clearly beat the alternative
+- No good alternative: AI feature can have lower quality and still be useful (better than nothing)
+
+If the alternative is a 10-minute manual process, an AI feature that takes 30 seconds with 80% quality might be a clear win. If the alternative is a fast, reliable manual process, the AI has to be near-perfect.
+
+**Factor 4: user expectations.** What did the user think they were getting?
+
+- Marketed as "exploratory": users tolerate more error
+- Marketed as "the answer": users expect near-perfect
+
+Honest framing lowers the required quality. Overpromising raises it (and breaks trust when the promise isn't met).
+
+**Factor 5: regulatory or contractual obligations.** For some use cases, there are external requirements. *"Medical information must be reviewed by a licensed clinician."* *"Financial advice is held to fiduciary standards."* These set hard floors that the eval bar has to meet or exceed.
+
+## The framework: cost-weighted quality
+
+A useful framing: the cost-weighted quality of an AI feature is `success_rate * value_per_success - failure_rate * cost_per_failure`.
+
+Plug in numbers:
+- Pass rate: 90%
+- Value per success: $5 (saved time, improved decision)
+- Cost per failure: $1 (user has to retry)
+- Net per use: 0.9*$5 - 0.1*$1 = $4.40
+
+Vs. an alternative:
+- Pass rate: 70%
+- Value per success: $5
+- Cost per failure: $50 (significant downstream consequence)
+- Net per use: 0.7*$5 - 0.3*$50 = -$11.50
+
+The first feature ships. The second doesn't, even though both have positive intuition.
+
+This framework forces you to be explicit about the costs and benefits. Most teams skip this. Most teams ship features whose cost-weighted quality is unclear.
+
+## Setting the bar by use case
+
+Concrete examples I'd ballpark:
+
+**Code suggestions in an IDE.** Pass rate: 70%. Cost of failure is low (user rejects the suggestion). Value of success is high (saves typing time). Bar: low.
+
+**Email triage / categorization.** Pass rate: 85%. Cost of misclassification is moderate (user might miss an email or see it in the wrong place). Value of correct classification is moderate. Bar: medium.
+
+**Customer service chat (general questions).** Pass rate: 90%. Cost of wrong answer is moderate-high (customer gets bad info, may follow up frustrated). Value is high (deflects support load). Bar: medium-high.
+
+**Financial recommendation.** Pass rate: needs to be very high; some categories of failure are unacceptable at any rate (e.g., recommending a specific security to retail users). Bar: high to floor.
+
+**Medical advice.** Pass rate isn't the right framing; specific safety properties have to be near-perfect (don't miss critical conditions, don't recommend dangerous interventions). Bar: regulatory floor.
+
+These are heuristics, not standards. The right bar for *your* product depends on your specific costs, alternatives, and user expectations.
+
+## What "above the bar" looks like
+
+Once you've set the bar:
+
+- Eval bench shows pass rate above the bar on representative cases
+- Production sampling confirms the eval is grounded (not eval drift)
+- Failure modes that occur are within the acceptable category (not the unacceptable kind)
+- User-facing UX handles the failures gracefully (clear, recoverable)
+- Cost per use is sustainable
+
+The first one (eval pass rate) is what most teams measure. The other four are equally important and more often skipped.
+
+## What to do when you're below the bar
+
+You're not above the bar yet. Three options.
+
+**Option 1: improve the AI.** Better prompts, better tools, better model, more eval-driven iteration. Most teams reach for this first.
+
+**Option 2: change the surface.** Make the AI's role smaller. Instead of "AI gives the answer," make it "AI gives suggestions for human review." Lower the bar by changing what the AI is responsible for.
+
+**Option 3: don't ship the feature.** Sometimes the right call. Not every AI idea should become a product.
+
+The mistake is shipping below the bar in the hope that quality will improve later. Quality often doesn't improve organically; it requires deliberate work that didn't happen because the team thought they'd already shipped.
+
+## Different bars for different cohorts
+
+Sometimes you can ship to one cohort while still iterating on another.
+
+- Power users tolerate more rough edges; ship to them first
+- Free users can be a beta cohort while paid users get the more polished version
+- Internal users are a great early audience
+
+This buys you real-world feedback while limiting the blast radius of mistakes. Use it deliberately as part of the path to a higher bar for general release.
+
+## The bar evolves
+
+As the model improves, costs drop, and you build more eval coverage, the achievable bar rises. The quality you couldn't reach a year ago might now be routine.
+
+Re-evaluate periodically. A feature that was below the bar at launch might now be above it. A feature that was above the bar might now be at risk because user expectations have grown.
+
+The bar is a moving target. Plan for it; don't set it once and assume it's stable.
+
+## Communicating the bar to the team
+
+A useful practice: write down the bar for each AI feature. *"For Feature X, we will ship when (a) eval pass rate is above 87%, (b) no failure modes in the critical category occur in 100 sampled production runs, (c) p95 latency is under 3 seconds, (d) cost per successful use is under $0.10."*
+
+Specific. Falsifiable. Everyone on the team knows what "ready" means.
+
+Without this, "is it ready?" becomes a debate of intuitions. The PM thinks yes; engineers think no; nobody can articulate the disagreement. The bar makes the disagreement concrete and resolvable.
+
+## The take
+
+The right quality bar for an AI feature depends on the cost of mistakes, the user's verification ability, the alternatives, the user's expectations, and any regulatory floors. There's no universal pass rate.
+
+Set the bar deliberately. Measure the cost of failure, the value of success, the user's tolerance. Write down the criteria for "ready." Re-evaluate as the model improves and user expectations shift.
+
+The teams shipping AI features that work are the ones who set the bar carefully and held the line. The teams shipping AI features that don't work either set the bar too low (and shipped before they should) or didn't set it at all (and shipped on intuition that was wrong).

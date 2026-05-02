@@ -1,0 +1,146 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Roadmapping AI products: planning for a moving foundation"
+description: "Traditional roadmaps assume the technology underneath is stable. AI products live on a substrate that changes every few months. Here's the planning approach that adapts."
+publishDate: "2026-05-29"
+pillar: product
+slug: ai-product-roadmap
+---
+
+A traditional product roadmap assumes the platform underneath is stable. The framework you're using doesn't change. The cloud APIs are predictable. You can plan a quarter, plan a year, with confidence that the foundation will be there.
+
+AI products don't have that assumption. The underlying models change every few months. Capabilities that were impossible last quarter become trivial; quirks that defined your product become obsolete. A feature that was your moat becomes a checkbox.
+
+This essay is about how to roadmap under those conditions. The standard "ship X by Q3" plan doesn't survive contact with the model release cycle. A different planning approach does.
+
+## What changes that traditional roadmaps assume doesn't
+
+Three things move under your AI roadmap.
+
+**Model capabilities.** The frontier model in three months will be more capable than today's. Some things you're doing manually will become single-prompt operations. Some things that required your custom logic will be done by the model alone.
+
+**Costs.** Per-token pricing tends to drop, sometimes dramatically. The economics of features that are unaffordable today might be fine in six months without any optimization on your part.
+
+**Tooling.** The ecosystem is moving. Better RAG, better agent frameworks, better evals. What you build today might be replaceable by an off-the-shelf tool tomorrow.
+
+The roadmap has to be designed assuming these will move. A plan that's locked in for 12 months will be wrong by month six.
+
+## The horizons framework
+
+A useful pattern: separate your roadmap into horizons by how stable the foundation is at each.
+
+**Horizon 0 (now to ~6 weeks).** Features you're building this sprint. The foundation is what it is today; the work is concrete.
+
+**Horizon 1 (6 weeks to ~6 months).** Features in the pipeline. The foundation may have shifted by the time these ship. Plan for adaptation.
+
+**Horizon 2 (6 months+).** Aspirational features. Don't commit to specifics; commit to themes. The foundation will definitely be different.
+
+The mistake is treating Horizon 2 like Horizon 0. Detailed specs for features 9 months out, when the model will have changed twice and your assumptions about what the AI can do will be wrong.
+
+## Plan in themes for distant horizons
+
+For Horizon 2, plan in themes, not specs.
+
+Bad: *"Q4 2026: ship multi-step research agent that can browse the web, synthesize across sources, and produce a 5-page report."* Specific. Brittle. By Q4, the model might do this in one prompt; your spec is overengineered. Or the model might still struggle with multi-step browsing; your spec is impossible.
+
+Good: *"Q4 2026: deep-research workflows. Users can pose research questions and get back high-quality synthesized analysis. Specific implementation TBD based on model capabilities at that point."*
+
+The theme is durable. The specifics adapt. You're committed to the user value; you're not committed to the engineering shape.
+
+## Re-planning cadence
+
+Plan reviews need to be more frequent than for non-AI products. A useful rhythm:
+
+- **Weekly:** Horizon 0 status. What shipped, what's blocked, what's in flight.
+- **Monthly:** Horizon 1 review. Are the in-pipeline features still the right ones given recent model releases? Adjust scope based on what the model now does easily vs. still struggles with.
+- **Quarterly:** Horizon 2 review. Are the themes still right? Do new themes need to be added? Are old themes obsolete because the underlying capability is now commodity?
+
+This is more re-planning than traditional product orgs do. It feels disruptive at first. After a few cycles, it's normal: the team treats re-planning as part of the work, not as a sign of failed planning.
+
+## What to do when the foundation moves
+
+When a major model release changes your assumptions:
+
+1. **Audit the in-flight roadmap.** Which features assumed the old model's limitations? Which assumed they'd persist?
+2. **Identify obsolete work.** Features in flight that are now trivial under the new model can be descoped.
+3. **Identify newly-feasible work.** Features that were impossible under the old model are now in scope. Add them.
+4. **Identify newly-obsolete competitive moats.** Your product's edge based on overcoming a model limitation is gone if the limitation disappeared.
+5. **Re-prioritize.** The new ordering reflects the new landscape, not the old one.
+
+This sounds like chaos. It's actually healthy. The teams that don't do this are building features that were the right idea six months ago and are now the wrong idea.
+
+## The "we built it; the model now does it" problem
+
+A specific pattern: you spent months building an elaborate system to overcome a model limitation. New model release; the limitation is gone. Your elaborate system is now a maintenance burden with no upside.
+
+Examples:
+- Custom prompting acrobatics to get reliable JSON output (now trivial with structured outputs)
+- Multi-call workflows to chain reasoning (now a single call with reasoning models)
+- Elaborate retry logic for hallucinations (now significantly less needed with newer models)
+
+When this happens, the right move is to delete the elaborate system, not to defend it. The maintenance cost is real; the original need is gone.
+
+The reluctance to delete is psychological. The team built it; deleting feels like wasted work. But carrying the maintenance forward is more wasted work. Cut your losses.
+
+## Capability bets
+
+Some product strategy depends on bets about future model capabilities.
+
+*"We're betting that within 12 months, models will be reliable at multi-step planning. We're building our product on that assumption."*
+
+These bets should be explicit. The team should know which features depend on capability that doesn't exist yet. There should be a fallback plan if the capability doesn't materialize on schedule.
+
+The opposite (implicit bets, no fallback) is dangerous. The team commits to a roadmap that requires capability that may not arrive.
+
+## Cost projections
+
+Cost forecasts are part of the roadmap. They have similar uncertainty to capability.
+
+Pattern that works:
+
+- Forecast cost based on current pricing
+- Note assumed pricing changes (most providers drop prices a few times a year)
+- Identify features that depend on price drops to be viable
+- Have a fallback if prices don't drop
+
+A feature that costs $1 per use today and is "viable when prices drop 5x" is a real bet. It might pay off; it might not. Document it as a bet.
+
+## What to commit to and what to leave open
+
+Some things should be locked in:
+
+- The user problems you're solving (these don't change with the model)
+- The brand and product identity
+- The strategic direction
+
+Some things should be deliberately fluid:
+
+- Specific feature implementations
+- Quarterly delivery dates more than 6 months out
+- Specific model choices
+
+The art is knowing which is which. Lock in the durable; leave the implementation-dependent open.
+
+## Communicating uncertainty to stakeholders
+
+Stakeholders often want certainty. *"What will be in Q4?"* Telling them "themes, not specifics" can frustrate.
+
+A framing that helps: *"Here's what we're committed to (themes). Here's our current best guess at how we'll deliver them (subject to change as the foundation evolves). We re-plan every month and will keep you updated."*
+
+This is more honest than promising specific features 9 months out. It manages expectations correctly. Stakeholders learn to interpret AI roadmaps differently from regular roadmaps.
+
+## When to lock in despite the uncertainty
+
+Some commitments are necessary even with the foundation moving. Customer contracts, marketing campaigns, hiring plans.
+
+The mitigation: make the committed deliverables conservative enough that they're robust to foundation changes. *"By Q3, we will have shipped capability X."* X is something achievable with today's foundation; if the foundation gets better, X is easier; if it stagnates, X is still doable.
+
+Don't commit to things that require unproven foundation capability. If the bet is risky, structure the commitment around the safer subset.
+
+## The take
+
+AI product roadmaps live on a moving foundation. Plan in horizons (concrete near-term, themes far-term). Re-plan more often than traditional products. Commit to user problems, leave implementation open. Cut elaborate workarounds when the foundation makes them obsolete.
+
+The teams that ship the best AI products are the ones whose roadmaps adapt as the foundation moves. The teams that lock in 12-month plans on Q1 assumptions ship features that were the right idea three model releases ago.
+
+Build the planning practice that fits the technology. The technology is moving; the planning has to move with it.
