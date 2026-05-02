@@ -63,17 +63,21 @@ const svg = `
   <text x="80" y="220" font-family="ui-monospace, monospace" font-size="18" letter-spacing="6" fill="#9B9B9B">PRODUCT  ENGINEER  ·  AI  ·  11Y</text>
 
   <!-- Hero headline -->
-  <text x="80" y="312" font-family="ui-sans-serif, sans-serif" font-size="74" font-weight="700" fill="#F5F5F0" letter-spacing="-2.5">I ship any product</text>
-  <text x="80" y="395" font-family="ui-sans-serif, sans-serif" font-size="74" font-weight="700" letter-spacing="-2.5">
+  <text x="80" y="295" font-family="ui-sans-serif, sans-serif" font-size="68" font-weight="700" fill="#F5F5F0" letter-spacing="-2.2">I ship any product</text>
+  <text x="80" y="370" font-family="ui-sans-serif, sans-serif" font-size="68" font-weight="700" letter-spacing="-2.2">
     <tspan fill="#9B9B9B">with </tspan>
     <tspan fill="#A088FF">AI</tspan>
-    <tspan fill="#9B9B9B"> in every layer</tspan>
+    <tspan fill="#9B9B9B"> in every layer,</tspan>
   </text>
-  <text x="80" y="478" font-family="ui-sans-serif, sans-serif" font-size="74" font-weight="700" letter-spacing="-2.5">
+  <text x="80" y="455" font-family="ui-sans-serif, sans-serif" font-size="56" font-weight="700" letter-spacing="-1.5">
     <tspan fill="#9B9B9B">from </tspan>
+    <tspan font-family="ui-monospace, monospace" font-style="italic" fill="#FF5C8A">infra</tspan>
+    <tspan fill="#9B9B9B"> to </tspan>
     <tspan font-family="ui-monospace, monospace" font-style="italic" fill="#00E5A0">DAGs</tspan>
     <tspan fill="#9B9B9B"> to </tspan>
-    <tspan font-family="ui-monospace, monospace" font-style="italic" fill="#A088FF">UI</tspan>
+    <tspan font-family="ui-monospace, monospace" font-style="italic" fill="#A088FF">APIs</tspan>
+    <tspan fill="#9B9B9B"> to </tspan>
+    <tspan font-family="ui-monospace, monospace" font-style="italic" fill="#F5F5F0">UI</tspan>
     <tspan fill="#9B9B9B">.</tspan>
   </text>
 
