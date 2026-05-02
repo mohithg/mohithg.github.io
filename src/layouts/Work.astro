@@ -22,15 +22,24 @@ const { title, tagline, role, start, end, accent = 'violet', metrics, descriptio
 const accentText = accent === 'mint' ? 'text-mint' : accent === 'pink' ? 'text-pink' : 'text-violet-soft';
 const accentBg = accent === 'mint' ? 'bg-mint/10' : accent === 'pink' ? 'bg-pink/10' : 'bg-violet/10';
 
+// Per-page OG image: derived from the URL slug (e.g. /work/portfoliopilot
+// → /og/portfoliopilot.png). The build-og.mjs script generates one PNG
+// per case study before each `astro build`.
+const slug = Astro.url.pathname.replace(/^\/work\//, '').replace(/\/$/, '');
+const ogImage = `/og/${slug}.png`;
+const canonicalUrl = new URL(Astro.url.pathname, SITE.url).toString();
+
 const articleJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Article',
   headline: title,
   description: tagline,
+  image: new URL(ogImage, SITE.url).toString(),
   author: { '@type': 'Person', name: SITE.name, url: SITE.url },
   publisher: { '@type': 'Person', name: SITE.name, url: SITE.url },
   datePublished: '2026-05-02',
-  mainEntityOfPage: new URL(Astro.url.pathname, SITE.url).toString(),
+  dateModified: '2026-05-03',
+  mainEntityOfPage: canonicalUrl,
 };
 
 const breadcrumbJsonLd = {
@@ -44,7 +53,7 @@ const breadcrumbJsonLd = {
 };
 ---
 
-<Base title={title} description={description ?? tagline} jsonLd={{ ...articleJsonLd, breadcrumb: breadcrumbJsonLd }}>
+<Base title={title} description={description ?? tagline} image={ogImage} jsonLd={{ ...articleJsonLd, breadcrumb: breadcrumbJsonLd }}>
   <article>
     <!-- Hero -->
     <header class="relative isolate overflow-hidden pt-32 pb-16 sm:pt-40 sm:pb-24">

@@ -14,6 +14,7 @@ const personJsonLd = {
   '@type': 'Person',
   name: SITE.name,
   url: SITE.url,
+  image: new URL('/og/default.png', SITE.url).toString(),
   jobTitle: 'Product Engineer',
   worksFor: {
     '@type': 'Organization',
@@ -25,12 +26,14 @@ const personJsonLd = {
     { '@type': 'Organization', name: 'IntuitionAI', url: 'https://intuition.ai' },
     { '@type': 'Organization', name: 'Rippling', url: 'https://rippling.com' },
     { '@type': 'Organization', name: 'AthenaHealth', url: 'https://www.athenahealth.com/' },
+    { '@type': 'CollegeOrUniversity', name: 'Saveetha Engineering College', url: 'https://saveetha.ac.in', sameAs: 'https://en.wikipedia.org/wiki/Anna_University' },
   ],
   email: `mailto:${SITE.email}`,
   sameAs: [SITE.github, SITE.linkedin, SITE.codepen, SITE.twitter, ...(SITE.blogEnabled ? [SITE.blog] : [])],
   knowsAbout: [
     'Artificial Intelligence',
     'Large Language Models',
+    'Quantitative finance',
     'Full-stack engineering',
     'React',
     'Python',
@@ -39,14 +42,40 @@ const personJsonLd = {
     'Real-time systems',
     'Kubernetes',
     'AWS',
-    'Quantitative systems',
+    'Eval systems',
     'Model monitoring',
   ],
   description: SITE.description,
 };
+
+const websiteJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE.name,
+  alternateName: 'mohithg.com',
+  url: SITE.url,
+  inLanguage: 'en',
+  author: { '@id': SITE.url + '/#person' },
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: `${SITE.url}/?q={search_term_string}`,
+    },
+    'query-input': 'required name=search_term_string',
+  },
+};
+
+const homeJsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    { ...personJsonLd, '@id': SITE.url + '/#person' },
+    websiteJsonLd,
+  ],
+};
 ---
 
-<Base jsonLd={personJsonLd}>
+<Base jsonLd={homeJsonLd}>
   <Hero />
   <CareerDag />
   <SelectedWork />

@@ -4,11 +4,47 @@ import { Image } from 'astro:assets';
 import headshot from '../assets/headshot.jpg';
 import { ArrowUpRight } from 'lucide-react';
 import { SITE } from '../lib/site';
+
+const profileJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfilePage',
+  dateModified: '2026-05-03',
+  mainEntity: {
+    '@type': 'Person',
+    name: SITE.name,
+    url: SITE.url,
+    jobTitle: 'Product Engineer',
+    description: SITE.description,
+    image: new URL('/og/about.png', SITE.url).toString(),
+    worksFor: {
+      '@type': 'Organization',
+      name: 'Global Predictions (PortfolioPilot)',
+      url: 'https://portfoliopilot.com',
+    },
+    sameAs: [SITE.github, SITE.linkedin, SITE.codepen, SITE.twitter, ...(SITE.blogEnabled ? [SITE.blog] : [])],
+    knowsAbout: [
+      'Artificial Intelligence',
+      'Large Language Models',
+      'Quantitative finance',
+      'Full-stack engineering',
+      'React',
+      'Python',
+      'TypeScript',
+      'Distributed systems',
+      'Real-time systems',
+      'Kubernetes',
+      'AWS',
+      'Healthcare compliance',
+    ],
+  },
+};
 ---
 
 <Base
   title="About"
   description="About Mohith G, an AI Product Engineer who ships full-stack products end-to-end. Currently first engineer at PortfolioPilot. Previously founding engineer at IntuitionAI (acquired by Domino Data Lab), Rippling."
+  image="/og/about.png"
+  jsonLd={profileJsonLd}
 >
   <article>
     <header class="relative isolate overflow-hidden pt-32 pb-12 sm:pt-40 sm:pb-16">

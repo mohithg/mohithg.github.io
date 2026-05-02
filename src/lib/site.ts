@@ -13,6 +13,7 @@ export const SITE = {
   linkedin: 'https://www.linkedin.com/in/mohithg',
   codepen: 'https://codepen.io/mohithg',
   twitter: 'https://twitter.com/mohithgm',
+  twitterHandle: '@mohithgm',
   location: 'Bengaluru, India',
   timezone: 'Asia/Kolkata',
   tagline: 'Product Engineer · ships any product, with AI in every layer',
