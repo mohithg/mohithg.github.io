@@ -67,7 +67,7 @@ export const QNA: readonly QnA[] = [
     ],
     keywords: ['rippling', 'parker', 'conrad', 'codebrahma', 'react', '2016', 'yc', 'hr', 'hris', 'zenefits'],
     answer:
-      'In early 2016, through Codebrahma, I built early product surfaces for **Rippling**, Parker Conrad\'s next company after Zenefits, now valued at $13B+. Seven months shipping complex React UI when "production React" was still a sentence that needed a footnote. The work earned a **tweet from Dan Abramov** about the production React coming out of Codebrahma at the time, when senior React tweets were the closest thing the ecosystem had to peer review.',
+      'In early 2016, through Codebrahma, I built early product surfaces for **Rippling**, Parker Conrad\'s next company after Zenefits, now valued at $13B+. Over a year shipping complex React UI when "production React" was still a sentence that needed a footnote. The work earned a **tweet from Dan Abramov** about the production React coming out of Codebrahma at the time, when senior React tweets were the closest thing the ecosystem had to peer review.',
     citations: [{ label: 'Rippling case study', href: '/work/rippling' }],
   },
   {

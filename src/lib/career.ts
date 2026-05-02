@@ -77,7 +77,7 @@ export const CAREER: readonly CareerNode[] = [
     role: 'React Engineer (via Codebrahma)',
     company: 'Rippling',
     start: '2016-02',
-    end: '2016-09',
+    end: '2017-05',
     location: 'San Francisco / Remote',
     summary:
       'Built early product surfaces for Rippling, Parker Conrad\'s next company after Zenefits. Worked through Codebrahma, the React shop where I shipped my first React app to production.',
