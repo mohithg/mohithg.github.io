@@ -1,0 +1,173 @@
+---
+layout: ../../layouts/Writing.astro
+title: "AI safety as engineering discipline, not philosophy"
+description: "Most AI safety conversations stay abstract. The teams shipping reliable AI products treat safety as concrete engineering: architecture, eval, instrumentation. Here's the discipline."
+publishDate: "2026-06-15"
+pillar: safety
+slug: ai-safety-as-engineering
+---
+
+When teams talk about AI safety, the conversation often drifts to philosophy. Alignment, existential risk, the long-term trajectory of AI capability. These are real conversations. They're also often disconnected from the safety work the team needs to do this week to ship a reliable product.
+
+There's a different conversation that gets less attention but matters more for production teams: AI safety as engineering. The specific architectural choices, eval patterns, monitoring instrumentation, and incident response practices that prevent your AI feature from doing harmful things to your users or your business.
+
+This essay is the case for treating AI safety as a concrete engineering concern, with the same discipline you'd apply to security or reliability.
+
+## What "engineering safety" covers
+
+The engineering surface of AI safety includes:
+
+- Preventing prompt injection from leaking data or executing unauthorized actions
+- Preventing the model from producing content that violates policy (harmful, illegal, off-brand)
+- Preventing hallucinated facts from reaching users on critical topics
+- Preventing actions outside the user's intent (sending emails the user didn't authorize, etc.)
+- Detecting when the system is being abused
+- Recovering from incidents quickly
+
+Each of these has concrete engineering work attached. Each is testable. Each can be the basis of an SLO.
+
+## Why philosophy isn't enough
+
+The philosophical conversations are useful for setting direction. They don't ship code.
+
+Specific failures the philosophy doesn't prevent:
+
+- A user uses prompt injection to extract another user's data: an engineering failure
+- The model produces medical advice for a financial product: a guardrail failure
+- An agent takes an irreversible action without confirmation: an architecture failure
+- Hallucinated facts about a competitor go viral: a content-policy failure
+
+For each, the fix is concrete: better permission architecture, better content filters, better confirmation gates, better fact-grounding. The philosophy informs which fixes matter; the engineering implements them.
+
+## The safety architecture layers
+
+A useful mental model: safety in an AI product has multiple architectural layers, each catching different kinds of failures.
+
+**Layer 1: input validation.** Before the user's input reaches the model, validate it. Length limits, content type checks, rejection of inputs that match abuse patterns.
+
+**Layer 2: permission boundaries.** What the model has access to is enforced architecturally, not by the prompt. Tools the model can call, data the retrieval can return, actions the agent can take.
+
+**Layer 3: prompt-level safety.** Instructions in the system prompt about what the model should and shouldn't do. The weakest layer; should not be load-bearing alone.
+
+**Layer 4: output filtering.** After the model generates, before the output reaches the user, filter it. Content moderation, refusal of off-policy content, redaction of sensitive data.
+
+**Layer 5: action confirmation.** For consequential actions, the user explicitly confirms before execution. The agent proposes; the user approves.
+
+**Layer 6: monitoring and audit.** All of the above is logged. Anomalies trigger alerts. Incidents are investigated.
+
+Most teams have layers 3 and partially 4. The teams shipping reliable AI products have all six.
+
+## Why prompt-level safety isn't enough
+
+The single most common safety pattern: put "you should refuse to do harmful things" in the system prompt and consider the safety work done.
+
+This fails because:
+
+- The user can craft inputs that override the prompt (prompt injection)
+- The model can be confidently wrong about what's harmful in specific cases
+- Safety constraints in prompts are aspirational, not enforceable
+- A prompt change can accidentally weaken safety; nothing catches this
+
+The prompt is one layer. Treating it as the only layer is like treating an authentication header as the only check on an API request: the request can come without the header, the header can be forged, the application logic can ignore it. Real security is multi-layered. Real safety is too.
+
+## Testing safety like you test functionality
+
+Safety should have its own eval bench:
+
+- Adversarial inputs designed to break the safety properties
+- Prompt injection attempts
+- Jailbreak attempts
+- Edge cases that test policy boundaries
+- Inputs that test confirmation gates
+
+Each case has a defined safe behavior. The bench measures pass rate. Regressions block merges. The safety eval has equal weight to the quality eval.
+
+Without this, safety is a vibes-based assessment that drifts as the prompt and model change.
+
+## Incident response for AI
+
+When safety incidents happen (and they will), how the team responds matters as much as how they prevented.
+
+Pattern that works:
+
+1. Detect (monitoring catches it; user reports come in)
+2. Disable or contain (feature flag turns off the affected capability; outputs from a problematic time window are flagged)
+3. Investigate (trace the request, understand what went wrong)
+4. Fix and add eval (close the gap; ensure regression doesn't happen)
+5. Communicate (internal post-mortem; external if user-impacting)
+
+Most teams have this pattern for security and reliability incidents. They often don't have it explicitly for AI safety incidents, even though AI safety incidents have the same shape.
+
+## Threat modeling for AI
+
+A useful exercise: threat-model your AI feature. What are the ways it could go wrong?
+
+Start with categories:
+- Data leakage (one user's data exposed to another)
+- Unauthorized actions (the agent does something the user didn't intend)
+- Off-policy content (the model produces content that violates your terms)
+- Brand-damaging output (factual errors, off-tone responses, embarrassing content)
+- Compliance violations (PII handling, regulatory content)
+- Abuse (users using the feature for purposes you don't sanction)
+
+For each category, list specific scenarios. For each scenario, design the mitigations across the safety layers. The result is a concrete safety roadmap.
+
+Most teams skip this exercise. The result is reactive safety: respond to incidents as they happen, with no comprehensive coverage.
+
+## Safety vs. capability tradeoffs
+
+There's a real tradeoff: safer systems are sometimes less useful.
+
+- Strict refusal patterns can reject queries that were actually legitimate
+- Heavy output filtering can remove acceptable content
+- Confirmation gates add friction for users who want to act fast
+- Permission boundaries can block useful agent behaviors
+
+Find the right balance for your product. A consumer chat product can tolerate more aggressive safety; a developer tool with sophisticated users can afford less. The "right" level is product-specific.
+
+The discipline: be deliberate about which tradeoffs you make. Don't accept "the model is restrictive" as a default; ask whether the restrictions are doing useful safety work.
+
+## What "safety culture" looks like in an AI team
+
+A few practices that signal a team takes safety as engineering seriously.
+
+- A safety eval bench that runs in CI
+- Threat models reviewed periodically
+- Incident response practiced (not just defined)
+- Safety incidents post-mortemed with the same rigor as outages
+- Safety is a named owner's responsibility, not "everyone's"
+- Safety improvements are tracked alongside features in roadmap
+
+Teams without these treat safety as a checkbox. Teams with them treat it as continuous work.
+
+## The relationship to security
+
+AI safety overlaps with security but isn't identical.
+
+Security: keeping unauthorized parties out, protecting data, preventing exploitation.
+Safety: preventing the AI from doing things it shouldn't, even when "authorized" parties operate it.
+
+Many AI safety concerns are also security concerns (data leakage). Some are not (the model produces wrong medical advice to a legitimately-authenticated user). Both require engineering rigor; the threat models are partly different.
+
+Most engineering orgs have security teams. AI products often need an analogous safety practice, sometimes folded into security and sometimes its own thing. Either way, name the function and resource it.
+
+## Compliance requirements
+
+For some products, safety has external requirements.
+
+- HIPAA: medical advice, patient data
+- SOC2: data handling, audit trails
+- GDPR / CCPA: PII handling, user rights
+- Industry-specific: financial advice, legal advice, etc.
+
+The compliance requirements set floors. Engineering safety has to meet them. Often the regulatory framework predates AI; you're translating "what does HIPAA mean for an AI assistant" into engineering practices.
+
+If your product has compliance obligations, safety engineering and compliance work overlap heavily. Coordinate them; don't treat them as separate projects with separate teams.
+
+## The take
+
+AI safety is engineering work. Architecture choices, eval discipline, monitoring instrumentation, incident response, threat modeling. Each is concrete and trackable.
+
+Don't let safety be philosophical when it should be specific. Build the layers, test them, monitor them, respond to incidents in them. Treat safety as a first-class engineering concern with named owners and measurable outcomes.
+
+The teams shipping reliable AI products have safety culture that's indistinguishable from their reliability culture. The teams that don't, ship features that surprise them in production with safety failures they could have prevented.

@@ -1,0 +1,186 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Content moderation for AI: the pipeline that holds up"
+description: "Models can produce content you don't want users to see. A moderation pipeline catches it before it reaches them. Here's the architecture and the patterns that work."
+publishDate: "2026-06-18"
+pillar: safety
+slug: content-moderation-pipeline
+---
+
+The model produces an output. Sometimes that output is great. Sometimes it's wrong. And occasionally it's actively bad: harmful content, policy violations, factual errors on safety-critical topics, content that would embarrass your brand.
+
+A content moderation pipeline catches the bad outputs before they reach users. Most teams ship without one and rely on the model's built-in safety. The model's built-in safety is real but not sufficient for production. This essay is about the pipeline that adds the layer of defense your product needs.
+
+## What "bad output" means in your product
+
+Before designing a pipeline, define what you're trying to catch.
+
+Categories that often matter:
+
+- **Harmful content.** Instructions for illegal or dangerous activities. Hate speech. Sexual content (when inappropriate for your product).
+- **Policy-violating content.** Content that violates your terms of service. Brand-inappropriate content.
+- **Factually dangerous content.** Wrong medical advice. Wrong financial advice. Misinformation that could harm the user.
+- **Privacy violations.** Output that leaks PII or sensitive data.
+- **Off-domain content.** Content that's well outside what your product is supposed to do (your customer service AI starts giving stock tips).
+- **Adversarial outputs.** Content produced by jailbreak success. Content shaped by prompt injection.
+
+Each category has different detection methods and different remediation. List the ones that apply to your product. Don't over-broaden; each added category is more pipeline complexity.
+
+## The pipeline architecture
+
+A moderation pipeline has a few stages.
+
+```
+Model output → Pre-filter → Classifier(s) → Decision → User-facing output
+```
+
+**Pre-filter.** Fast pattern matching. Catches obvious issues (specific banned phrases, structural patterns).
+
+**Classifier(s).** ML-based or LLM-based moderation. Each classifier is tuned for a category (toxicity, sexual content, etc.).
+
+**Decision.** Based on classifier outputs, decide what to do: pass, redact, refuse, escalate.
+
+**User-facing output.** The (possibly modified) output that actually reaches the user.
+
+This pipeline runs synchronously in the user's request path (it has to; the user can't see the output until moderation passes).
+
+## What classifiers to use
+
+In 2026, several reasonable options.
+
+**Provider built-in moderation.** OpenAI, Anthropic, and others have built-in moderation that evaluates inputs and outputs. Free or low-cost; reasonable quality on broad categories.
+
+**Llama Guard / Llama Guard 3.** Open-source moderation model. Runs cheaply on-prem. Good for general content categories.
+
+**Specialized classifiers.** For specific concerns (medical advice, financial advice, legal advice), you may need specialized classifiers tuned for your domain.
+
+**LLM-as-classifier.** A general LLM with a structured prompt. Slower and more expensive; flexible enough to capture custom policies.
+
+Most production pipelines combine several: provider built-in for the obvious stuff, Llama Guard for general concerns, custom classifiers or LLM-as-judge for product-specific policies.
+
+## Latency budget
+
+Moderation adds latency to every response. Budget for it.
+
+Typical numbers:
+
+- Provider built-in: 50-150ms
+- Llama Guard self-hosted: 30-100ms
+- LLM-as-classifier (small model): 200-500ms
+- Multiple classifiers in parallel: max(individual latencies)
+
+For interactive use, parallel classifier calls keep total latency low. Sequential calls add up fast.
+
+If your latency budget is tight, you may need to run only the cheapest classifiers in the request path and run more thorough analysis offline (with retroactive redaction if needed).
+
+## What to do when moderation fires
+
+Three remediation patterns.
+
+**Pattern 1: refuse.** Don't show the output. Show a polite refusal: "I can't help with that specific request. Try [alternative]."
+
+Best for high-confidence policy violations. The user gets a clear signal.
+
+**Pattern 2: redact.** Show the output minus the problematic portions. The user gets most of what they wanted; the bad parts are removed.
+
+Best for outputs that are mostly fine with one issue (a leaked PII string, an accidental brand mention).
+
+**Pattern 3: re-generate with stricter prompt.** Have the model try again with explicit instructions to avoid the issue. The user gets a different answer.
+
+Best when the original was off but the user's intent was legitimate.
+
+Most pipelines mix these based on the category that triggered. Hate speech: refuse. Accidental PII: redact. Off-domain: re-generate.
+
+## False positive and false negative tradeoffs
+
+Moderation is a classifier; it has both false positives (good output flagged as bad) and false negatives (bad output passes).
+
+Conservative settings: high false positive rate. Many legitimate outputs get blocked. Users frustrated.
+Permissive settings: high false negative rate. Bad outputs get through. Safety risk.
+
+Pick based on the category's stakes. For "this might leak PII" you want high false positive rate (better safe than sorry). For "this might be slightly off-tone" you want low false positive rate (don't overblock benign outputs).
+
+Track both metrics. Tune over time as you observe production behavior.
+
+## User experience for moderation
+
+When moderation fires, the user has a degraded experience. How you communicate matters.
+
+Bad: silent failure. The output never appears; the user is confused.
+
+Worse: scary failure. *"Your request was flagged for policy violation."* makes legitimate users feel accused.
+
+Good: graceful degradation. *"I can't help with that specific request. You might try [alternative phrasing] or [related action]."* The user has a path forward without feeling judged.
+
+Match the language to the actual reason. For policy violations, be clear (it's the right signal). For false positives, lean toward "I'm not the best for this" rather than "you violated something."
+
+## Output filtering vs input filtering
+
+Some products filter inputs (refuse to even process certain queries). Others filter outputs (process anything but moderate the response).
+
+Tradeoffs:
+
+- Input filtering: faster (no model call needed for refused inputs), more conservative (might refuse legitimate requests phrased oddly), gives a clear signal to users.
+- Output filtering: slower (always uses the model), more permissive in what it processes, can produce more useful refusal messages because they're informed by what the model would have said.
+
+Most production systems do both: input filter for obvious abuse patterns, output filter for nuanced policy violations.
+
+## Custom moderation for your domain
+
+Generic moderation catches the broad categories. Your specific product has specific policies that generic moderation doesn't know about.
+
+Custom moderation patterns:
+
+- LLM-as-classifier with your specific policy in the prompt
+- Rule-based filters for product-specific patterns (must include disclaimer, must not mention competitors)
+- Domain-specific classifiers (e.g., a financial-compliance classifier for a fintech AI)
+
+These are additional cost and latency but catch the cases generic moderation can't.
+
+## Logging and audit
+
+Every moderation decision should be logged:
+
+- What was the model's original output
+- Which classifiers fired
+- What was the decision (pass, redact, refuse)
+- What did the user actually see
+
+This serves multiple purposes:
+
+- Debugging false positives ("why was this blocked?")
+- Improving moderation (look at false negatives that slipped through)
+- Compliance (audit trail for safety incidents)
+- Trend analysis (are certain types of attacks increasing?)
+
+Without this, moderation is a black box. With it, you can iterate.
+
+## When the model's built-in safety is enough
+
+For some products, built-in moderation from your model provider plus minimal custom rules is sufficient.
+
+Cases:
+- Simple products with well-bounded use cases
+- Internal tools with trusted users
+- Low-stakes consumer features (entertainment, casual chat)
+
+For these, don't over-engineer. The provider's moderation API plus pattern matching for product-specific issues is fine.
+
+## When you need more
+
+Cases where more thorough moderation is justified:
+
+- Consumer-facing products at scale (broad user base, attack surface)
+- Regulated industries (healthcare, finance, legal)
+- Products handling sensitive content (mental health, sexual health, legal advice)
+- Products where brand impact of a bad output is high
+
+For these, invest in the multi-stage pipeline with specialized classifiers and active red-teaming.
+
+## The take
+
+Content moderation isn't optional for most production AI products. The model's built-in safety is one layer; your pipeline adds the layers needed for your specific risks.
+
+Define the categories you care about. Pick classifiers for each. Pipe outputs through pre-filter, classifier(s), and decision logic. Communicate gracefully on flagged outputs. Log everything. Tune based on production data.
+
+The teams shipping AI products that don't make news for embarrassing outputs are the teams with moderation pipelines. The teams that occasionally do are usually the teams that trusted the model alone.

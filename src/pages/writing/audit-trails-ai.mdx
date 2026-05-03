@@ -1,0 +1,178 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Audit trails for AI: who decided what, when"
+description: "When something goes wrong with an AI system, the audit trail is what tells you what happened. Most AI systems don't have one. Here's the structure that holds up under investigation."
+publishDate: "2026-06-23"
+pillar: safety
+slug: audit-trails-ai
+---
+
+A user reports that the AI gave them wrong advice three weeks ago, and they acted on it. Now they have a problem and they want to know how the AI's decision was made.
+
+If you have a real audit trail, you can answer in five minutes: here's the prompt the model saw, here's the model version, here's the data that was retrieved, here's the model's full output, here's the path the user took afterward.
+
+If you don't have an audit trail, you're piecing together logs from multiple systems, none of which were designed for this question. The investigation takes days. You can't confidently say what happened.
+
+This essay is about audit trails for AI systems: what they need to capture, how they need to be structured, and what regulatory and incident-response use cases drive the design.
+
+## Why AI audit trails are different
+
+Regular service audit trails capture: request, response, user, time. For most services, that's enough.
+
+AI audit trails need more because:
+
+- The model's behavior is non-deterministic. The same input on a different day might produce different output.
+- The model version matters. The behavior was specific to the model running at the time.
+- The prompt matters. Behavior depends on the system prompt and any in-context content.
+- The retrieved context matters. For RAG systems, the retrieved documents are part of "what the model saw."
+- The agent's trajectory matters. For agents, the sequence of tool calls and intermediate observations is part of how the decision was made.
+
+Capturing all of this is more than standard request logging.
+
+## What to capture
+
+For each LLM-driven decision in your system, capture:
+
+```
+event_id: UUID for this specific event
+parent_event_id: UUID linking to the user request that triggered this
+timestamp: when this happened
+user_id: who initiated (if applicable)
+agent_type: which AI feature
+model_id: specific model and version (e.g., claude-sonnet-4-6-20251020)
+prompt_version: version of the prompt that was used
+system_prompt: the full system prompt
+user_input: what the user said
+retrieved_context: full text of retrieved documents (or pointers to them)
+tools_available: list of tools the model could call
+tool_calls: each tool call made, with inputs and outputs
+final_output: full model output
+post_processing: any moderation, redaction, or transformation applied
+user_facing_output: what the user actually saw
+metadata: anything else relevant (latency, cost, feature flags)
+```
+
+This is a lot. Most teams capture maybe 30% of it. The 70% missing is what you'll wish you had during an investigation.
+
+## Storage considerations
+
+Audit trails grow. For a high-volume product, you can be generating GB or TB of audit data per day.
+
+Storage tiers:
+
+- **Recent (0-30 days):** in fast storage; queryable in seconds
+- **Mid-term (30 days-1 year):** in cold storage; queryable in minutes
+- **Long-term (1 year+):** archived; queryable in hours
+
+Match retention to your obligations. GDPR data subject rights apply for the retention period. Some regulations require minimum retention (e.g., financial advice records for X years). Some require maximum retention (data minimization).
+
+For most products, 1-2 years of audit data is reasonable. Older data is archived or deleted per policy.
+
+## Linking to user actions
+
+The audit trail captures what the AI did. To investigate the full incident, you also need what the user did with the output.
+
+Link AI events to user actions:
+
+- The user asked X; the AI produced Y; the user clicked Z next; the user submitted form A
+- For agents that take actions: the agent took action B; the action affected record C; the result was D
+
+This crosses the boundary between AI infrastructure and product analytics. Both should be queryable from the same investigation tool.
+
+## What the trail enables
+
+A few investigation patterns the audit trail supports.
+
+**Pattern 1: incident reproduction.** "User reports X went wrong on date Y. What did the AI see and produce?" Pull the audit record; look at it.
+
+**Pattern 2: regression debugging.** "Pass rate dropped after the prompt change last week. What's different in the failing cases?" Compare audit records before and after.
+
+**Pattern 3: compliance response.** "Regulator asks how we made decision X for user Y." Show the audit record.
+
+**Pattern 4: trend analysis.** "Which queries trigger our refusal rules most often?" Aggregate over the audit data.
+
+**Pattern 5: model upgrade impact.** "After the model upgrade, which user-facing behaviors changed?" Compare audit records.
+
+Without the trail, none of these are tractable. With it, all are routine.
+
+## Privacy and audit trails
+
+Audit trails contain user data. They have to be handled with the same care as any user data.
+
+Considerations:
+
+- Access controls: who can read audit trails?
+- Retention: how long is data kept?
+- Right to deletion: when a user requests deletion, audit trails for them have to be deleted (or anonymized)
+- PII redaction: if audit trails will be reviewed by humans, consider PII redaction
+
+Don't make audit trails the place where privacy controls don't apply. They're often the place with the most sensitive data; they need the most controls.
+
+## Structured for queryability
+
+The audit trail isn't just a log; it should be structured data you can query.
+
+Schema with SQL-friendly types:
+
+- IDs as proper UUIDs
+- Timestamps as proper datetime
+- Nested data as JSONB (queryable with SQL)
+- Foreign keys to your user table, your conversation table, etc.
+
+Many teams log audit data as unstructured text in their general logging system. When investigation time comes, they can't easily query it. Pre-structure it; the queries become fast.
+
+## Real-time vs batch
+
+When the audit trail is written:
+
+- *Synchronously* with the request: most accurate, slight latency cost
+- *Asynchronously* after the request: small risk of missed records on crashes, no latency cost
+
+For most production systems, asynchronous is fine. Use a reliable queue (Kafka, SQS) so records are durable.
+
+For high-stakes systems where any missing record would be a problem (financial trades, medical decisions), synchronous is better. The latency cost is worth the certainty.
+
+## Alerting from the audit trail
+
+The audit trail is also a source for alerts.
+
+Patterns:
+
+- Spike in refusals: maybe an attack pattern
+- Unusual model output patterns: investigate
+- Tool calls outside the expected set: agent doing something new
+- High-cost requests: investigate
+
+Each alert based on audit-trail data is a way to detect problems before users report them.
+
+## Compliance audit trail
+
+For regulated domains, the audit trail has to satisfy specific requirements:
+
+- *HIPAA:* who accessed what PHI when
+- *SOX:* who made financial decisions and based on what data
+- *MIFID II / GDPR:* what records exist for what duration
+- *SOC 2:* logging of security-relevant events
+
+The compliance requirements drive specific audit fields and retention. For products in regulated industries, the compliance requirements are often the design constraints for the audit trail.
+
+## What to do during an incident
+
+A specific runbook for using the audit trail during an incident:
+
+1. Get the user_id or session_id
+2. Find all events in that session
+3. Look at the AI's full output and the user's action
+4. Compare the audit record against the user's report
+5. Identify what went wrong: bad input, bad retrieval, bad model output, bad post-processing, bad action
+6. Fix the underlying issue and add eval coverage
+
+Without the audit trail, step 3 requires guesswork. With it, step 3 is reading.
+
+## The take
+
+Audit trails for AI systems capture what the model saw, what it produced, and what action followed. They serve incident response, debugging, compliance, and analytics. They have to be designed deliberately because regular request logs don't capture enough.
+
+Build the audit trail before you need it. Structure it for query. Match retention to your obligations. Treat it as sensitive data.
+
+The teams that respond to AI incidents in hours rather than days are the ones with audit trails. The teams that struggle to explain what their AI did are usually the teams who didn't capture enough.

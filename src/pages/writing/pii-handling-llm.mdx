@@ -1,0 +1,241 @@
+---
+layout: ../../layouts/Writing.astro
+title: "PII handling in LLM products: where the data actually goes"
+description: "AI products handle user data. Most teams don't have a clear picture of where PII flows in their stack. Here's the audit and the patterns that actually keep data safe."
+publishDate: "2026-06-20"
+pillar: safety
+slug: pii-handling-llm
+---
+
+A user types their name and account details into your AI feature. The data flows somewhere. Many somewheres, often. Most teams don't have a clear picture of all the places PII actually goes in their LLM stack.
+
+The data flows include:
+
+- Provider APIs (model calls, embedding calls)
+- Logging systems (request logs, trace logs)
+- Eval and monitoring infrastructure
+- Caches at multiple layers
+- Vector databases
+- Observability platforms (Datadog, Honeycomb, etc.)
+- Backups and snapshots
+
+If any of these handle PII without proper controls, you have a privacy issue. The issue is invisible until it's discovered, often by a regulator or an incident.
+
+This essay is the audit framework and the patterns that contain PII flow.
+
+## The flow audit
+
+Map where PII can go in your system.
+
+```
+User input (PII source)
+  ↓
+Application server (logged?)
+  ↓
+LLM API (provider sees PII)
+  ↓
+Trace / observability (PII in traces?)
+  ↓
+Eval bench (PII in eval cases?)
+  ↓
+Vector DB (PII in embedded docs?)
+  ↓
+Cache layer (PII in cache?)
+  ↓
+Backups (PII in backups?)
+```
+
+For each step, ask:
+
+- Does PII flow here?
+- Where is it stored?
+- For how long?
+- Who has access?
+- Is it covered by your privacy policy?
+- Does it satisfy your regulatory obligations?
+
+Most teams haven't done this audit. The first time they do, they find places they hadn't considered.
+
+## The classes of PII
+
+Different PII has different requirements.
+
+**Direct identifiers.** Name, email, phone, address, account number. The "obvious" PII.
+
+**Quasi-identifiers.** Date of birth, ZIP code, gender. Individually less identifying; combined, can be.
+
+**Sensitive PII.** Health data, financial data, sexual orientation, political views. Higher protection requirements (HIPAA, GDPR special categories).
+
+**Behavioral data.** Search history, conversation history, click patterns. Can be PII when combined with identifiers.
+
+Your handling requirements depend on the class. Email addresses are more sensitive than usernames; medical conditions are more sensitive than email addresses.
+
+## The provider question
+
+When you call an LLM API, the provider sees the prompt content. If your prompt contains PII, the provider has it.
+
+Most providers offer:
+
+- Data processing agreements (DPAs) covering what they'll do with the data
+- Options to opt out of training-data use
+- Data residency commitments (US, EU, etc.)
+- Audit reports (SOC 2, ISO 27001)
+
+Pick a provider whose data handling matches your obligations. Sign the appropriate DPA. Configure the provider's privacy settings (usually: opt out of training, data residency in your region).
+
+For sensitive data (health, regulated finance), consider providers specifically certified for your domain (HIPAA-eligible, FedRAMP, etc.) or self-hosting.
+
+## Redaction patterns
+
+For non-essential PII, redact before sending to the model.
+
+Patterns:
+
+**Pattern 1: regex-based redaction.** Email patterns, SSN patterns, credit card patterns. Crude but catches structured PII.
+
+**Pattern 2: NER-based redaction.** Named entity recognition (small ML model) identifies names, locations, organizations. Replace with placeholders. More accurate than regex.
+
+**Pattern 3: tokenization.** Replace PII with stable tokens (`john@example.com` → `<email_a3f2>`). The model can use the tokens; resolve back to actual values on output.
+
+For most products, NER-based redaction with custom rules for your domain is the right balance.
+
+## Tokenization deep dive
+
+The tokenization pattern is powerful for many use cases.
+
+```
+User input: "Send the report to john@acme.com"
+
+Tokenized: "Send the report to <email_001>"
+
+LLM processes tokenized version, produces:
+"Sending report to <email_001>"
+
+Detokenize: "Sending report to john@acme.com"
+
+User sees: "Sending report to john@acme.com"
+```
+
+The PII never reached the model. The model's behavior is the same. The user experience is the same.
+
+The cost: tokenization service (small infrastructure piece), latency overhead for tokenize/detokenize, complexity managing the mapping.
+
+For high-PII-exposure systems, this pattern is worth the complexity.
+
+## What goes in logs
+
+Logs are where PII most often leaks. Patterns:
+
+- Request bodies logged with raw PII
+- LLM prompts logged (and prompts contain user data)
+- Trace data including model outputs (which echo the inputs)
+
+Logging patterns that handle this:
+
+**Pattern 1: structured logging with redaction.** Specific fields are redacted before logging. The user_id is logged; the user's email is not.
+
+**Pattern 2: separate sensitive log channel.** Sensitive data goes to a separate, more controlled log store. Standard logs see only metadata.
+
+**Pattern 3: log without PII at all.** Capture metrics and metadata; don't capture content. Lose debugability for sensitive data; gain compliance simplicity.
+
+For LLM applications, Pattern 1 is most common. Pattern 3 for products with strict requirements.
+
+## Caches and PII
+
+Cache layers (response caches, prompt caches, embedding caches) can leak PII.
+
+Risks:
+
+- A cache key includes user-specific data; a cache lookup might return another user's data if the key collides
+- Cached responses are stored longer than the user expected
+- Cache infrastructure isn't subject to your full privacy controls
+
+Patterns:
+
+- Per-user cache namespaces (key includes user_id)
+- TTLs that match your retention policy
+- Cache infrastructure in the same trust zone as your primary stores
+
+Don't share caches across users without thought. The cost of a cache leak is real.
+
+## Vector DB and embeddings
+
+If you're storing embeddings of user content, those embeddings encode the content. They may not be readable like text, but they leak information.
+
+Considerations:
+
+- Embedding inversion: research shows you can sometimes reconstruct text from embeddings. If your threat model includes "an attacker gets the vector DB," embeddings alone are not safe.
+- Cross-tenant isolation: same as for the source data.
+- Retention: when a user's data is deleted, are their embeddings deleted? Often missed.
+
+For sensitive data, treat embeddings as PII. Apply the same access controls and retention as the source content.
+
+## Right to deletion
+
+GDPR and similar regulations give users the right to deletion. Your AI system has to honor this.
+
+For deletion to actually work:
+
+- Source data (database) must be deleted
+- Embeddings derived from the data must be deleted
+- Caches containing the data must be invalidated
+- Logs must be redacted or expired
+- Backups must eventually be cycled
+
+The hardest part is often embeddings (which may have been used in eval, fine-tuning, etc.) and logs (where the data is mixed with other data).
+
+Build a deletion pipeline that touches every store. Test it. Don't pretend "it'll work" without verification.
+
+## Conversations and context
+
+For chat products, conversation history is itself PII.
+
+Considerations:
+
+- Where is conversation history stored?
+- Who has access to it?
+- How long is it retained?
+- Can the user export or delete it?
+
+These are standard data-handling questions but often overlooked because conversation history feels ephemeral. It's not; it's stored somewhere.
+
+## Compliance frameworks
+
+If your product has compliance obligations:
+
+- **GDPR:** lawful basis, data subject rights, DPA with processors, breach notification
+- **HIPAA:** BAAs with all data handlers, technical safeguards, audit logs
+- **CCPA / CPRA:** notice, opt-out rights, sensitive PI handling
+- **PCI-DSS:** if handling card data, very strict requirements
+- **SOC 2 Type II:** for B2B trust signaling
+
+Each framework has implications for your AI architecture. The compliance requirements drive engineering decisions; don't bolt compliance on after the fact.
+
+## What to build first
+
+If you're starting an AI product with PII concerns, do these first:
+
+1. Map the data flow. Know where PII goes.
+2. Sign appropriate DPAs with all processors (model providers, hosting, observability).
+3. Implement structured logging with redaction.
+4. Build a deletion pipeline.
+5. Document the privacy posture in your privacy policy.
+
+Each of these is a few days of work. None can be added easily after the system is live and full of data.
+
+## What to monitor
+
+Ongoing PII observability:
+
+- Spot-check logs for PII that should be redacted
+- Audit access patterns to user data (who's reading what)
+- Test deletion: does it actually delete?
+- Monitor for new data flows (new feature added, where does data go?)
+
+This is hygiene, not project work. Add it to your team's quarterly review.
+
+## The take
+
+PII in LLM products flows to more places than teams usually realize. Audit the flow. Apply redaction or tokenization where appropriate. Configure providers correctly. Handle caches, logs, embeddings, and backups consistently. Honor deletion requests across all stores.
+
+The teams that ship AI products without privacy incidents are the teams who mapped the data flow early. The teams with privacy incidents usually didn't, and discovered the gaps the hard way.

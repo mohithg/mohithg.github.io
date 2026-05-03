@@ -1,0 +1,193 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Incident response for AI features: the playbook"
+description: "AI incidents look different from regular software incidents. The playbook is similar but with AI-specific steps. Here's the runbook the teams I've seen use successfully."
+publishDate: "2026-06-24"
+pillar: safety
+slug: ai-incident-response
+---
+
+Software teams have incident response playbooks: detect, contain, investigate, fix, post-mortem, prevent. The same playbook applies to AI incidents with one important shift: the failures are non-deterministic, often subtle, and the system can't always be "rolled back" to a known-good state.
+
+This essay is the AI-specific incident response runbook. The shape is familiar; the specifics are different.
+
+## The kinds of AI incidents
+
+Several categories.
+
+**Category 1: harmful output.** The AI produced output that's directly harmful (illegal advice, hate speech, dangerous instructions). User saw it; possibly took action.
+
+**Category 2: data leak.** The AI included content that should have been private (other users' data, internal data, secrets) in its output to a user.
+
+**Category 3: factual misinformation.** The AI made up facts (often confidently). The user acted on the false information.
+
+**Category 4: unauthorized action (agent).** The AI took an action it shouldn't have. Sent a message, made a transaction, modified data.
+
+**Category 5: scale degradation.** The AI's quality dropped meaningfully. Many users get bad outputs, even if no single output is severely bad.
+
+**Category 6: capability loss.** The AI stopped working entirely or started refusing legitimate requests.
+
+Each category has different urgency and different containment. Have a triage matrix that maps category to severity to response.
+
+## Detection
+
+How AI incidents come to your attention.
+
+**Signal 1: monitoring alerts.** Quality metrics drop. Refusal rate spikes. Cost spikes. Latency spikes. Each is a signal of underlying issues.
+
+**Signal 2: user reports.** A user contacts support reporting something off. Each report should be triaged for whether it's an isolated annoyance or a systemic issue.
+
+**Signal 3: external attention.** Someone tweets about your AI's bad output. A journalist asks. A regulator notices. By this point, the incident is public; speed matters.
+
+**Signal 4: internal discovery.** A team member, dogfooding or QA-ing, notices the issue.
+
+The first two are the ideal cases (you find issues before they become public). The third is incident-grade. Build for the first two; have a plan for the third.
+
+## Containment
+
+Once an incident is detected, contain it before fixing it.
+
+**Containment options for AI:**
+
+- Disable the affected feature (feature flag off)
+- Roll back to the previous prompt / model version
+- Switch to a fallback (template response, classical algorithm, error message)
+- Restrict the affected user cohort (paid users continue; free users see the feature disabled)
+- Add stricter moderation that catches the specific output pattern
+
+Containment doesn't fix the root cause. It prevents the incident from continuing while you investigate.
+
+For most AI incidents, feature flag off + fallback is the right immediate action. The user sees a degraded but safe experience instead of more bad outputs.
+
+## Investigation
+
+Once contained, figure out what happened.
+
+The audit trail (if you have one) is your main tool. Look at:
+
+- The specific request that produced the bad output
+- The model version that ran
+- The prompt that was active
+- The retrieved context (if RAG)
+- The full model output (vs. user-facing output)
+- Any moderation decisions
+
+For each, ask: what was different from the expected behavior?
+
+Common findings:
+
+- Prompt change introduced a regression
+- Model upgrade changed behavior
+- Retrieval surfaced unexpected content
+- Moderation didn't catch a pattern it should have
+- Architectural assumption was violated
+
+The investigation might take an hour for a clear case or days for a subtle pattern. Don't skip steps to declare it solved; subtle issues recur.
+
+## Fix
+
+Fix at the layer that caused the issue.
+
+- Prompt regression: revert or improve the prompt
+- Model upgrade issue: roll back model version or update prompts to handle new behavior
+- Retrieval issue: improve retrieval, filter the offending content, update chunking
+- Moderation gap: add the missing pattern to moderation rules
+- Architectural issue: re-evaluate the architecture; may be a larger fix
+
+Fix at the right level. A patch in moderation doesn't fix a bad prompt. A prompt change doesn't fix bad architecture.
+
+## Add eval
+
+Whatever the fix, add eval coverage that would have caught the issue.
+
+The eval case:
+
+- Input: the input that produced the bad output
+- Expected behavior: what should happen now
+- Pattern: what category of failure does this represent
+
+Run the eval. Confirm the fix actually addresses it. Confirm no new regressions.
+
+The eval case stays in the bench permanently. Future regressions on the same pattern are caught before deploy.
+
+## Post-mortem
+
+For meaningful incidents (anything user-impacting), write a post-mortem.
+
+Sections:
+
+- **What happened.** Timeline of detection, containment, investigation, fix.
+- **Impact.** How many users affected. What did they see. What did they do.
+- **Root cause.** What technical issue caused this.
+- **Why it wasn't caught earlier.** What gaps in eval, monitoring, or process let it through.
+- **What's changing.** Specific changes to prevent recurrence.
+
+Distribute the post-mortem widely. The team learns from each incident; the post-mortem is the artifact of that learning.
+
+For AI incidents specifically, focus on what's transferable. *"This particular prompt was wrong"* is narrow learning. *"Our prompt change process doesn't include eval against safety cases"* is broad learning that prevents whole classes of recurrence.
+
+## External communication
+
+For incidents users notice, communicate:
+
+- *Internally:* don't hide it. Other teams need to know.
+- *To affected users:* if specific users were affected, tell them. *"Earlier today, our AI gave you advice that was incorrect. The correct information is X. We've fixed the underlying issue."*
+- *To the public:* if the incident was visible, address it. Often a status page update or a tweet acknowledging "we identified an issue with our AI feature; it's been resolved."
+- *To regulators:* if applicable. Some incidents have notification requirements.
+
+The principle: be honest. Hiding usually fails (someone finds out) and erodes trust further. Acknowledging maintains trust even after a failure.
+
+## What's specific to AI
+
+Compared to regular incidents, a few AI-specific elements.
+
+**The non-determinism problem.** "Try the same query and see if it still fails" might not work; the model might produce a different output the second time. Test with controlled seeds where possible.
+
+**The "model changed" problem.** If your provider deployed a new version, your behavior may have changed without your code changing. Check the model version in your audit trail.
+
+**The "is this fixed?" question.** With non-deterministic outputs, you can't be 100% certain a fix is complete. Run the eval many times; look at the rate. Fix is "rate dropped to acceptable" not "case never fails again."
+
+**The privacy implication.** AI incidents often involve user data. Privacy obligations may apply to the response (notification requirements, deletion duties).
+
+## Practicing the playbook
+
+Incident response gets better with practice. Schedule fire drills:
+
+- Simulate an AI incident (hypothetical bad output)
+- Run the response: detect, contain, investigate, fix, communicate
+- Time each step
+- Identify gaps in tooling or process
+- Improve before the real incident
+
+Once a quarter is a reasonable cadence. The first drill exposes lots of gaps; subsequent drills refine.
+
+## What to build before you need it
+
+Tools that pay for themselves on the first incident.
+
+- Audit trail (covered in another essay)
+- Quality monitoring with alerts
+- Feature flags for individual AI features
+- Documented rollback procedures
+- Communication templates (status page, user emails)
+- Post-mortem template
+- Stakeholder contact list
+
+Build these in calm times. During an incident, you don't have time to figure out the rollback procedure.
+
+## When the incident is severe
+
+For serious incidents (large user impact, public visibility, regulatory implications), escalate properly.
+
+- Bring in leadership early
+- Involve legal and PR
+- Document everything as you go (you'll need this later)
+- Consider hiring external help (forensics, communications) if needed
+
+Don't try to handle a severe incident with the regular team alone. The cost of the wrong move is too high.
+
+## The take
+
+AI incident response is the regular incident playbook with AI-specific elements. Detect via monitoring and user reports. Contain quickly with feature flags. Investigate using the audit trail. Fix at the right level. Add eval coverage. Post-mortem. Communicate honestly.
+
+The teams that respond to AI incidents well are the ones who built the playbook before they needed it. The teams that scramble during incidents usually didn't.

@@ -1,0 +1,198 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Hallucination mitigation: not 'fewer hallucinations' but 'no harmful ones'"
+description: "Eliminating hallucination is unrealistic. Preventing hallucinations from causing harm is achievable. Here's the reframing and the patterns that work."
+publishDate: "2026-06-21"
+pillar: safety
+slug: hallucination-mitigation
+---
+
+The framing of hallucination as a problem to eliminate is wrong. Models will continue to occasionally produce outputs that are confidently incorrect. No amount of prompting, fine-tuning, or model upgrades fully solves this.
+
+The right framing for production AI safety: don't try to make hallucination go to zero. Make sure that when hallucinations happen, they don't cause harm. That's a different problem with different solutions, most of them tractable.
+
+This essay is about that reframing and the engineering patterns that follow from it.
+
+## Why "eliminate hallucination" fails
+
+Three reasons.
+
+**Reason 1: it's an inherent property of generative models.** Models generate plausible content. When the right answer is in their training distribution, plausible matches reality. When it isn't, plausible diverges from reality. The model can't tell the difference.
+
+**Reason 2: improvement is asymptotic.** Each model generation hallucinates less than the previous, but never reaches zero. The improvement curve is real but not enough to rely on.
+
+**Reason 3: the bar for "harmful" is product-specific.** A creative writing tool can hallucinate freely; a medical advisor cannot. The threshold for "harmful hallucination" depends on what the user does with the output.
+
+Stop chasing zero. Design so the hallucinations that happen don't cause harm.
+
+## What "harmful hallucination" actually means
+
+For your product, define harmful concretely:
+
+- *In medical advice:* hallucinated drug interactions, hallucinated diagnoses
+- *In financial advice:* hallucinated security recommendations, hallucinated quantitative facts
+- *In legal advice:* hallucinated case citations, hallucinated regulations
+- *In customer service:* hallucinated policy details that contradict reality
+- *In product documentation:* hallucinated features, hallucinated APIs
+
+These are the cases where the user takes wrong action based on a false fact. The wrong action causes harm.
+
+Other hallucinations might not be harmful: a hallucinated detail in a brainstormed list is annoying, not harmful. A creative description that wasn't quite right is fine.
+
+Focus your safety effort on the harmful cases.
+
+## Pattern 1: ground answers in retrieved sources
+
+The most effective hallucination mitigation: don't let the model rely on its training data for facts. Force it to use retrieved sources.
+
+System prompt pattern:
+
+```
+You answer questions based on the provided documents.
+For any factual claim, cite the source document.
+If the documents don't contain relevant information,
+say so explicitly. Do not use facts from your training.
+```
+
+Combined with citation in the output ("[1]", "[2]") and links back to source documents, the user can verify any factual claim.
+
+Hallucinations on grounded outputs become much rarer because the model has explicit content to draw from. When they happen, they're catchable: the cited source either supports the claim or doesn't.
+
+## Pattern 2: explicit uncertainty
+
+Train (or prompt) the model to express uncertainty appropriately.
+
+Outputs should distinguish:
+- *"Based on the documents, the answer is X."* (high confidence)
+- *"The documents suggest X, though they don't directly answer your question."* (moderate confidence)
+- *"I don't have specific information about this."* (low confidence; refuse rather than hallucinate)
+
+Users learn to read the uncertainty cues. They double-check confident claims; they ignore tentative ones.
+
+The opposite (always-confident outputs regardless of actual confidence) trains users to distrust everything because they can't tell when to trust.
+
+## Pattern 3: domain-specific verification
+
+For high-stakes domains, verify factual claims structurally.
+
+Examples:
+
+- *Citations to specific cases / regulations:* check that the citation actually exists in your reference database. If not, refuse or warn.
+- *Quantitative claims:* check that the numbers come from the engine / data source you trust. If the model invented a number, flag.
+- *Specific facts about identifiable entities:* check against canonical sources. If the model claims a CEO of company X, verify.
+
+This is structural verification: a small layer that catches specific hallucination patterns common in your domain.
+
+## Pattern 4: explicit refusal capabilities
+
+The model should refuse rather than hallucinate when it doesn't know.
+
+System prompt:
+
+```
+If you don't know something, say "I don't have information
+about that" rather than guessing. This is more helpful than
+a confident wrong answer.
+```
+
+Combined with eval cases that test refusal behavior, the model can be tuned to refuse appropriately.
+
+This works imperfectly. Some queries will get hallucinated answers anyway. But shifting the model's prior toward refusal (rather than confidence-by-default) reduces harmful hallucination in the cases where the model has nothing to draw from.
+
+## Pattern 5: human verification for high-stakes outputs
+
+For outputs that will be acted upon with real consequences, require human verification.
+
+- Medical recommendations: clinician review before patient sees
+- Financial transactions: user confirmation before execution
+- Legal documents: attorney review before filing
+
+This isn't about distrust of the AI; it's about catching the residual error rate that the AI alone can't eliminate.
+
+Build the verification step into the workflow. Don't bolt it on after a hallucination causes harm.
+
+## Pattern 6: scope limits
+
+Limit what the AI is allowed to claim authority on.
+
+A customer service AI for software shouldn't answer general medical questions, even if asked. A financial tool shouldn't make legal claims. Each scope expansion is more surface for hallucination.
+
+Implementation:
+
+- System prompt that defines scope
+- Refusal behavior for off-scope queries
+- Maybe routing: off-scope queries go to a different system or a human
+
+Users get clear signals about what the AI is good for. The AI doesn't venture into areas where its hallucination rate is unacceptable.
+
+## Pattern 7: post-hoc fact checking
+
+For outputs that will be published or used at scale, run them through fact-checking before they reach users.
+
+Patterns:
+
+- LLM-as-judge with a "verify against sources" prompt
+- Specialized fact-checking models
+- Lookup against canonical databases
+
+Adds latency and cost. Worth it for outputs where post-hoc correction is too late.
+
+## What to measure
+
+Trackable metrics for hallucination:
+
+- *Citation accuracy:* of cited sources, what fraction actually contains the cited fact?
+- *Fact consistency:* of factual claims, what fraction are consistent with the source data?
+- *Refusal rate:* what fraction of queries get "I don't know" rather than a guess?
+- *User-reported errors:* what's the rate of users flagging hallucinated information?
+
+Track over time. If citation accuracy drops or refusal rate decreases, hallucination is increasing in your system.
+
+## When users complain about hallucinations
+
+User complaints are signal. Each one is a specific case to investigate.
+
+- What was the user's query?
+- What was the model's response?
+- Was the response actually wrong, or did the user misread it?
+- Was the wrong information catchable by your safeguards?
+- What would have prevented this?
+
+Each investigation produces an eval case. The bench grows; future regressions on the same pattern are caught.
+
+## What "good enough" looks like
+
+For most consumer products:
+
+- Grounded retrieval-based answers with citations
+- Explicit uncertainty in outputs
+- Refusal when confidence is low
+- Tracking of citation accuracy over time
+- Specific verification for the highest-stakes outputs in the product
+
+For regulated domains:
+
+- All of the above
+- Stricter verification (post-hoc fact checking, specialized validation)
+- Human-in-the-loop for the most consequential outputs
+- Audit trails on all factual claims
+
+Match the rigor to the stakes.
+
+## What you can't fully mitigate
+
+Some hallucinations will happen. Some will reach users. Some will cause minor inconvenience.
+
+For the residual hallucinations that pass all your safeguards, the goal is:
+
+- Make them recoverable (the user can correct them, retract them)
+- Make them detectable (you find out about them quickly)
+- Make them rare on critical paths
+
+The acceptance is honest: you're not eliminating hallucination, you're managing it.
+
+## The take
+
+Don't aim for zero hallucination. Aim for zero harmful hallucination. Ground answers in retrieved sources. Express uncertainty. Verify structural facts. Allow refusal. Limit scope. Track citation accuracy.
+
+The teams shipping AI products that users trust are the ones who acknowledged the inherent failure rate and engineered around it. The teams whose AI products lose user trust are usually the ones who promised confidence and delivered confident wrongness.

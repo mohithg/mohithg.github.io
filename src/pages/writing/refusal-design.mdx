@@ -1,0 +1,169 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Designing refusal: how AI says no without alienating users"
+description: "Refusing user requests is part of every safe AI product. How the refusal is communicated determines whether users tolerate the limit or abandon the product. Here's the design."
+publishDate: "2026-06-22"
+pillar: safety
+slug: refusal-design
+---
+
+A safe AI product refuses certain user requests. Refusing harmful queries, refusing actions outside the user's authorization, refusing tasks the AI can't reliably do. The refusal is necessary; how the refusal is communicated determines whether the user tolerates the limit or concludes the product is broken.
+
+Most AI products handle refusal poorly. Vague apologies, generic "I cannot help with that" messages, or worse: the model gives a non-answer that pretends to help while actually refusing. Each pattern erodes trust.
+
+This essay is about refusal as a design problem and the patterns that make it work.
+
+## The patterns that fail
+
+Three antipatterns I see often.
+
+**Antipattern 1: vague refusal.** *"I'm sorry, I can't help with that."* The user has no idea why or what to do next. They retry the same query, hoping for a different result. They get the same vague refusal. They give up.
+
+**Antipattern 2: lecture-y refusal.** *"As an AI, I am not able to provide [extensive paragraph about safety and limitations]..."* Three paragraphs of justification for a one-sentence refusal. Reads as preachy.
+
+**Antipattern 3: hidden refusal.** The model produces something that looks like an answer but isn't actually answering. *"That's a great question! Let me think about it..."* followed by content that doesn't address the query. The user thinks they got an answer; they got a soft refusal.
+
+**Antipattern 4: false confidence.** The model refuses to say "I don't know" and instead generates a plausible but wrong answer. The user doesn't realize they were refused; they realize later when they act on the wrong information.
+
+Each of these is a failure of refusal design.
+
+## What good refusal looks like
+
+A good refusal has three properties.
+
+**Property 1: clear about what's being refused.** *"I can't help with X."* The user knows what specifically the system won't do.
+
+**Property 2: brief explanation.** *"...because [specific reason]."* Not a paragraph; a sentence. Enough to inform.
+
+**Property 3: path forward.** *"You might try [alternative]."* The user has a next step.
+
+Combined: *"I can't make trades on your behalf. To execute a trade, you can do it through your broker. I can help you analyze whether the trade aligns with your goals."*
+
+Concrete, brief, useful. The user understands and has options.
+
+## Refusal categories
+
+Different reasons for refusal warrant different refusal styles.
+
+**Out of scope.** *"I'm a financial assistant; I don't help with general medical questions. For medical questions, I'd recommend [resource]."*
+
+**Capability limit.** *"I don't have access to [specific data needed]. To get that, you'd need to [setup step]."*
+
+**Authorization required.** *"I can draft this for you but I'll need you to approve before I send it."*
+
+**Uncertainty / not enough info.** *"I'm not confident in the answer here. Let me know more about [specific clarification]."*
+
+**Policy violation.** *"I can't help with that specific request."* (Often the right answer for harmful queries; brief without being engaging.)
+
+**Hallucination prevention.** *"I don't have current information about [topic]. Try [resource] for the latest."*
+
+Each category has a slightly different tone and structure. The clearer the user gets on which category applies, the more useful the refusal.
+
+## Refusal as opportunity
+
+A refusal is an opportunity to teach the user about your product. Don't waste it.
+
+A user who tries to do something out of scope has an incomplete mental model of your product. The refusal should sharpen that mental model.
+
+*"I'm focused on helping with your portfolio. For tax filing questions, you'd want a CPA or a tax software tool."*
+
+The user learns: this AI does portfolio stuff, not tax stuff. Their next query is more likely to be in-scope.
+
+The opposite (vague refusals) leaves the user no better informed about what the AI does. Their next query is also off-target. Eventually they conclude the AI doesn't work.
+
+## Refusal-on-uncertainty
+
+The hardest refusal: when the model is *uncertain* about its answer rather than certain it can't help.
+
+Two approaches.
+
+**Approach 1: refuse with hedge.** *"I'm not certain, but my best understanding is [tentative answer]. You might verify with [authoritative source]."* The user gets some signal but knows to double-check.
+
+**Approach 2: refuse outright.** *"I don't have confident information about this."* The user gets no signal but isn't misled.
+
+For high-stakes domains, Approach 2 is safer. For low-stakes, Approach 1 is more useful.
+
+The choice depends on what the user does with confident-but-wrong vs. honest-but-tentative answers. Pick deliberately.
+
+## Tone for harmful queries
+
+When the user asks something genuinely harmful, the refusal should be:
+
+- Brief (don't engage extensively)
+- Non-judgmental (don't lecture)
+- Final (don't suggest alternatives)
+
+*"I can't help with that."* (Maybe one more sentence of context if relevant.)
+
+The user gets a clear signal. The model isn't drawn into role-play or further engagement around the topic. The conversation can move on.
+
+The opposite (long lectures) sometimes invites further attempts at jailbreaking, because the user sees there's a thing to negotiate against.
+
+## Refusal in context
+
+Refusal patterns should match the user's context.
+
+A new user being onboarded should get gentle, informative refusals: "I can help with X, Y, Z. For Q, you might want [other resource]."
+
+A power user who knows the product should get terser refusals: "Out of scope."
+
+A user who appears to be testing limits gets clear-but-firm refusals: "I can't help with that."
+
+The same underlying refusal can be communicated differently based on what the user already knows.
+
+## Eval for refusal
+
+Build eval cases that test refusal:
+
+- Clearly out-of-scope queries: should refuse
+- Clearly in-scope queries: should not refuse
+- Borderline queries: should refuse with explanation OR answer with caveats
+- Harmful queries: should refuse cleanly
+
+The pass criterion isn't just "did it refuse" but "did it refuse appropriately for the case." Track both false-positive refusals (refused legitimate query) and false-negative refusals (failed to refuse problematic query).
+
+A common failure: tuning the model toward strictness, getting low false negatives but high false positives. Users hit refusals on legitimate queries; product feels frustrating. Tune toward the right balance.
+
+## Refusal and frustrated users
+
+When a user hits multiple refusals in a session, frustration grows. They're trying to do something and the AI keeps saying no.
+
+Mitigation:
+
+- After 2-3 refusals on similar queries, escalate to a human or to additional help
+- Provide a clear feedback channel ("Was this refusal appropriate?")
+- Track per-user refusal rates; high rates may indicate a product fit issue
+
+Don't just keep refusing. The user has signaled "this isn't working for me." Respond.
+
+## When refusal is the wrong answer
+
+Sometimes the right answer to "can you do X?" is to actually do X, not refuse.
+
+Cases:
+
+- The query is out-of-scope but related to a service you can offer: route, don't refuse.
+- The query is policy-borderline but clearly legitimate: lean toward helping with appropriate caveats.
+- The query is technically out of scope but the user clearly wants help and there's no good alternative: maybe help anyway with caveats, or extend scope.
+
+Refusal isn't always safe. Over-refusal has its own cost. Calibrate.
+
+## A worked example
+
+A financial AI gets a query: *"My friend got cancer last week, what should I do about my portfolio?"*
+
+A bad refusal: *"I'm sorry, I cannot provide medical advice."* (Misreads the query; the user isn't asking for medical advice.)
+
+A worse refusal: *"I'm not able to help with that."* (Vague; user has no idea why.)
+
+A good refusal: *"I'm sorry to hear about your friend. The portfolio question is in scope for me. I can help you think about whether this changes anything you're planning. For the medical situation, I'd recommend their healthcare team."*
+
+The model handled the human moment, addressed the actual portfolio question, and gracefully separated what it can and can't help with. The user feels heard and gets a useful path forward.
+
+This level of nuance takes deliberate prompt engineering. It's worth the effort for products where users will sometimes ask emotionally complex questions.
+
+## The take
+
+Refusal is part of every safe AI product. How the refusal is communicated determines user trust. Brief, specific, with a path forward. Match tone to context. Eval for both over-refusal and under-refusal. Handle frustration when it builds.
+
+The teams shipping AI products that feel useful even when refusing are the teams that designed refusal as a real interaction pattern. The teams whose products feel frustrating often have refusal as an afterthought, with vague messages that don't help the user.

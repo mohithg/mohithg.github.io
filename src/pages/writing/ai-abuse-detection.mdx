@@ -1,0 +1,187 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Abuse detection for AI products: spotting bad actors at scale"
+description: "Some users will try to abuse your AI product. The volume of normal usage hides the abusive patterns until they're costly. Here's how to detect abuse without spying on legitimate users."
+publishDate: "2026-06-25"
+pillar: safety
+slug: ai-abuse-detection
+---
+
+Once an AI product has real users, some fraction of them will try to abuse it. The shapes of abuse vary: some try to extract harmful content, some try to use the product for purposes outside your terms, some try to consume excessive resources, some try to use the product to attack other users.
+
+Most teams don't have explicit abuse detection. They rely on per-request safety (moderation, refusal patterns) to handle individual bad outputs. This catches one-off failures but misses the patterns of repeat offenders. A user who's been steadily probing for a year is invisible to per-request systems.
+
+This essay is about abuse detection at the user-and-pattern level rather than the per-request level.
+
+## What "abuse" means in your product
+
+Define this concretely. The categories vary by product.
+
+**Resource abuse.** A user consuming dramatically more than their fair share. Often: running scripts, reselling access, or generating content for external commercial use that violates your terms.
+
+**Policy abuse.** A user repeatedly trying to make the AI produce content against your policies. Each individual attempt might fail (your moderation catches it) but the pattern indicates intent.
+
+**Adversarial abuse.** A user systematically probing for jailbreaks, prompt injection vulnerabilities, or data leakage. Their queries are unusual in ways that indicate testing.
+
+**Platform abuse.** A user using the AI to generate content that's then used elsewhere for abuse (spam, misinformation, impersonation).
+
+**Account abuse.** A user creating many accounts to evade limits or to amplify abusive activity.
+
+Your specific product may have other categories. List them; design for them.
+
+## Patterns of abusive behavior
+
+Several patterns recur.
+
+**Pattern 1: high request rate.** A user makes far more requests than peers. Could be legitimate power user, could be bot/script.
+
+**Pattern 2: similar query at high rate.** A user repeatedly asks the same or near-identical query. Often: trying to bypass refusals through repetition.
+
+**Pattern 3: queries match attack patterns.** Frequent queries that look like injection attempts, jailbreak attempts, or PII extraction attempts. Each individually triggers safety; the pattern indicates intent.
+
+**Pattern 4: cross-account similarity.** Multiple accounts with similar query patterns. Suggests one user with multiple accounts or a coordinated effort.
+
+**Pattern 5: anomalous resource usage.** A user's per-request resource consumption (tokens, latency) is far above peers. Could be legitimate or could be optimization-evading.
+
+**Pattern 6: violations of terms.** Generated content matches patterns associated with banned uses (academic dishonesty, misinformation, spam).
+
+Detection rules can be built around each pattern.
+
+## Detection architecture
+
+A useful design.
+
+```
+Request stream → Real-time flags → Per-user aggregations → Anomaly detection → Action
+```
+
+**Real-time flags.** Each request is tagged with low-level signals: did moderation fire, is the input long, does it match attack patterns.
+
+**Per-user aggregations.** Periodically (every minute or hour), aggregate per user: request rate, flag rate, resource use, etc.
+
+**Anomaly detection.** Compare each user's stats to the population. Outliers are flagged for review.
+
+**Action.** Based on severity: alert, rate-limit, suspend, escalate.
+
+This is more infrastructure than per-request safety but it's what catches sustained patterns.
+
+## What to alert on, what to act on
+
+The threshold matters.
+
+**Alert (review by human):**
+- Outlier behaviors that might be legitimate (heavy users)
+- Patterns that match attack signatures but with low confidence
+- Cross-account similarity that might be coordinated abuse
+
+**Auto-action (no human in loop):**
+- Hard rate limit violations (clear abuse, low risk of false positive)
+- Repeated violations of moderation in a short window
+- Confirmed patterns from previously identified abusers
+
+**Manual action only:**
+- Account suspension
+- Permanent bans
+- Legal action
+
+Auto-actions need to be reversible (rate limits expire) or low-stakes. High-stakes actions (bans) should have human review.
+
+## False positives matter
+
+Aggressive abuse detection catches legitimate power users. Their account gets flagged or rate-limited; they leave the product.
+
+Calibration:
+
+- Track false positive rate via user appeals / support contacts
+- Tune thresholds to balance abuse caught vs legitimate users impacted
+- For high-impact actions (suspension), require multiple signals not just one
+
+The cost of a false positive is real. Don't optimize for "zero abuse" at the cost of legitimate usage.
+
+## Privacy for abuse detection
+
+Abuse detection looks at user behavior. Done badly, it's surveillance.
+
+Patterns that respect privacy:
+
+- Aggregate signals, not individual content (rate, flag count, not specific queries)
+- Retain abuse signals only as long as needed
+- Don't share user behavior data outside the abuse-detection system without justification
+- Respect deletion requests for users who haven't been flagged
+
+The abuse detection should look at users in the same way airline security does: most attention to those exhibiting concerning patterns; minimal attention to those behaving normally.
+
+## Communicating with flagged users
+
+When a user is flagged, communication matters.
+
+Bad: silent flagging. The user notices their product feels different but doesn't know why.
+
+Better: transparent flagging. *"We've noticed unusual activity on your account. We've temporarily limited [specific feature]. If this seems incorrect, please contact support."*
+
+Best: graduated response. Soft warnings first. *"Some of your recent queries appear to violate our terms. Please review."* Then escalate if the behavior continues.
+
+The user gets a chance to correct course. Often the flagging was for a misunderstanding; communication resolves it.
+
+## Coordinated abuse
+
+A specific pattern: multiple accounts working together. Could be one human with many accounts; could be a group; could be a botnet.
+
+Detection signals:
+
+- Account creation patterns (timing, IP, device fingerprint)
+- Behavioral similarity across accounts
+- Cross-account communication patterns (one account's output is another's input)
+- Campaigns of similar queries appearing across accounts
+
+Coordinated abuse is harder to detect than individual abuse but more impactful. Worth investing in as your product grows.
+
+## What to do when abuse is detected
+
+A graduated response:
+
+1. **Soft signal:** in-product warning. *"This appears outside our terms; please reconsider."*
+2. **Temporary throttle:** rate limits, capability restrictions. *"You've exceeded normal usage; please slow down."*
+3. **Account review:** human review of the user's recent activity.
+4. **Account suspension:** temporary, with explanation.
+5. **Account ban:** permanent, with right of appeal.
+6. **Legal action:** for serious abuse (CSAM, fraud, attacks on infrastructure).
+
+Most abuse warrants only steps 1-3. Steps 4-6 are reserved for clear and serious violations.
+
+## Collaboration with platform abuse signals
+
+If you're built on top of providers, those providers have their own abuse detection. Sometimes their signals are useful for your detection.
+
+- A user whose IP is blocked at the provider level
+- Patterns the provider has flagged in your usage
+- Reputation signals from connected platforms
+
+Use these as inputs. Don't treat them as authoritative; the provider may have different definitions of abuse.
+
+## Auditing your detection
+
+Periodically audit the abuse detection itself.
+
+- What fraction of flags are legitimate abuse?
+- What fraction are false positives?
+- Are there abuse types we're missing?
+- Are there legitimate uses we're misclassifying?
+
+Without audits, the detection drifts. Patterns of legitimate behavior change; the rules calibrated to old patterns now over- or under-fire.
+
+## When abuse becomes a product fit issue
+
+Sometimes high abuse is a signal about your product, not just bad users.
+
+If a large fraction of users are using your product in ways that violate your terms, the question is whether the terms fit the product. Maybe the use case is one you should formally support. Maybe the users are responding to incentives in your design.
+
+Treat abuse rates as a product metric. Investigate when they shift. The answer might be product change rather than abuse mitigation.
+
+## The take
+
+Abuse detection at the user-and-pattern level catches what per-request safety misses. Build aggregations of user behavior, anomaly detection on those aggregations, and graduated response when patterns emerge.
+
+Tune thresholds carefully; false positives have real cost. Communicate transparently with flagged users. Audit your detection periodically.
+
+The teams shipping AI products at scale have abuse detection. The teams that ship without it eventually have user-impacting abuse incidents that the per-request systems didn't catch.
