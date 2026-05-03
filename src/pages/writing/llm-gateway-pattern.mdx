@@ -1,0 +1,270 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The LLM gateway pattern: one API for all your AI"
+description: "Calling LLM APIs directly from product code is fine until it isn't. The gateway pattern centralizes the cross-cutting concerns. Here's how to build one without overengineering."
+publishDate: "2026-06-27"
+pillar: infra
+slug: llm-gateway-pattern
+---
+
+When teams first ship LLM features, they call the provider's SDK directly from product code. It works; it's simple; what could go wrong?
+
+Six months later, the team has provider SDK calls scattered across 30 files. Adding cost tracking means touching all 30. Adding multi-provider failover means touching all 30. Each call has slightly different retry logic, slightly different error handling, slightly different logging. The cross-cutting concerns are scattered.
+
+The pattern that scales better: an LLM gateway. A thin internal abstraction that all LLM calls go through. Cross-cutting concerns live in the gateway. Product code talks to the gateway, not to providers directly.
+
+This essay is about how to build a gateway without overengineering it.
+
+## What the gateway does
+
+The minimum gateway handles:
+
+- Routing the request to the right provider based on the model requested
+- Adding consistent metadata (request ID, user, feature, prompt version)
+- Logging every call with structured tracing data
+- Computing and tracking cost
+- Handling retries on transient failures
+- Returning normalized responses
+
+That's the floor. From there, you can add:
+
+- Multi-provider failover
+- Caching (prompt cache, response cache)
+- Rate limit management
+- Prompt management (versioned prompts loaded by the gateway)
+- Output filtering / moderation
+- Cost-based routing (route to cheaper models for some tasks)
+- Per-tenant or per-user policies
+
+Each addition is optional. Build what you need; defer what you don't.
+
+## The minimum viable gateway
+
+For a small team, the gateway can be a hundred lines of code:
+
+```python
+class LLMGateway:
+    def __init__(self):
+        self.provider = AnthropicProvider()  # or whichever
+        self.tracer = Tracer()
+
+    async def call(
+        self,
+        prompt: str,
+        model: str,
+        feature: str,
+        user_id: str | None = None,
+        prompt_version: str = "v1",
+        **kwargs
+    ) -> LLMResponse:
+        request_id = uuid4()
+        start = time.time()
+
+        try:
+            response = await self._call_with_retries(
+                prompt=prompt,
+                model=model,
+                **kwargs
+            )
+
+            self.tracer.log({
+                "request_id": request_id,
+                "feature": feature,
+                "user_id": user_id,
+                "model": model,
+                "prompt_version": prompt_version,
+                "latency_ms": (time.time() - start) * 1000,
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+                "cost_usd": self._compute_cost(model, response),
+                "status": "success",
+            })
+
+            return response
+        except Exception as e:
+            self.tracer.log({
+                "request_id": request_id,
+                "feature": feature,
+                "status": "error",
+                "error": str(e),
+            })
+            raise
+```
+
+This gives you tagging, tracing, cost computation, and structured retries. It's enough to ship and grow from.
+
+## The interface contract
+
+The gateway's interface is the contract product teams use. Design it deliberately.
+
+A few principles.
+
+**Principle 1: explicit feature tagging.** Every call requires a `feature` parameter. This makes attribution work. No "default" or unset values.
+
+**Principle 2: model selection at call site.** Product code says which model it wants. Routing logic in the gateway can override (e.g., for cost reasons), but the default is what the caller asked for.
+
+**Principle 3: typed responses.** The gateway returns a normalized response type, not the provider's raw type. Switching providers later is then non-breaking.
+
+**Principle 4: streaming as a first-class option.** If your product needs streaming, the gateway supports it without ceremony.
+
+**Principle 5: extensibility for metadata.** Allow callers to attach arbitrary metadata that flows into traces.
+
+## Handling multiple providers
+
+Once you have more than one provider (say, Anthropic and OpenAI), the gateway abstracts the differences.
+
+A common pattern:
+
+```python
+@dataclass
+class LLMRequest:
+    messages: list[Message]
+    model: str  # opaque string; gateway resolves to provider
+    max_tokens: int
+    # ... other normalized fields
+
+@dataclass
+class LLMResponse:
+    content: str
+    input_tokens: int
+    output_tokens: int
+    finish_reason: str
+    # ... normalized fields
+```
+
+The gateway converts between this normalized format and each provider's specific format. Product code only sees the normalized format.
+
+This abstraction is leaky in places (provider-specific features like prompt caching may not have direct equivalents). Handle the leaks with optional fields and provider-specific extensions where needed.
+
+## Failover patterns
+
+Multi-provider failover is one of the gateway's high-value features.
+
+Patterns:
+
+**Pattern 1: cascade failover.** Try provider A. If it fails (rate limit, error, timeout), try provider B with the same prompt. If it fails, surface the error.
+
+**Pattern 2: load-balanced routing.** Distribute requests across providers (60/40 or similar). On failure, route to the working one.
+
+**Pattern 3: cost-based routing.** Route to the cheaper provider when both are available; fail over to the more expensive one only when needed.
+
+**Pattern 4: capability-based routing.** Some requests need a specific provider (e.g., specific structured-output features). Route accordingly.
+
+For most teams, Pattern 1 is the right default. Add others as use cases emerge.
+
+## Retries and idempotency
+
+The gateway handles retries. Product code doesn't need to.
+
+The retry logic:
+
+- Retry on rate limits (with appropriate backoff)
+- Retry on transient errors (timeouts, 5xx)
+- Don't retry on logic errors (4xx that aren't 429)
+- Cap retries (3-5 typical)
+- Add jitter to backoff to avoid thundering herd
+
+LLM calls are usually idempotent (same prompt, same response within reason), so retries are safe. For non-idempotent flows (where the call has side effects), the gateway should know not to retry, and the application should design around the failure case.
+
+## Caching at the gateway
+
+The gateway is the right place to handle caching.
+
+Levels of caching:
+
+**Level 1: prompt prefix cache.** The provider supports this; the gateway just enables it. Most providers handle the cache automatically given the right flags.
+
+**Level 2: response cache.** For identical prompts (rare but happens, especially for common queries), serve a cached response. Requires careful key construction.
+
+**Level 3: semantic cache.** For semantically similar queries, serve the cached response from a similar query. Embedding-based; aggressive but powerful.
+
+Level 1 is essentially free. Level 2 helps for repetitive queries. Level 3 is optional and use-case dependent.
+
+## Output streaming
+
+Streaming is important for chat / interactive applications.
+
+The gateway should support streaming:
+
+```python
+async def stream(self, ...) -> AsyncIterator[StreamChunk]:
+    async for chunk in provider.stream(...):
+        yield self._normalize_chunk(chunk)
+    # Log completion after streaming finishes
+```
+
+Product code can then iterate over the stream. The gateway handles tracing (logged after stream completes), cost computation, etc.
+
+Streaming complicates traces and retries. Worth the complexity for interactive products.
+
+## Configuration and secrets
+
+The gateway centralizes provider credentials. Product code never sees API keys directly.
+
+Configuration:
+
+- Provider credentials in secret store (Vault, AWS Secrets Manager)
+- Per-environment provider settings (production uses one set of keys, dev uses another)
+- Feature flags for routing logic
+- Per-tenant or per-feature overrides where needed
+
+Centralization here is important for security and rotation. Rotating an API key means updating one config; product code is unaffected.
+
+## Observability of the gateway itself
+
+The gateway is also a piece of infrastructure that needs observability.
+
+Track:
+
+- Request rate per feature, per provider
+- Error rate per provider
+- Latency distribution per provider
+- Failover events (when did fallback fire?)
+- Cost per feature, per cohort
+
+These metrics help you understand traffic patterns and catch issues before they become outages.
+
+## When the gateway becomes a bottleneck
+
+A common concern: "isn't the gateway a single point of failure?"
+
+The gateway should be:
+
+- Stateless (instances are interchangeable)
+- Horizontally scalable
+- Deployed redundantly (multiple instances behind a load balancer)
+- Independently from any single provider's availability (failover handles provider issues)
+
+Done right, the gateway is more reliable than any single provider. Done badly (single instance, no redundancy), it's a bottleneck.
+
+For most teams, the gateway is a thin enough layer that it doesn't add meaningful latency or failure surface.
+
+## When not to build a gateway
+
+A few cases where the gateway is overkill.
+
+- *Pre-MVP or quick prototypes.* Direct provider SDK calls are fine until the product proves out.
+- *Single-developer projects.* The cost of building the gateway exceeds the value at very small scale.
+- *Frameworks that already provide one.* If your AI framework (LangChain, Vercel AI SDK, etc.) provides gateway-like functionality, use that instead of rolling your own.
+
+For most production systems with more than a couple of LLM features and a team of engineers, the gateway pays for itself quickly.
+
+## What to build first vs later
+
+A reasonable progression:
+
+**Day 1:** Wrapper with logging, tagging, retries.
+**Month 1:** Cost tracking, basic dashboards.
+**Month 3:** Caching (provider-supported caching at minimum).
+**Month 6:** Multi-provider with failover.
+**Year 1:** Sophisticated routing, output filtering, prompt management.
+
+Don't build it all at once. Build progressively as the need emerges.
+
+## The take
+
+The LLM gateway is the foundational piece of AI infrastructure. It centralizes the cross-cutting concerns (tagging, cost, retries, failover) so you don't reimplement them per call site.
+
+Build it small at first; grow it as needed. Make it the interface product code uses. Centralize provider credentials, tracing, and policies in it.
+
+The teams shipping AI products at scale all have something like this. The teams that struggle usually have provider SDK calls scattered through their codebase with no central control.

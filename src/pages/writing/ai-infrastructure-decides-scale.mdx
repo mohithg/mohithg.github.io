@@ -1,0 +1,204 @@
+---
+layout: ../../layouts/Writing.astro
+title: "AI infrastructure: the boring layer that decides if you scale"
+description: "Prompts and models get attention. Infrastructure decides whether the product survives. Here's the infrastructure thinking that separates teams that scale from teams that don't."
+publishDate: "2026-06-26"
+pillar: infra
+slug: ai-infrastructure-decides-scale
+---
+
+The conversation about AI products usually focuses on the visible layer: prompts, models, agent designs, user-facing features. The infrastructure underneath gets less attention. Inference servers, gateways, caching layers, queue systems, monitoring stacks, load-balancing.
+
+This is a mistake. Infrastructure is usually what determines whether an AI product can actually serve real users at real volumes. The team that has a beautiful prompt and a brittle infrastructure has a beautiful prompt and a product that breaks. The team with adequate prompts and excellent infrastructure has a product that ships.
+
+This essay is the case for infrastructure as a first-class part of AI product engineering.
+
+## What "AI infrastructure" actually covers
+
+The pieces that often get bundled under "AI infrastructure":
+
+- The gateway that routes requests to model providers
+- Caching layers (response cache, prompt cache, embedding cache)
+- The queue system for async work
+- The vector DB
+- The trace and observability pipeline
+- Inference servers (for self-hosted models)
+- The eval and monitoring infrastructure
+- Multi-region routing
+- Rate limiting and quota management
+- Cost tracking and attribution
+- Failover and degradation paths
+
+Each one is real engineering work. The teams that ship at scale have built each one deliberately.
+
+## What goes wrong without good infrastructure
+
+Specific failures that come from infrastructure shortcuts.
+
+**Failure 1: a single provider outage takes the product down.** No multi-provider failover; a provider's bad day is your product's bad day.
+
+**Failure 2: cost spikes catch the team off guard.** No cost tracking, no per-feature attribution; the bill is a surprise.
+
+**Failure 3: latency problems hit users.** No caching, no smart routing; every request pays full latency cost.
+
+**Failure 4: rate limits become outages.** No queueing, no backpressure; spikes cause errors.
+
+**Failure 5: debugging is impossible.** No trace pipeline; debugging an issue takes days instead of hours.
+
+**Failure 6: data residency is unmet.** No regional routing; users' data crosses jurisdictions in ways that violate compliance.
+
+Each is preventable with the right infrastructure. Each is common in teams that didn't invest.
+
+## The principle: infrastructure precedes scale
+
+Most teams build infrastructure reactively. They hit a problem, they build a solution. Outage occurs, they add failover. Cost spike, they add tracking. Latency complaint, they add caching.
+
+This works for some products. It fails when the problems compound: by the time you have multiple infrastructure gaps, fixing each one takes more effort because they interact.
+
+The proactive alternative: anticipate the infrastructure you'll need at the scale you're targeting. Build before the problems.
+
+A useful exercise: imagine your product 10x larger than today. What infrastructure would it need? Build incrementally toward that. By the time you're 10x larger, the infrastructure is in place.
+
+## What to build first
+
+For an early-stage AI product, the infrastructure essentials.
+
+1. **Trace pipeline.** Every LLM call logged with prompt, response, model, tokens, latency.
+2. **Basic observability.** Dashboards for request rate, error rate, latency, cost.
+3. **Simple gateway.** All LLM calls go through a wrapper that handles tagging, retries, basic logging.
+4. **Prompt and model versioning.** Pinned versions, controlled rollout, ability to roll back.
+5. **Basic caching.** Prompt-prefix caching at minimum.
+
+These don't take long to build. A few weeks for a small team. They pay back the first time you have an incident or a cost surprise.
+
+## What to add as you grow
+
+As the product grows, additional infrastructure earns its keep.
+
+**At 10K+ requests/day:**
+- Eval bench in CI
+- Automated alerts on quality and cost regressions
+- Basic rate limit handling
+
+**At 100K+ requests/day:**
+- Multi-provider gateway with failover
+- More sophisticated caching (semantic cache, response cache)
+- Cost attribution by feature/cohort
+- Active incident response runbook
+
+**At 1M+ requests/day:**
+- Multi-region presence
+- Self-hosted models for high-volume routine tasks
+- Sophisticated traffic shaping (priority queues, backpressure)
+- Dedicated SRE attention
+
+Each tier adds work; each enables the next scale. Skip a tier and you'll feel it.
+
+## The gateway pattern
+
+A pattern that pays for itself: route all LLM calls through a thin internal gateway.
+
+```
+Application code → Internal gateway → Provider API
+```
+
+The gateway handles:
+
+- Tagging (feature, user, prompt version)
+- Retries and timeout handling
+- Multi-provider routing
+- Rate limit management
+- Cost tracking
+- Tracing (every call logged)
+- Caching (where applicable)
+- Fallbacks (degrade gracefully on failure)
+
+Application code doesn't talk to the provider SDK directly. It talks to the gateway. This centralization is what makes everything else possible.
+
+Most teams skip this pattern early because "it's just an API call." Then they have provider SDK calls scattered through the codebase, none with consistent tagging or retry. Adding any cross-cutting concern requires touching every caller. The gateway is the architecture; build it from the start.
+
+## The case for self-hosting (sometimes)
+
+Self-hosting models is operationally heavier than calling APIs. It also unlocks things the APIs don't:
+
+- Predictable cost at high volume
+- Custom fine-tunes that aren't available via API
+- Data residency for sensitive workloads
+- Lower latency for specific architectures
+
+Self-hosting is justified when one or more of these is decisive. Pure cost optimization at moderate scale rarely pencils out (the engineering and ops cost eats the savings). At very high scale or for specific compliance, it does.
+
+For most teams, the right path is: API for everything until you have a specific reason for self-hosting. Then self-host that specific workload, keep API for the rest. Hybrid is usually the answer.
+
+## The MCP horizon
+
+Model Context Protocol (MCP) is reshaping how AI infrastructure connects to external systems.
+
+The basic idea: a standard protocol for exposing tools, data, and capabilities to AI models. Instead of every product writing its own integrations, MCP servers expose standardized interfaces that any MCP-aware client can use.
+
+For infrastructure planning:
+- MCP-compatible architectures decouple AI from specific tool implementations
+- The ecosystem of MCP servers means more capabilities available without custom integration
+- For internal tools, exposing them as MCP servers lets any AI feature use them
+
+In 2026, MCP is becoming a baseline assumption for serious AI products. Architectures that don't account for it are taking on tech debt.
+
+## The observability gap
+
+A specific area where many teams underinvest: AI-specific observability.
+
+Standard observability tools (Datadog, Honeycomb) track requests and latency. They don't natively track:
+
+- Per-request token usage and cost
+- Prompt versions
+- Model versions in use
+- Quality metrics (eval pass rate, user feedback)
+- Trace structure (especially for agents)
+
+You can build these on top of standard observability but it takes work. Some dedicated tools (Langfuse, Helicone, Arize) handle them out of the box.
+
+For a serious AI product, AI-specific observability is part of the infrastructure. Build it; don't approximate it with general-purpose tools.
+
+## The cost-tracking gap
+
+Specific to LLM products: cost tracking that maps to product features.
+
+Standard infrastructure cost tracking is per-service or per-team. LLM cost tracking should be per-feature, per-user, per-prompt-version.
+
+Without this, the conversation about "which features are profitable" is impossible. With it, you have the data to make pricing and optimization decisions.
+
+Most teams add this at the gateway layer. Each call's cost is computed at gateway time and attributed to the feature that triggered it.
+
+## The fallback discipline
+
+Every external dependency can fail. Every AI product depends on at least one external dependency (the model provider). Fallbacks are how you handle the failures.
+
+Fallback patterns:
+
+- **Provider failover.** Call provider A; if it fails, call provider B with the same prompt.
+- **Model degradation.** Call the workhorse model; if it fails, call the smaller cheaper model.
+- **Cached fallback.** If the live call fails, serve a cached response (perhaps slightly stale).
+- **Non-AI fallback.** If everything fails, serve a template response or classical algorithm output.
+- **Outright failure.** Sometimes the right answer is "we're temporarily unable to help; please try again later."
+
+Each fallback has different quality implications. Pick the one that matches the criticality of the feature.
+
+## The team for AI infrastructure
+
+Who owns this work?
+
+In small teams: it's distributed. Whoever shipped the feature also built the infrastructure. Risk: inconsistency.
+
+In medium teams: a platform team focused on AI infrastructure. Other teams build features on top. Risk: platform team becomes bottleneck.
+
+In large teams: dedicated AI infrastructure team plus AI-fluent engineers in each product team. The platform handles common concerns; product teams handle their specifics.
+
+Match to your team size. Don't have an AI infrastructure team in a small startup; do have one (or formalize the role) in a 20+ person org.
+
+## The take
+
+AI infrastructure is the layer that determines whether you ship at scale. The visible layer (prompts, models) gets attention; the invisible layer (gateway, caching, observability, failovers) does the work.
+
+Build it deliberately. Start with a trace pipeline, basic observability, and a gateway. Add capabilities as scale demands. Don't wait for incidents to motivate each piece; build proactively for the scale you're targeting.
+
+The teams shipping AI products at meaningful scale invested in the infrastructure. The teams that struggle to scale usually have great prompts and brittle plumbing.

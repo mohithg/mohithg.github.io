@@ -1,0 +1,201 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Load testing AI features: what breaks first under load"
+description: "AI features fail differently under load than regular APIs. Standard load tests miss the failure modes that matter. Here's the load testing approach that finds real problems."
+publishDate: "2026-07-04"
+pillar: infra
+slug: llm-load-testing
+---
+
+When teams load-test AI features, they often use the same patterns they use for regular APIs: ramp request rate, measure latency and error rate, see what breaks. The patterns are right; the failure modes they reveal aren't always the ones that matter for AI products.
+
+AI features have failure modes specific to their architecture: provider rate limits, queue buildup, GPU saturation, cache thundering herd, agent loops blowing up. Each manifests differently from a regular API failure. The load test that doesn't account for these will miss the real production risks.
+
+This essay is about load testing AI features in ways that find the actual failure modes.
+
+## The failure modes specific to AI
+
+Several patterns that AI features experience under load.
+
+**Failure 1: provider rate limits.** Your traffic spikes; you hit your provider's rate limit; some requests get 429 errors. The pattern depends on whether you have multi-provider failover.
+
+**Failure 2: latency degradation.** Even before hitting hard rate limits, providers sometimes slow down under load. Latency drifts up; the user experience degrades.
+
+**Failure 3: GPU memory pressure (self-hosted).** Concurrent requests share GPU memory. As concurrency grows, memory fills, and either requests get queued or the server fails.
+
+**Failure 4: cache thundering herd.** Cache miss for a popular key generates many concurrent identical requests; the first one populates cache; subsequent ones eventually hit cache but not before causing a spike.
+
+**Failure 5: queue buildup.** If you have an async / queue pattern, queue depth grows under load. By the time the queue clears, users have given up.
+
+**Failure 6: agent loop divergence.** Under load, agents that retry on errors can amplify the load (each failed call retries; the retries fail too; cascading collapse).
+
+**Failure 7: cost spikes.** Even if latency holds, cost can spike if more requests trigger longer trajectories or more tool calls.
+
+Each is a real failure mode. The load test should expose them.
+
+## Test workload shape
+
+A useful load test mimics realistic traffic, not just raw RPS.
+
+Components:
+
+- **Diverse query mix.** Different query types (simple, complex, agent-style). Tests different code paths.
+- **Realistic prompt sizes.** Long prompts cost more compute; mix sizes.
+- **Burst patterns.** Real traffic bursts; testing only steady-state misses burst-specific issues.
+- **Concurrent users.** Different users sending simultaneously; tests connection limits.
+- **Cancellations.** Some users cancel mid-stream; tests cleanup paths.
+
+Synthesize this from your production traffic shape. Don't just send the same prompt 10K times; that's not what production looks like.
+
+## What to measure
+
+Beyond standard metrics (RPS, latency, error rate), AI-specific:
+
+- **Provider latency vs total latency.** Is the slow-down at the provider or in your code?
+- **Tokens per second.** For streaming, when does generation rate drop?
+- **Cost per request.** Are costs scaling linearly or worse?
+- **Agent step counts.** Do agents take more steps under load (suggesting they're getting confused)?
+- **Cache hit rates.** Do they degrade under load?
+- **Queue depths.** Are queues backing up?
+
+These metrics tell the story that latency-and-error alone misses.
+
+## Testing rate limits
+
+Specifically test what happens when you hit provider rate limits.
+
+Steps:
+
+1. Set load high enough to exceed your normal quota
+2. Observe behavior: do you get 429s? Do retries work? Does failover kick in?
+3. Verify users see graceful degradation, not errors
+4. Verify the system recovers gracefully when load drops
+
+Many production teams haven't actually tested rate limit behavior. They've imagined it should work; they haven't verified. The test reveals gaps before users do.
+
+## Testing failover
+
+If you have multi-provider failover:
+
+1. Simulate provider A unavailable (point your gateway at a fake endpoint that returns errors)
+2. Verify traffic shifts to provider B
+3. Measure how long failover takes
+4. Verify quality is preserved (provider B's responses are acceptable)
+5. Recover provider A; verify traffic shifts back appropriately
+
+Test this regularly. Failover that works in theory but not in practice is the worst kind.
+
+## Testing graceful degradation
+
+Define what "degraded" looks like for your product. Test that you reach degraded state cleanly.
+
+For example:
+
+- Normal: full agent functionality, top-tier model, 2-3 second latency
+- Degraded level 1: agent functionality, mid-tier model (cheaper, faster)
+- Degraded level 2: simpler workflow (no agent), template responses
+- Outage: clear error message; user knows we're working on it
+
+Each level should be testable in isolation. The system should transition smoothly between levels under increasing load.
+
+## Testing realistic burst
+
+Production traffic spikes happen. Test for them.
+
+Burst patterns:
+- Marketing campaign launch (10x traffic for an hour)
+- News mention (sudden 30x spike for 30 minutes)
+- Diurnal peak (smooth ramp to 3x)
+
+Run each. Verify the system handles it. Note where it breaks first.
+
+The goal isn't to make the system handle infinite load. It's to know where it breaks and ensure breakage is graceful.
+
+## Testing cache effectiveness
+
+Caching is supposed to help under load. Test that it does.
+
+Setup:
+- Pre-warm caches with expected query patterns
+- Run load with similar query patterns
+- Measure hit rate
+- Compare with and without caching at the same load
+
+If caching doesn't help under load, your cache config is wrong (TTLs too short, keys too specific, capacity insufficient).
+
+## Testing canceled requests
+
+Real users cancel. Streaming tests should include cancellation.
+
+Setup:
+- Some requests cancel after 1-2 seconds
+- Verify server-side: model generation stops
+- Verify resources are freed (no leaked GPU memory, no orphaned tokens)
+- Verify metrics are correct (cancellation, not error)
+
+Cancellation handling is the most-overlooked part of streaming. Load test reveals what happens at scale.
+
+## Tools
+
+For load testing AI:
+
+- **k6.** General-purpose load testing; good for HTTP including SSE.
+- **Vegeta.** Simple, scriptable, fast.
+- **Custom scripts.** For complex workloads, you may need to write your own. Async Python or Go is fine.
+- **Provider-specific tools.** Some providers have load testing infrastructure for their APIs.
+
+Whatever tool, ensure it can simulate concurrent users with diverse query patterns, not just raw RPS.
+
+## When to test
+
+Load testing isn't a one-time event.
+
+- **Pre-launch.** Before going to production with a new feature.
+- **Before major events.** Marketing campaigns, product launches that might drive traffic.
+- **After architecture changes.** Significant infrastructure or code changes.
+- **Quarterly.** Even without obvious changes, drift accumulates.
+
+Make it routine. The system that's load-tested regularly has fewer load-related surprises.
+
+## Cost of load testing
+
+Load testing AI features costs real money. Each test request goes through the provider; you pay for it.
+
+Patterns:
+- Use cheaper models for load shape testing (verify the architecture handles concurrency); validate with primary models for a smaller subset
+- Test in a staging environment if you have one (with real provider but isolated)
+- Set budget caps; abort the test if cost exceeds threshold
+
+Don't skip load testing because of cost; do plan the cost.
+
+## What "passing" looks like
+
+A successful load test:
+
+- System handles target load without user-visible errors
+- Latency stays within budget at peak
+- Cost per request stays roughly linear
+- Failover (if applicable) works correctly
+- Cancellation works at all load levels
+- Degradation paths trigger appropriately
+
+If any of these fail, you have a fix to make before production handles real load.
+
+## Post-test analysis
+
+The most valuable part is what you learn.
+
+- What broke first? (Tells you where to invest)
+- What was the failure mode? (Affects how you fix)
+- How did the system recover? (Tells you about resilience)
+- Were the metrics right? (Did your monitoring catch the issue?)
+
+Load test results inform infrastructure investment. Without the test, you're guessing.
+
+## The take
+
+Load testing AI features needs to test for AI-specific failure modes: rate limits, latency degradation, GPU saturation, cache thundering herd, queue buildup, agent loop divergence, cost spikes.
+
+Use realistic workloads, not just raw RPS. Test rate limits, failover, graceful degradation, and cancellation. Make it routine.
+
+The teams that ship AI products that survive traffic spikes load-tested their systems. The teams that have outages on their first marketing campaign usually didn't.

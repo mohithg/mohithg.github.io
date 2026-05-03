@@ -1,0 +1,214 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Streaming LLM responses: the UX win that's harder than it looks"
+description: "Streaming the model's tokens to the user as they're generated dramatically improves perceived latency. The implementation has more gotchas than tutorials suggest."
+publishDate: "2026-07-01"
+pillar: infra
+slug: streaming-llm-responses
+---
+
+Streaming LLM responses, where tokens are sent to the user as they're generated rather than waiting for the full response, is one of the highest-leverage UX improvements available for AI products. A user seeing the first words after 500ms reads at human speed and never notices the actual generation time. Without streaming, the same 8-second generation feels broken.
+
+The basic concept is simple. The implementation has gotchas that the tutorials don't always cover. This essay is the production-grade view of streaming.
+
+## What streaming actually is
+
+The model generates tokens one at a time. Without streaming, the server waits for all tokens to be generated and returns the complete response. With streaming, the server sends tokens as they're produced.
+
+The user experiences:
+
+- First token arrives within ~100-500ms of submitting (depending on model and infrastructure)
+- Tokens flow at the model's generation speed (typically 20-100 tokens/sec)
+- The full response is complete after the same total time, but the user has been reading
+
+The perceived latency is dramatically lower. Even an 8-second total generation feels fast because the user sees output immediately.
+
+## The transport layer
+
+Several options for streaming over HTTP.
+
+**Server-Sent Events (SSE).** Standard HTTP streaming. Browser-supported via EventSource API. Simple. The right default for most web apps.
+
+**WebSockets.** Bidirectional. Useful for chat with continuous turn-taking. More setup; more capability.
+
+**HTTP/2 streaming.** The underlying protocol; SSE rides on top.
+
+**gRPC streaming.** For internal APIs between services. Standard protobuf-based streaming.
+
+For most consumer AI products, SSE is the right choice. It's simple, browser-native, and handles the use case cleanly.
+
+## The streaming response shape
+
+A typical streaming endpoint:
+
+```
+GET /api/chat/stream
+
+Server sends:
+data: {"content": "The"}
+data: {"content": " quick"}
+data: {"content": " brown"}
+...
+data: {"done": true, "usage": {"input_tokens": 50, "output_tokens": 23}}
+```
+
+Each event is a delta (a partial response). The client accumulates them; the final event signals completion with usage stats.
+
+Some APIs send full responses with each event (the response so far). Less efficient on bandwidth; simpler client code. Pick based on tradeoffs.
+
+## Provider streaming APIs
+
+Most LLM providers offer streaming APIs:
+
+- Anthropic: Server-Sent Events with a specific event format
+- OpenAI: Server-Sent Events with delta-style events
+- Open-source serving (vLLM, TGI): typically SSE with their own formats
+
+The gateway (covered in another essay) should normalize across providers. Product code talks to the gateway; the gateway handles the provider-specific streaming.
+
+## Connection management
+
+Streaming connections are long-lived. This affects:
+
+**Connection limits.** Each streaming user is consuming a connection. At scale, you need to handle many concurrent open connections. Standard load balancers handle this fine; your application architecture should be event-loop-based (Python asyncio, Node.js, etc.).
+
+**Connection drops.** Networks are imperfect. Mid-stream disconnects happen. Handle them gracefully:
+
+- Server side: detect disconnect, stop the model generation, log the partial result
+- Client side: detect disconnect, decide whether to retry or show an error
+
+**Idle timeouts.** Many proxies have idle timeouts (default 30-60s). For long generations, this can break streaming. Configure timeouts appropriately.
+
+## Streaming JSON or structured output
+
+A common need: the response is structured (JSON) but you want to stream parts as they're generated.
+
+The challenge: JSON isn't valid until the closing brace. You can't display a partial JSON object without parsing it specially.
+
+Patterns:
+
+**Pattern 1: stream the text representation.** The model outputs JSON as a string; you stream the string; the client renders only complete fields.
+
+**Pattern 2: incremental JSON parsing.** Parse the partial JSON as it streams. Modern parsers (e.g., partial-json) handle incomplete JSON gracefully.
+
+**Pattern 3: structured streaming protocols.** Define your own event format that signals when fields complete.
+
+For most production use cases, Pattern 2 (incremental JSON parsing) is the sweet spot. The user sees fields appear as they're generated.
+
+## Cancellation
+
+If the user cancels (closes the tab, hits stop, navigates away), you should:
+
+- Stop the model generation (some providers support cancellation; others don't)
+- Save partial results if relevant
+- Free server-side resources
+
+Cancellation is one of the most-skipped pieces of streaming implementations. Without it, cancelled requests still consume model capacity until they complete; you pay for tokens nobody sees.
+
+If the provider supports cancellation, use it. If not, at minimum stop forwarding tokens to the disconnected client; you can't reclaim the model time but you can avoid unnecessary downstream work.
+
+## Streaming and tool calls
+
+For agents that make tool calls, streaming gets complicated.
+
+The model's stream might include:
+- Text intended for the user
+- Tool call requests (which the user shouldn't see directly)
+- Internal reasoning (chain-of-thought)
+
+Patterns:
+
+**Pattern 1: only stream user-visible text.** Tool calls and reasoning are processed server-side; the user sees only the assistant's response after tool calls resolve.
+
+**Pattern 2: stream with annotations.** The user sees a "thinking..." indicator while tool calls run, then the response continues streaming after.
+
+**Pattern 3: stream the agent's reasoning.** Show the user what the model is "thinking" and what tools it's calling. Transparency at the cost of visual complexity.
+
+Pattern 1 is the right default for most consumer products. Pattern 3 fits power-user products (developer tools, AI coding assistants).
+
+## Streaming and rate limits
+
+Streaming consumes the same model resources as non-streaming. Rate limits apply.
+
+Considerations:
+- A streaming request holds capacity until completion
+- Concurrent streaming users multiply capacity demand
+- Rate limit errors during streaming need graceful handling (often: surface the error to the user mid-stream)
+
+For high-volume products, plan rate-limit headroom that accounts for streaming concurrency.
+
+## Buffering and flush
+
+Server-side buffering can break streaming.
+
+Common culprits:
+
+- Application server buffering (some servers buffer responses by default)
+- Reverse proxy buffering (nginx, Cloudflare, etc.)
+- TLS / HTTP/2 buffering
+
+The fix: configure each layer to flush immediately. For nginx: `proxy_buffering off`. For your application: ensure responses are flushed per chunk.
+
+If streaming "doesn't work" even though the code looks right, buffering is the usual culprit.
+
+## Streaming and observability
+
+Streaming complicates observability.
+
+Standard request logs typically log start time, end time, status. For streaming, the meaningful events are:
+
+- First token time (TTFT)
+- Token rate during streaming
+- Total tokens
+- Final status (completed, cancelled, error)
+
+Update your logging to capture these. They're the metrics that tell you about streaming-specific performance.
+
+## Streaming for non-chat use cases
+
+Streaming isn't only for chat. Consider:
+
+- Long-form content generation (articles, reports): stream as the user reads
+- Code generation: stream as the user reviews
+- Data extraction: stream extracted records as found
+- Search results: stream results as they're computed
+
+Each case benefits from the same perceived-latency improvement. Default to streaming for any LLM response longer than a sentence or two.
+
+## What can't stream
+
+A few cases where streaming doesn't help:
+
+- Outputs that need full validation before display (some structured outputs)
+- Outputs that pass through synchronous moderation that must finish first
+- Use cases where the user can't interact with partial output
+
+For these, ship without streaming. Don't force it where it doesn't fit.
+
+## Mobile and unreliable networks
+
+Mobile users have flakier connections. Streaming over mobile:
+
+- More disconnects mid-stream
+- Higher variance in TTFT
+- May benefit from chunked progressive delivery rather than per-token streaming
+
+For mobile-heavy products, test streaming behavior on real mobile networks. The desktop developer experience can hide problems mobile users hit.
+
+## When streaming hurts
+
+Streaming has a cost you don't always want to pay.
+
+- It increases per-request connection overhead (small)
+- It complicates client code (some)
+- It makes some operations (caching, replay) harder
+
+For batch workloads, internal APIs, and other non-user-facing cases, skip streaming. It exists for the perceived-latency benefit; if there's no human reading in real time, the benefit is zero.
+
+## The take
+
+Streaming is essential UX for user-facing AI products. The basic implementation is simple; the production implementation handles disconnects, cancellation, structured output, tool calls, and buffering.
+
+Default to streaming for any user-facing LLM response. Use SSE as the transport. Handle cancellation properly. Configure all the layers for proper flushing.
+
+The teams shipping AI products that feel fast use streaming. The teams whose products feel slow despite acceptable total latency usually skipped it.

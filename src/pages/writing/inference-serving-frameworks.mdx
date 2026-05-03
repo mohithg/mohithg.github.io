@@ -1,0 +1,235 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Inference serving in 2026: vLLM, TGI, SGLang, and the choice that matters"
+description: "If you're self-hosting LLMs, the inference server is one of the highest-leverage choices. Here's the landscape and the criteria that actually drive the decision."
+publishDate: "2026-06-29"
+pillar: infra
+slug: inference-serving-frameworks
+---
+
+For teams self-hosting LLMs, the inference server is one of the largest infrastructure decisions. The choice affects throughput, latency, GPU utilization, and what features (continuous batching, quantization, speculative decoding) you can use.
+
+In 2026 the major options are vLLM, Text Generation Inference (TGI), SGLang, TensorRT-LLM, and a few others. Each has tradeoffs; the right choice depends on your workload and team.
+
+This essay is a practical comparison and the criteria that actually drive the decision.
+
+## The frameworks
+
+A quick survey.
+
+**vLLM.** Open-source, mature, widely adopted. Excellent throughput on common hardware. PagedAttention for memory efficiency. Good support for many model architectures.
+
+**Text Generation Inference (TGI).** From Hugging Face. Focused on HF-hosted models. Production-grade with telemetry, tracing. Slightly behind vLLM on some throughput metrics; ahead on integration with HF ecosystem.
+
+**SGLang.** Newer; strong on structured generation, complex generation programs (reasoning chains, structured outputs). Useful when output structure matters as much as throughput.
+
+**TensorRT-LLM.** From NVIDIA. Highest performance on NVIDIA GPUs but more complex to deploy. Good when you can afford the operational complexity.
+
+**Triton Inference Server.** General-purpose; supports LLMs via integrations. Worth considering if you're already running Triton for other ML.
+
+**Cloud-managed serving.** AWS Bedrock self-hosted, Azure ML, etc. Removes ops burden at the cost of control and per-token cost.
+
+## The decision factors
+
+Several factors drive the choice.
+
+**Factor 1: throughput vs latency.** Higher throughput per GPU lowers cost; lower latency improves UX. The frameworks differ in how they balance these.
+
+**Factor 2: model support.** Some frameworks support all popular open models; some have narrower support. Confirm yours is supported.
+
+**Factor 3: feature support.** Continuous batching, quantization, speculative decoding, structured generation, multi-LoRA. Different frameworks have different feature sets.
+
+**Factor 4: ops complexity.** Some frameworks are easy to deploy (containerized, autoscaling); some require careful tuning.
+
+**Factor 5: ecosystem fit.** If you're on Hugging Face's stack, TGI fits. If you're on Triton/NVIDIA, TensorRT-LLM. If you want maximum flexibility, vLLM.
+
+## When to pick vLLM
+
+Default for most teams self-hosting open-source models.
+
+Pros:
+- Strong throughput with good GPU utilization
+- Widely deployed; lots of tribal knowledge available
+- Active development, frequent releases
+- Supports most popular models and quantization formats
+
+Cons:
+- Operational complexity is real (tuning batch sizes, memory)
+- Some advanced features (speculative decoding) are still maturing
+
+For teams that want a solid middle-ground choice, vLLM is usually right.
+
+## When to pick TGI
+
+Best for teams already in the Hugging Face ecosystem.
+
+Pros:
+- Tight integration with HF model hub
+- Good telemetry / observability built-in
+- Easy deployment for HF-hosted models
+
+Cons:
+- Throughput slightly behind vLLM on some workloads
+- Smaller community than vLLM
+
+If you're using HF for model selection, training, or inference SaaS, TGI is the natural extension.
+
+## When to pick SGLang
+
+Worth considering when output structure matters.
+
+Pros:
+- Strong structured generation support
+- Allows complex generation programs (multi-step chains, branching) at the inference server layer
+- Competitive throughput
+
+Cons:
+- Newer; smaller community
+- Less battle-tested than vLLM
+
+For products that lean heavily on structured output, agent-like workflows, or multi-step generation, SGLang has unique advantages.
+
+## When to pick TensorRT-LLM
+
+For maximum performance on NVIDIA hardware, when you can pay the ops cost.
+
+Pros:
+- Highest throughput per GPU on NVIDIA hardware
+- Excellent quantization support
+- Mature; used in many production deployments
+
+Cons:
+- Operational complexity is meaningful
+- NVIDIA-specific; reduces flexibility
+- Steeper learning curve
+
+For teams running serious volume on NVIDIA fleets, TensorRT-LLM's performance gains can justify the complexity.
+
+## When to use managed serving
+
+For teams that don't want the ops burden.
+
+Pros:
+- No GPU management
+- Autoscaling handled
+- Patches and updates managed
+
+Cons:
+- Per-token cost higher than self-hosting at scale
+- Less control over specific model versions and configurations
+- Vendor lock-in
+
+For low-to-medium volume, managed serving is often the right call. The savings of self-hosting don't materialize until you have meaningful sustained throughput.
+
+## What to actually benchmark
+
+Don't just trust framework benchmarks. Benchmark on your data.
+
+Pattern:
+
+1. Pick 2-3 candidate frameworks
+2. Set up each with the model you'll actually use
+3. Run a workload representative of your production traffic (similar prompt lengths, similar concurrency)
+4. Measure: tokens/sec throughput, p50/p95/p99 latency, GPU utilization
+5. Pick based on results
+
+The benchmark might take a week. It's worth it; the picks based on framework marketing pages often disappoint.
+
+## Quantization
+
+Modern inference servers support quantization (running models at lower precision: INT8, INT4, FP8) for better throughput and lower memory.
+
+Tradeoffs:
+
+- INT8 / FP8: small quality loss, significant throughput improvement
+- INT4: noticeable quality loss on some tasks, large throughput improvement
+- FP16: no quality loss, baseline performance
+
+For high-volume serving, quantization is often essential to fit within GPU budgets. Quality drops are usually acceptable for most tasks; verify on your eval bench.
+
+## Continuous batching
+
+Continuous batching lets the server process multiple requests simultaneously by interleaving their generation steps. Modern inference servers do this automatically.
+
+The benefit: higher throughput per GPU. Multiple concurrent requests share the same GPU pass.
+
+The catch: latency for individual requests can be slightly higher than dedicated serving because of batching overhead.
+
+For interactive workloads, the latency cost is small (typically under 10ms added). For high-throughput batch workloads, continuous batching is critical for cost efficiency.
+
+## Speculative decoding
+
+Speculative decoding uses a smaller "draft" model to propose tokens, which a larger "verifier" model validates. When the draft is right (often), generation is faster.
+
+In 2026, speculative decoding can lift throughput 2-3x for many models. Most modern inference servers support it.
+
+Worth enabling if your framework supports it. The setup involves picking a compatible draft model; verify quality is maintained on your eval bench.
+
+## Model loading and switching
+
+For teams running multiple models or fine-tuned variants:
+
+- Some servers support "model registry" with hot-swapping
+- Multi-LoRA serving lets you switch between adapters with minimal overhead
+- Some servers require restart to switch base models
+
+If you have many fine-tunes or need to swap models frequently, prioritize this capability when picking.
+
+## Observability for inference servers
+
+The serving layer is itself infrastructure that needs observability.
+
+Track:
+
+- Throughput (tokens/sec, requests/sec)
+- Latency distribution (TTFT, time-to-first-token; total response time)
+- GPU utilization
+- Memory usage
+- Queue depth
+- Error rates
+
+These metrics tell you when you're nearing capacity, when latency is spiking, when something is misconfigured.
+
+## Multi-region and HA
+
+For production at meaningful scale, multi-region:
+
+- Deploy serving in multiple regions
+- Route requests to the nearest healthy region
+- Failover when a region has issues
+
+This is more infrastructure but necessary for products with users worldwide and reliability requirements.
+
+## The cost picture
+
+Self-hosted serving cost is dominated by GPU.
+
+Rough numbers (2026):
+
+- GPU hourly rate: $1-5/hour depending on type and provider
+- Tokens per hour at full GPU utilization: tens of millions for mid-size models
+- Per-million-token cost: $0.01-0.10 at high utilization
+
+Compare to API: $0.5-30 per million tokens depending on model.
+
+The break-even is typically at hundreds of millions of tokens per month sustained. Below that, API is cheaper. Above that, self-hosted pencils out.
+
+## When to self-host vs API
+
+Decision factors:
+
+- *Volume:* high sustained volume favors self-hosted
+- *Data residency:* required residency favors self-hosted
+- *Latency:* tightly co-located self-hosted can be lower latency
+- *Customization:* fine-tuned models often require self-hosted
+- *Operational maturity:* if you don't have GPU ops experience, API is safer
+
+For most teams under 100M tokens/month, API is the right call. Above that, self-hosted starts to win on cost.
+
+## The take
+
+Inference server choice matters when you're self-hosting. vLLM is the strong default. TGI fits HF-centric stacks. SGLang for structured generation. TensorRT-LLM for max performance with the ops to support it.
+
+Benchmark on your actual workload. Use quantization and continuous batching. Plan for multi-region if you need reliability.
+
+The teams running large self-hosted LLM infrastructure picked their inference server deliberately and benchmarked. The teams that struggle often picked by hype and didn't measure.

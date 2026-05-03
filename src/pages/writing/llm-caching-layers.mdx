@@ -1,0 +1,204 @@
+---
+layout: ../../layouts/Writing.astro
+title: "LLM caching layers: prompt cache, response cache, semantic cache"
+description: "Caching for LLM products has more layers than caching for regular APIs. Each layer has different tradeoffs. Here's the stack and the patterns that compound."
+publishDate: "2026-07-02"
+pillar: infra
+slug: llm-caching-layers
+---
+
+Caching for LLM products is unusually high-leverage. Per-call costs are meaningful; per-call latencies are seconds; many calls are similar enough that caching applies. A well-designed cache stack can cut both cost and latency by 50%+.
+
+The stack has multiple layers. Each layer has different hit rates, different staleness implications, different infrastructure requirements. Picking the right layers (and configuring them well) is part of building production-grade LLM infrastructure.
+
+This essay walks through the layers and how they compose.
+
+## Layer 1: prompt prefix cache
+
+The most universal layer. Modern LLM APIs cache prompt prefixes; cached portions are billed at a fraction of normal rates.
+
+How it works:
+- The model provider keeps a cache of recently seen prompt prefixes
+- Calls with identical prefixes pay reduced cost on the cached portion
+- TTL is typically 5-10 minutes
+
+What you do:
+- Structure prompts with stable parts (system prompt, tool descriptions, few-shot) at the start
+- Variable parts (conversation history, user input) at the end
+- Enable provider's caching feature (usually a flag)
+- Track cache hit rate as a metric
+
+Effective savings: 50-80% on cached portions. For prompts where most of the content is stable, the overall cost drops dramatically.
+
+This layer is essentially free to use. Most teams that don't are leaving money on the table.
+
+## Layer 2: response cache (exact match)
+
+For repeated identical requests, cache the full response.
+
+How it works:
+- Hash the request (model, prompt, parameters)
+- If hash exists in cache, return cached response
+- Otherwise, call the model, store the response
+
+Hit rate depends on traffic shape. For products with repetitive queries (FAQs, common patterns), hit rate can be 20-40%. For products with mostly unique queries, hit rate is near zero.
+
+Considerations:
+- TTL: how long is the cache valid? Depends on whether the underlying answer can change.
+- Cache key: must include all parameters that affect output (temperature, system prompt version, etc.)
+- Privacy: caching across users requires care; usually cache key includes user ID.
+
+Effective savings: at 30% hit rate, ~30% cost reduction on the affected calls.
+
+## Layer 3: semantic cache
+
+For queries that aren't identical but mean the same thing, semantic cache.
+
+How it works:
+- Embed the request
+- Search the cache for similar embeddings
+- If similarity exceeds threshold, return the cached response
+
+Hit rate is higher than exact match (semantic similarity is more permissive). False positive rate is the risk; sometimes "similar" queries have meaningfully different answers.
+
+Considerations:
+- Similarity threshold: tune carefully. Too low: false positives. Too high: too few hits.
+- Eval the cache: run the cached responses against the eval bench. Are they still correct?
+- Cache key still needs to include user-specific context.
+
+Effective savings: 30-60% in some products. Worth investing if your traffic has many semantically-similar queries.
+
+This layer requires more engineering (embedding step, vector search, threshold tuning). Worth it for high-volume products with broad semantic clustering.
+
+## Layer 4: tool result cache
+
+For agents, tool results often repeat across queries.
+
+How it works:
+- When a tool is called, hash the tool name and arguments
+- Cache the result with a TTL appropriate to that tool's data freshness
+- Subsequent identical calls return the cached result
+
+Savings depend on tool call patterns. For tools called repeatedly with same args (e.g., "get user portfolio"), high hit rate.
+
+Considerations:
+- TTL per tool: a portfolio doesn't change often (5-min cache fine). A market data call needs shorter TTL (seconds to minutes).
+- Cache invalidation: writes invalidate caches.
+- Per-user caching: tool results for user A shouldn't return for user B.
+
+This layer is often overlooked. For agent products where tools dominate cost, it's high-leverage.
+
+## Layer 5: KV cache (intra-request)
+
+A specialized layer for self-hosted serving: the KV cache stores attention computation across tokens within a single request.
+
+This is automatic in modern inference servers (vLLM, etc.). You don't usually configure it; the server handles it.
+
+The implication: longer prompts have proportionally more cached state. Long-context generation isn't quite as expensive as it would be without KV caching.
+
+For self-hosted serving, KV cache management is part of the inference server's job. For API users, this is invisible (the provider handles it).
+
+## Composition: how the layers work together
+
+The layers compose. A typical request might:
+
+1. Hit Layer 3 (semantic cache): if a similar query was answered recently, return that answer. Done.
+2. Miss Layer 3 but hit Layer 2 (exact match): exact identical query. Return the cached response. Done.
+3. Miss Layers 2 and 3, but Layer 1 (prompt cache) saves cost on the model call.
+4. Layer 4 (tool result cache) reduces cost during agent tool calls within the model run.
+5. Layer 5 (KV cache) improves throughput within the model call itself.
+
+Each layer kicks in if the previous didn't catch the request. Cumulative savings can be substantial.
+
+## Cache hit rate monitoring
+
+Track per-layer hit rates:
+
+- Layer 1: % of prompt tokens served from cache
+- Layer 2: % of requests served from response cache
+- Layer 3: % of requests served from semantic cache
+- Layer 4: % of tool calls served from cache
+
+Watch trends. A drop in hit rate may indicate:
+- Schema changes invalidating caches
+- Traffic distribution shifting
+- TTL miscalibration
+- Cache infrastructure issue
+
+## Cache invalidation
+
+The hard problem.
+
+Patterns:
+
+**Pattern 1: TTL-based.** Cache entries expire after a duration. Simple. Some staleness during the TTL window.
+
+**Pattern 2: explicit invalidation.** When source data changes, invalidate the relevant cache entries. Lower staleness; more complex.
+
+**Pattern 3: versioned keys.** Include a version in the cache key. When the underlying source changes, increment the version. Old cache entries become unreachable; they expire normally.
+
+For most LLM products, TTL-based for most layers, with explicit invalidation for sensitive cases (user explicitly updated their preferences; cache should reflect immediately).
+
+## Privacy considerations
+
+Caching across users is risky.
+
+Patterns:
+
+- Per-user cache namespaces (key includes user ID)
+- Avoid caching responses that contain user-specific content unless cached per-user
+- For multi-tenant products, isolate caches per tenant
+
+Don't accidentally serve user A's response to user B because the queries happened to be similar.
+
+## When caching hurts
+
+Caching isn't universally good.
+
+Cases where it's a net negative:
+
+- Highly personalized responses (cache hit rate is too low to justify infrastructure)
+- Real-time data (cached responses are wrong by definition)
+- Creative outputs where users expect novelty (returning the same response feels weird)
+- Compliance contexts where each output must be a fresh decision
+
+For these, skip caching or use only at the appropriate layers.
+
+## Cache as a quality concern
+
+A subtle issue: cached responses can have worse quality than fresh ones.
+
+The cached response was generated at a point in time. The model has improved since (model upgrade). The fresh response would be better.
+
+For products where quality drift over time matters, periodically refresh cache entries. The cache TTL itself can serve this: entries naturally expire and regenerate from the current model.
+
+## Cost vs. complexity
+
+Each layer adds operational complexity. Match the layers to your actual savings.
+
+- Layer 1: essentially free; always use
+- Layer 2: minor complexity; use if traffic has repeats
+- Layer 3: moderate complexity; use at scale where hit rate justifies
+- Layer 4: depends on agent architecture; valuable for tool-heavy agents
+- Layer 5: handled by your serving framework
+
+For a small product, Layer 1 alone might be sufficient. For a large product, all five layers compose into substantial savings.
+
+## What to build first
+
+If you're starting:
+
+1. Enable Layer 1 (prompt cache). Almost free; immediate savings.
+2. Add Layer 2 (response cache) once you observe traffic; tune TTL based on freshness needs.
+3. Add Layer 4 (tool cache) if you have agents.
+4. Add Layer 3 (semantic cache) only at scale where the engineering is justified.
+
+Don't build all five before you have any users. Build progressively as the savings justify the complexity.
+
+## The take
+
+Caching for LLM products is high-leverage and multi-layered. Prompt prefix cache, response cache, semantic cache, tool result cache, KV cache. Each catches different patterns; each contributes to the savings.
+
+Build progressively. Track per-layer hit rates. Tune TTLs to balance freshness and savings. Handle privacy carefully.
+
+The teams running cost-disciplined LLM infrastructure use multiple cache layers. The teams that don't are paying full price for traffic that could have been served from cache.

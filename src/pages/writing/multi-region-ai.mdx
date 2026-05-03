@@ -1,0 +1,198 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Multi-region AI deployment: latency, residency, and reliability"
+description: "Once your AI product has users worldwide, single-region deployment hurts. Multi-region adds complexity but solves real problems. Here's the architecture that works."
+publishDate: "2026-07-03"
+pillar: infra
+slug: multi-region-ai
+---
+
+A startup ships their AI product. Users from the US are happy. Users from Europe complain about latency. Users from Asia complain more. The team adds a CDN; latency for static content drops; LLM call latency stays the same because LLM calls are dynamic and route through the team's US-based servers.
+
+This is the multi-region problem. AI products with users in multiple regions need infrastructure in multiple regions. The work is non-trivial; the alternative is a poor experience for non-domestic users.
+
+This essay is the architecture that handles multi-region for AI products.
+
+## Why multi-region matters more for AI
+
+Three reasons.
+
+**Reason 1: latency adds up.** A user in Asia hitting a US server adds 200-300ms RTT. For a typical AI request that's already 2-3 seconds, this is significant. Streaming helps but the time-to-first-token still has the RTT cost.
+
+**Reason 2: data residency.** Europe (GDPR), Asia (various regulations), some industries (healthcare, finance) have data residency requirements. Calling an LLM API in another region might violate those.
+
+**Reason 3: reliability.** Single-region deployment means a single-region outage takes you down for everyone. Multi-region means regional outages affect only that region.
+
+For a product with users worldwide, all three apply. For a product with users in one region, the discussion is moot.
+
+## The components that need to be regional
+
+Not everything needs to be regional. The pieces that benefit:
+
+**Application servers.** Where the user's request lands first. Should be near the user.
+
+**LLM provider endpoints.** Most providers have regional endpoints. Use the one closest to your application server.
+
+**Vector DB (for RAG).** The retrieval call has to be fast. Regional vector DBs avoid the latency.
+
+**Cache layers.** Caches close to the user reduce latency on hits.
+
+**Trace and logging infrastructure.** Less critical for latency but important for compliance and operational simplicity.
+
+The pieces that may not need to be regional:
+
+**Static data and rarely-updated content.** CDN-cached.
+
+**Async background work.** If a job runs overnight, it doesn't matter much where.
+
+**Eval infrastructure.** Run wherever; results don't need to be region-local.
+
+## The architecture pattern
+
+A workable multi-region setup:
+
+```
+Region 1: [App servers] → [Cache] → [LLM provider Region 1]
+                       → [Vector DB Region 1]
+
+Region 2: [App servers] → [Cache] → [LLM provider Region 2]
+                       → [Vector DB Region 2]
+
+Cross-region: [Source-of-truth DB] → replicated to each region
+
+Routing: [Global LB] → routes user to nearest region
+```
+
+The user's request stays in their region for as much of the work as possible. Only when data is genuinely cross-region (rare for most products) does the call cross regions.
+
+## Routing users to regions
+
+Three patterns.
+
+**Pattern 1: GeoDNS.** DNS resolves to the nearest region based on the resolver's location. Simple. Imperfect (user's resolver might not match user location).
+
+**Pattern 2: anycast IPs.** A single IP routes to the nearest deployed region via BGP. Fast failover. More complex setup.
+
+**Pattern 3: client-side routing.** The client app picks a region based on latency probes. Best accuracy. Adds client complexity.
+
+Most teams use Pattern 1 or 2. Pattern 3 is overkill except for products with strict latency requirements.
+
+## Data residency implications
+
+For products with residency requirements:
+
+- User data stays in the user's home region
+- LLM calls happen in the home region
+- No data crosses regions without explicit consent / legal basis
+
+This rules out some patterns. *"Failover to another region during outage"* might violate residency. Need explicit handling: queue / delay / surface error rather than silently routing data to another region.
+
+For most consumer products without residency requirements, the simpler "fail over freely" pattern is fine.
+
+## Replication patterns
+
+Source-of-truth data (user accounts, content, configuration) usually has one primary location with replicas.
+
+Patterns:
+
+**Pattern 1: single-master + read replicas.** Writes go to one region; reads from replicas in each region. Simple. Write latency from far regions is bad.
+
+**Pattern 2: multi-master.** Writes can go to any region; conflicts resolved by various means. More complex.
+
+**Pattern 3: regional partitioning.** Each user's data is "owned" by one region. All operations for that user happen there. No cross-region data movement.
+
+Pattern 3 (sharding by region) often fits AI products best. User experience is fast in their home region; cross-region operations are rare.
+
+## Multi-provider for redundancy
+
+Multi-region often pairs with multi-provider for the LLM layer.
+
+If each region has access to multiple LLM providers:
+
+- Provider outages affect only that provider, not the region
+- Cost optimization can route between providers within each region
+- Failover within a region is faster than failing over to another region
+
+For high-reliability products, multi-provider per region is the architecture. The complexity is real but justified for the reliability.
+
+## Cache propagation
+
+If you cache LLM responses, regional caches don't share state.
+
+Implications:
+
+- A user routed to Region A has different cache state than one routed to Region B
+- Cold start for a user routed to a "new" region (their first request there)
+- Cache hit rates per region depend on regional traffic patterns
+
+For most products, accept that caches are regional. If global cache state is essential, you have a more complex architecture problem.
+
+## What to monitor
+
+Multi-region adds new metrics.
+
+- Per-region latency (p50, p95)
+- Per-region error rate
+- Per-region traffic share
+- Cross-region traffic (should be small; investigate if growing)
+- Failover events (when did a region's traffic shift?)
+
+Watch the per-region metrics, not just aggregates. Aggregates can hide a single region having serious issues.
+
+## Cost implications
+
+Multi-region multiplies infrastructure cost. Naive deployment doubles cost (two regions instead of one).
+
+Optimization patterns:
+
+- *Spot capacity in less-loaded regions.* Reduces cost; tolerates capacity reclamation.
+- *Smaller infrastructure in lower-traffic regions.* Match capacity to demand.
+- *Active-passive for some components.* Primary in one region, standby in another.
+
+For a global product, 1.3-1.6x single-region cost is typical with optimization.
+
+## When NOT to go multi-region
+
+Cases where single-region is fine.
+
+- Users concentrated in one region (mostly US, etc.)
+- Internal tools where users are near the deployment
+- Pre-product-fit phase where worldwide users aren't yet a real concern
+- Strict cost constraints; multi-region complexity not justified
+
+Don't go multi-region prematurely. The complexity is real. Start single-region; expand when user distribution justifies.
+
+## Migration from single-region
+
+Going from single-region to multi-region:
+
+1. Decide on regional topology (which regions, how many)
+2. Replicate or shard the data layer
+3. Deploy app stack in each region
+4. Set up routing (GeoDNS or anycast)
+5. Test thoroughly with synthetic traffic
+6. Migrate users gradually
+7. Monitor closely during ramp
+
+This is a multi-month effort for a non-trivial product. Don't underestimate.
+
+## What "good enough" looks like
+
+For a multi-region AI product:
+
+- Two or three regions covering the user base (US-East, EU, APAC is common)
+- Sub-100ms p95 latency to nearest app server from anywhere
+- Sub-2s p95 LLM call latency in each region
+- Per-region monitoring with alerts
+- Documented failover procedures
+- Tested regional outage scenarios
+
+Most teams that ship globally have this kind of setup. Teams that don't end up with users complaining about latency from specific regions.
+
+## The take
+
+Multi-region for AI products is necessary once you have users worldwide. The architecture: app servers in multiple regions, regional LLM endpoints, regional vector DBs and caches, cross-region replication for shared data.
+
+Decide on regional topology based on user distribution. Handle data residency where required. Plan for the increased operational complexity.
+
+The teams shipping AI products with users worldwide have multi-region infrastructure. The teams that don't have unhappy users in non-primary regions and a "we should fix that someday" item that never moves.

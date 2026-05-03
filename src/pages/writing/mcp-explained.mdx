@@ -1,0 +1,195 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Model Context Protocol (MCP): what it actually is and why it matters"
+description: "MCP is the protocol decoupling AI models from the tools and data they use. In 2026 it's becoming a baseline. Here's what it is and what to actually do about it."
+publishDate: "2026-06-28"
+pillar: infra
+slug: mcp-explained
+---
+
+The Model Context Protocol (MCP) emerged in 2024-2025 as a standard for how AI systems connect to tools and data sources. By 2026, it's becoming the default integration pattern for serious AI products. Teams that haven't adopted it are taking on technical debt; teams that have are unlocking faster integration with the broader ecosystem.
+
+This essay is a practical introduction to MCP: what it is, why it matters, and what to actually do with it for production AI products.
+
+## The problem MCP solves
+
+Before MCP, every AI product wrote its own tool integrations. Want your AI to read GitHub? Write a custom GitHub tool. Want it to read Slack? Write a custom Slack tool. Want it to read your internal CRM? Write that too.
+
+Each integration is custom code: authentication handling, response parsing, error handling, schema definition, prompt-friendly descriptions. The work is real but undifferentiated; every team writing GitHub integrations is solving the same problem.
+
+MCP standardizes this. A GitHub MCP server exposes GitHub tools through a standard protocol. Any MCP-compatible AI client can use it. The integration is written once, used many times.
+
+## What MCP actually is
+
+MCP is:
+
+- A protocol for AI clients (the application using the model) to communicate with servers (services that expose tools, resources, or prompts)
+- A standardized way to describe tools, including parameters, types, and natural-language descriptions for the model
+- A standardized way to invoke tools and return results
+- A discovery mechanism so the client can learn what a server provides
+- Transport-agnostic (typically over stdio for local servers, HTTP/WebSocket for remote)
+
+It's analogous to LSP (Language Server Protocol) for IDEs: a standard so any editor can work with any language's tooling. MCP brings the same decoupling to AI tooling.
+
+## What MCP servers can expose
+
+Three primary types.
+
+**Tools.** Functions the model can call. *"send_email(to, subject, body)"* with typed parameters and a description.
+
+**Resources.** Data the model can read. *"Recent emails from inbox X"* exposed as a readable resource.
+
+**Prompts.** Pre-defined prompt templates the server provides. *"Summarize this email in your domain's house style."*
+
+Tools are the most common; resources and prompts are useful for specific patterns.
+
+## What MCP changes for AI infrastructure
+
+Several things become different.
+
+**Integration becomes a build-vs-buy decision.** For common tools (GitHub, Slack, Google Workspace, Notion, etc.), there are MCP servers available. Use them; don't build your own.
+
+**Internal tools can be exposed standardly.** Wrap your internal APIs as MCP servers. Any AI feature in your org can use them via the same protocol.
+
+**Tool discovery becomes dynamic.** The AI client can ask a server what tools it provides. New tools added to the server are automatically available without client changes.
+
+**Switching AI clients becomes easier.** If your tools are MCP-compliant, switching from one AI framework to another is a configuration change, not a rewrite.
+
+These reduce the integration tax that has historically been a meaningful share of AI feature development.
+
+## When to build vs use existing servers
+
+A practical heuristic.
+
+**Use existing MCP servers** for: well-known SaaS tools, public APIs with clear standard interfaces, common file operations.
+
+**Build your own MCP server** for: internal APIs, proprietary data sources, custom logic specific to your product.
+
+For most production teams, the mix is 70-80% existing servers, 20-30% custom. The custom ones expose your unique capabilities; the existing ones cover the commodity integrations.
+
+## Where MCP fits in your architecture
+
+```
+[User] → [AI Application] → [MCP Client] → [MCP Server(s)] → [Underlying Service]
+                          ↘ [Model API] ↗
+```
+
+The MCP client is part of your AI application. It manages connections to MCP servers, surfaces their tools to the model, invokes tools when the model requests them, and returns results.
+
+Most modern AI frameworks (Claude SDK, LangChain, etc.) have built-in MCP client support. Adding MCP server connections is configuration, not code.
+
+## Authentication
+
+A practical concern: how does an MCP server authenticate its caller?
+
+Patterns:
+
+- **Per-server static credentials.** The MCP server has its own access tokens (e.g., a GitHub token); the AI client doesn't deal with auth.
+- **OAuth pass-through.** The AI client presents the user's OAuth token; the MCP server uses it to call the underlying service.
+- **Per-user credentials.** The MCP server has a database of user credentials; client identifies the user and the server picks up credentials.
+
+For B2B and consumer products, OAuth pass-through is common because it respects the user's identity. For internal tools, per-server static credentials with appropriate scoping are common.
+
+## Permissions and scoping
+
+A specific concern for MCP: which tools should an AI agent be able to call?
+
+If your MCP setup exposes 50 tools, the agent has access to 50 tools. Some are dangerous (delete, write, send). The agent might call a dangerous tool when it shouldn't.
+
+Mitigations:
+
+- Don't expose dangerous tools without need
+- Configure the MCP client to disable specific tools
+- Add confirmation gates on dangerous tools (the agent proposes; the user confirms)
+- Log all tool calls for audit
+
+The principle: just because a tool is available via MCP doesn't mean every agent should be able to call it. Apply least-privilege thinking.
+
+## Building an MCP server
+
+If you're exposing internal tools, build an MCP server.
+
+The structure (in Python):
+
+```python
+from mcp.server import Server
+
+server = Server("my-internal-tools")
+
+@server.tool()
+async def get_user_portfolio(user_id: str) -> dict:
+    """Returns the user's portfolio. Use when the user
+    asks about their holdings or current investments."""
+    return await fetch_portfolio_from_db(user_id)
+
+@server.tool()
+async def get_market_data(ticker: str, period: str = "1d") -> dict:
+    """Returns market data for a ticker over a period.
+    period must be one of '1d', '1w', '1m', '1y'."""
+    return await fetch_market_data(ticker, period)
+
+server.run()
+```
+
+The server exposes these tools to any MCP client that connects. The descriptions guide the model in choosing the right tool.
+
+## Building good MCP servers
+
+A few patterns that make MCP servers actually useful.
+
+**Pattern 1: write descriptions for the model, not for engineers.** The descriptions are part of the prompt the model sees. Be specific about when to use each tool and when not to.
+
+**Pattern 2: type parameters strictly.** Use enums (`Literal["1d", "1w"]`) where applicable; the model is constrained at decode time.
+
+**Pattern 3: return structured data with summaries.** The model reads the response. Include both a summary at the top and the structured data below.
+
+**Pattern 4: handle errors with informative messages.** When a tool call fails, the message becomes part of the model's context. Make it self-correcting.
+
+**Pattern 5: keep tools focused.** A tool that does one thing well beats a tool that does many things ambiguously.
+
+## MCP for B2B products
+
+If your product offers AI features that integrate with customer systems, MCP changes how integrations work.
+
+Old pattern: each customer needs custom integration work to connect their systems to your AI.
+
+New pattern: customers point your AI at their MCP servers (or you point yours at standard MCP servers). The integration is configuration.
+
+For B2B products, this can dramatically reduce per-customer integration cost. It also lets customers expose their own internal data through MCP, with you as the AI consumer.
+
+## MCP for personal AI
+
+For consumer AI products, MCP enables a "bring your own integrations" pattern. Users add MCP servers (their email, their files, their calendar) and the AI gets access. The AI vendor doesn't need to integrate with each service separately.
+
+This is similar to how plugins work, but more interoperable. A user's set of MCP servers can move with them between AI products.
+
+## What to do today
+
+If you're building AI features in 2026:
+
+1. Use MCP-compatible AI frameworks (most are now)
+2. Connect to existing MCP servers for common tools
+3. Wrap your internal tools as MCP servers if you have multiple AI features that should use them
+4. Apply permission and audit controls to MCP tool access
+5. Watch the MCP ecosystem; new servers emerge regularly
+
+Don't build custom integrations for tools that have MCP servers; the duplication isn't worth it.
+
+## What's still settling
+
+A few things in flux:
+
+- The exact security model for MCP is still being formalized (especially for untrusted servers)
+- Tool descriptions and prompts still vary in quality across servers
+- Performance characteristics vary; some MCP servers are slow
+- The set of "must-have" MCP servers is still expanding
+
+Plan for change. The MCP ecosystem is real but young. What's true today may shift in 6 months.
+
+## The take
+
+MCP is the protocol decoupling AI models from tools and data sources. By 2026, it's the integration pattern for serious AI products.
+
+Use existing MCP servers for common tools. Build MCP servers for your internal tools. Apply permission controls. Watch the ecosystem.
+
+The teams shipping faster in 2026 are the ones who treat MCP as a default. The teams writing custom integrations for tools that have MCP servers are doing duplicate work that the rest of the ecosystem solved.

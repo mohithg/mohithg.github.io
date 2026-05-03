@@ -1,0 +1,211 @@
+---
+layout: ../../layouts/Writing.astro
+title: "GPU economics for AI inference: where the money actually goes"
+description: "Self-hosting LLMs means renting GPUs. The cost calculation isn't just $/hour. Utilization, batching, quantization, and cold starts all change the picture. Here's the real math."
+publishDate: "2026-06-30"
+pillar: infra
+slug: gpu-economics
+---
+
+When teams consider self-hosting LLMs, the cost analysis starts with GPU hourly rates. *"H100 is $X/hour, the model runs at Y tokens/sec, so per-token cost is..."* The math looks compelling.
+
+Production GPU economics are more complicated than the napkin math. Utilization is rarely 100%. Cold starts have hidden costs. Quantization changes the equation. Different workloads suit different GPU types. Multiple of these factors compound to make actual production cost meaningfully different from the spec-sheet calculation.
+
+This essay is the GPU economics framework that fits production reality.
+
+## The naive calculation
+
+The starting point most teams use:
+
+```
+GPU hourly cost: $3/hour (H100 cloud rate, ballpark)
+Tokens/sec at full utilization: 5000 (model and config dependent)
+Tokens/hour: 18M
+Cost per million tokens: $3 / 18 = $0.17/M tokens
+```
+
+vs API price (mid-tier model): $0.50-1.00/M tokens.
+
+Looks like 5x cheaper to self-host. Decision seems obvious.
+
+This calculation has three problems.
+
+## Problem 1: utilization
+
+The 18M tokens/hour assumes the GPU is busy 100% of the time. Real production workloads aren't.
+
+Real utilization patterns:
+
+- Diurnal traffic: peak during business hours, idle overnight
+- Weekly: peaks weekdays, troughs weekends
+- Bursty: intermittent surges with quiet periods between
+
+Average utilization for typical production workloads: 30-60%.
+
+Adjusted cost:
+- At 50% utilization: $0.34/M tokens
+- At 30% utilization: $0.57/M tokens
+
+The "5x cheaper" margin shrinks. For some workloads, self-hosted is barely cheaper than API after accounting for utilization.
+
+## Problem 2: cold starts and provisioning
+
+Spinning up GPU instances takes time (minutes for cold starts on cloud GPU). You can't spin up exactly when traffic arrives; you need capacity before traffic.
+
+The implication:
+- You provision for peak, not average
+- The buffer capacity is paid for whether used or not
+- Autoscaling helps but has its own complexity (scaling delay, instance churn cost)
+
+A common pattern: provision at p90 of demand. Burst traffic above p90 gets queued or routed to API fallback. The p90 capacity costs money during the rest of the time.
+
+## Problem 3: batching dynamics
+
+The 5000 tokens/sec assumes optimal batching. Real batching depends on traffic shape.
+
+Sparse traffic: low batching efficiency. Each request runs nearly alone on the GPU. Throughput drops 3-5x.
+
+Dense traffic: high batching efficiency. Multiple requests share the GPU pass. Throughput approaches the optimum.
+
+For an interactive product with sparse-to-medium traffic, effective throughput is often half of theoretical maximum.
+
+## The corrected calculation
+
+For a realistic production workload:
+
+```
+GPU cost: $3/hour
+Theoretical throughput: 18M tokens/hour
+Utilization: 50% (provisioned for peak; lower average)
+Batching efficiency: 70% (mix of sparse and dense traffic)
+Effective throughput: 18M * 0.5 * 0.7 = 6.3M tokens/hour
+Real cost per million tokens: $3 / 6.3 = $0.48/M tokens
+```
+
+Now we're at API pricing. The math is much closer.
+
+For specific workload shapes (heavily batched, high sustained utilization), self-hosted still wins. For typical interactive workloads, the gap is narrow.
+
+## Where self-hosting actually wins
+
+Specific scenarios where the economics favor self-hosting clearly.
+
+**Scenario 1: very high sustained volume.** You have millions of tokens per minute, sustained. Utilization is 70%+. Batching is good. Per-token cost drops to $0.10-0.20/M tokens. API would be 5-10x more.
+
+**Scenario 2: batch processing.** Background jobs that can run when GPUs are idle. Effectively 100% utilization on those GPUs. Per-token cost is the spec-sheet number.
+
+**Scenario 3: data residency.** API can't be used due to compliance. Self-hosted is the only option; cost is what it is.
+
+**Scenario 4: custom fine-tunes.** Your fine-tune isn't available via API. Self-hosting is required.
+
+**Scenario 5: controlled latency.** API latency varies; co-located self-hosted serves with predictable latency.
+
+For these, the self-hosting math works. For other scenarios, it usually doesn't.
+
+## GPU type tradeoffs
+
+Different GPUs serve different workloads.
+
+**H100.** Top of the line. Best for large models and high throughput. ~$3-5/hour cloud.
+
+**A100.** Older but very capable. Often a price/performance sweet spot. ~$1.50-3/hour.
+
+**A10 / L4.** Mid-tier. Good for smaller models or moderate workloads. ~$0.50-1/hour.
+
+**T4.** Budget option. Limited memory; works for small quantized models. ~$0.30-0.50/hour.
+
+For inference of mid-size models, A100 or L40S is often the sweet spot. H100 only earns its premium for very large models or highest-throughput requirements.
+
+Match GPU to workload. Don't reflexively pick the highest-end GPU.
+
+## Quantization economics
+
+Running models at lower precision (INT8, INT4, FP8) saves GPU memory and increases throughput.
+
+Effects:
+
+- INT8: 1.5-2x throughput improvement, minor quality drop
+- FP8: similar to INT8, sometimes better quality
+- INT4: 2-3x throughput improvement, more noticeable quality drop
+
+For cost-sensitive deployments, quantization is essentially free money. Verify quality on your eval bench; for most tasks, the drop is acceptable.
+
+For high-stakes outputs (medical, legal, regulated finance), test quantization more carefully. Some specific behaviors degrade more than others.
+
+## The reserved instance pattern
+
+For sustained workloads, reserved/committed instances cut costs significantly.
+
+- Cloud GPU on-demand: ~$3-5/hour
+- Reserved (1-year commit): 20-40% discount
+- Spot/preemptible: 50-70% discount, but can be reclaimed
+
+For predictable workloads, reservations save real money. For bursty workloads, mix on-demand with spot.
+
+For workloads that can tolerate interruptions (batch processing), spot is a meaningful cost lever.
+
+## Multi-tenancy on a GPU
+
+If your workload has multiple model variants or many small models, multi-tenancy on a GPU is a cost lever.
+
+Patterns:
+
+- Multiple LoRA adapters on a single base model (cheap to switch)
+- Multiple smaller models loaded simultaneously
+- Batched serving across tenants with isolation
+
+Effective throughput per GPU is higher; per-tenant cost is lower.
+
+This requires inference server support (vLLM and others have it). Worth implementing for multi-tenant workloads.
+
+## Total cost of ownership
+
+GPU cost is the visible number. Total cost includes:
+
+- GPU rental or amortization
+- Network egress (LLM responses can be large)
+- Storage (model weights, logs, traces)
+- Engineering time (deployment, tuning, debugging, on-call)
+
+The engineering time is often underestimated. A team spending 2 FTEs on inference infrastructure has a real cost beyond hardware.
+
+For TCO, self-hosting at small/medium scale often loses to API even when the per-token cost is lower. The engineering time eats the savings.
+
+## When the cost picture flips
+
+Several signals to revisit your serve-vs-API decision:
+
+- Volume crosses a threshold (you have enough sustained traffic to keep GPUs busy)
+- A new model release dramatically changes capability or pricing
+- A new GPU generation changes cost or throughput
+- Your team's ops capability matures enough to manage GPU fleet
+
+Re-evaluate every 6-12 months. The economics shift.
+
+## What to track for cost discipline
+
+If you're self-hosting:
+
+- GPU utilization (target: 60-80%)
+- Throughput per GPU (compare to theoretical max)
+- Cost per request (or per M tokens)
+- Cold start frequency
+- Queue depth during peak
+
+These metrics tell you whether your infrastructure is efficient or wasteful.
+
+## When to start self-hosting
+
+A practical heuristic: don't self-host until your monthly LLM API spend is at least $20K and growing. Below that, the engineering cost dominates.
+
+Above $20K/month, the savings start to materialize. Above $100K/month, self-hosting is often clearly the right call.
+
+For most early-stage teams, API is right. The team isn't spending enough on inference for self-hosting savings to outweigh the engineering and ops cost.
+
+## The take
+
+GPU economics aren't the spec-sheet calculation. Real production utilization, batching efficiency, cold starts, and operational overhead all reduce effective savings.
+
+For specific workloads (high sustained volume, batch processing, data residency, custom fine-tunes), self-hosting wins. For typical interactive workloads at small/medium scale, API often wins despite higher per-token cost.
+
+Run the real math. Account for utilization and batching. Include engineering cost in TCO. Re-evaluate as the landscape shifts. The teams running profitable AI products at scale picked the right serving model for their actual workload, not for the napkin-math best case.

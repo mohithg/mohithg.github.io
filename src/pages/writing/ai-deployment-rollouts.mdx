@@ -1,0 +1,205 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Deploying AI changes safely: rollouts that don't surprise users"
+description: "AI deployments have unique risks. Standard CI/CD patterns leave gaps. Here's the rollout discipline that catches problems before they reach all users."
+publishDate: "2026-07-05"
+pillar: infra
+slug: ai-deployment-rollouts
+---
+
+When you ship a code change, you can usually verify it worked by running tests and watching metrics. The change either works or doesn't; it's largely deterministic.
+
+When you ship an AI change (new prompt, new model, new tool, new prompt-and-tool combo), the change is non-deterministic. The eval bench tells you it works on the cases you've tested. Production has cases you haven't. The question isn't "will it work" but "will it work well enough on the cases that matter."
+
+This essay is about deploying AI changes in ways that surface problems before they reach all users.
+
+## What's different about AI deployments
+
+Three properties that demand more careful rollout.
+
+**Property 1: per-input behavior variance.** A change that improves one user's experience might degrade another's. Aggregate metrics can hide segment-level regressions.
+
+**Property 2: subtle quality drift.** Quality dimensions hard to capture in eval (tone, judgment, edge case handling) can shift with prompt or model changes. Users notice; metrics don't.
+
+**Property 3: cost and latency shifts.** A "small" change can multiply cost or latency. The change itself might be 10 lines of prompt; the cost impact might be 2x.
+
+These mean the rollout has to surface issues that the pre-deploy eval might have missed.
+
+## The rollout pipeline
+
+A robust rollout has stages.
+
+**Stage 1: dev / staging eval.** Pre-deploy eval. Pass rate above threshold. No new failure modes in critical categories.
+
+**Stage 2: canary.** 1-5% of production traffic gets the new version. Watch metrics for 1-24 hours.
+
+**Stage 3: ramp.** Increase to 10%, 25%, 50%, 100% over hours or days. Monitor at each step.
+
+**Stage 4: full deployment.** Old version retired. New version is the default.
+
+Skip a stage and you accept more risk. For high-stakes products, don't skip. For low-stakes, you can move faster.
+
+## Canary metrics that matter
+
+What to watch during canary.
+
+**Quality metrics.** Pass rate on shadow eval against the canary's traffic. If significantly different from control, investigate.
+
+**User behavior signals.** Click-through rate on AI suggestions, retry rate, conversation length. Subtle shifts indicate quality change.
+
+**Cost.** Cost per request. Significant increase suggests trajectory change or other inefficiency.
+
+**Latency.** End-to-end latency, p50 and p95. Slowdowns affect UX even if outputs are good.
+
+**Error rate.** Both hard errors and soft errors (refusals, fallbacks). Sudden increase warrants investigation.
+
+**Safety signals.** Moderation flags, refusal rate, abuse-detection signals. Should not change meaningfully on a benign change.
+
+If any of these drift significantly during canary, stop the rollout and investigate.
+
+## Comparing canary to control
+
+The canary doesn't tell you anything in isolation. Compare to control (the rest of production on the previous version).
+
+For each metric, compare canary cohort to control cohort:
+
+- Same metric, both cohorts, same time window
+- Statistical significance test for the difference
+- Alert if significantly different and not in the expected direction
+
+Without this comparison, you might mistake normal variation for a regression (or miss a real regression amid noise).
+
+## Stratified rollouts
+
+Sometimes you want to roll out to specific user segments first.
+
+Patterns:
+
+- *Internal users first.* Catches obvious issues quickly.
+- *Power users.* They notice changes; their feedback is valuable.
+- *Specific cohorts.* Free vs paid, geo-based, etc.
+- *Specific feature flags.* Users who explicitly opted into experiments.
+
+Stratification finds issues earlier than uniform random sampling because the early users are often more diagnostic.
+
+## The "just ship it" failure mode
+
+A common pattern: confidence in the change leads to skipping rollout discipline. *"The eval pass rate is great; just ship to 100%."*
+
+Issues this misses:
+
+- Production traffic distribution differs from eval set
+- Cost or latency changes that eval doesn't capture
+- Subtle UX shifts users notice
+- Edge cases that didn't happen to be in eval
+
+The cost of careful rollout (a few days, a small fraction of users on each step) is much less than the cost of a regression that affects all users.
+
+## What to roll back on
+
+Define the rollback criteria upfront.
+
+- Quality metric drops by more than X
+- Cost increases by more than Y
+- Latency p95 exceeds Z
+- New error categories appear at rate above threshold
+- User complaints exceed normal rate
+
+If any of these fire during rollout, roll back. Don't debate; the criteria are pre-defined for a reason. Investigate after rollback.
+
+## What "rollback" means for AI
+
+For most code changes, rollback is reverting to the previous version. For AI changes:
+
+- **Prompt rollback:** revert to previous prompt version. Should be a feature flag flip; takes seconds.
+- **Model rollback:** point to previous model version. Should be config; takes seconds.
+- **Architecture rollback:** revert the code change. Standard CI/CD.
+
+Make rollback fast. Manual investigation can take hours; rollback should be seconds.
+
+## Long-running A/B for important changes
+
+For changes you want to evaluate carefully:
+
+- Run as A/B for an extended period (days to weeks)
+- Track behavior over the full period
+- Make decision based on cumulative data
+
+This is slower than a quick canary but gives much higher confidence. For high-stakes changes (major model upgrades, prompt rewrites), worth the time.
+
+## The "model upgrade" rollout
+
+Specific case: when your provider releases a new model version.
+
+Steps:
+
+1. Run your eval bench against the new model. Pass rate?
+2. Run your safety eval. Any new failure modes?
+3. Compare cost and latency.
+4. If looks good, canary the new model on 1-5% of traffic.
+5. Compare canary metrics to control extensively.
+6. Ramp gradually if all looks good.
+7. Plan rollback path: easy to revert if needed.
+
+Don't auto-upgrade on provider releases. Each one is a deliberate decision.
+
+## Configuration vs deployment
+
+Many AI changes are configuration, not code:
+
+- Prompt version
+- Model version
+- Tool selection
+- Routing rules
+
+Configuration changes can be deployed faster than code changes. They can also be rolled back faster. Treat them with appropriate respect: they affect production behavior even though they're not "code."
+
+A prompt version flip should still go through the rollout pipeline: canary, watch metrics, ramp.
+
+## Coordination with adjacent teams
+
+AI changes affect downstream consumers.
+
+- Customer support: needs to know if behavior changed (so they can support users)
+- Marketing: might want to communicate improvements
+- Other teams that depend on AI feature: need to know about behavior changes
+
+For meaningful changes, communicate before rollout. *"We're rolling out a model upgrade Tuesday. Expect [these specific behavior changes]."* Avoids surprises.
+
+## The post-deployment review
+
+After full rollout:
+
+- Did the metrics match expectations?
+- Did any unexpected changes emerge?
+- Are users behaving differently?
+- Is cost where expected?
+
+Document what worked and what didn't. The next deployment uses this as a baseline.
+
+## What to build for safe rollouts
+
+Infrastructure that supports the rollout pipeline:
+
+- Feature flags per AI change (so individual changes can be ramped or rolled back)
+- Per-version metrics tracking (so canary vs control comparison is straightforward)
+- Automated rollback triggers (when criteria fire, system rolls back without manual intervention)
+- A/B framework for AI experiments
+
+Most teams have feature flags. Fewer have the per-version metrics or automated rollback. Build them.
+
+## Frequency
+
+How often you can safely deploy depends on your rollout discipline.
+
+Teams with good rollout discipline ship AI changes daily or multiple times daily. Each goes through canary; metrics are watched; no concerns; full rollout. Fast feedback loop.
+
+Teams without rollout discipline ship rarely (because each ship is risky) or recklessly (because they don't measure). Both produce worse outcomes than disciplined frequent shipping.
+
+## The take
+
+AI deployments have unique risks: per-input behavior variance, subtle quality drift, cost and latency shifts. Standard CI/CD doesn't fully address these.
+
+Use a staged rollout: dev eval, canary, ramp, full. Compare canary to control on quality, cost, latency, and safety metrics. Define rollback criteria upfront. Make rollback a config flip, not a code revert.
+
+The teams that ship AI changes safely have rollout discipline. The teams that ship and discover problems through users usually skipped the canary or didn't watch the right metrics.
