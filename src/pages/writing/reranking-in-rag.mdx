@@ -1,0 +1,168 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Reranking: the second-stage retrieval most teams skip"
+description: "First-pass retrieval is fast and noisy. A reranker on top cleans up the order in tens of milliseconds. Skipping it leaves quality on the table."
+publishDate: "2026-06-07"
+pillar: retrieval
+slug: reranking-in-rag
+---
+
+A typical RAG system retrieves top-k documents, stuffs them into the prompt, and generates an answer. The "retrieve" step is usually a single-stage process: vector search returns the top documents, in order of vector similarity, and that's the order they hit the prompt.
+
+This single-stage approach leaves quality on the table. The vectors are an approximation; the order they produce is approximate. A second stage of retrieval, a reranker, takes the top-50 from first-stage and re-orders them more carefully, returning a much higher-quality top-5 or top-10.
+
+This essay is about why rerankers are worth the extra complexity and how to deploy them well.
+
+## Why first-stage retrieval is noisy
+
+Vector similarity is computed by comparing embeddings. The embeddings are learned representations that capture *general* semantic similarity. They're optimized for fast retrieval over millions of documents.
+
+The optimization for speed has costs:
+
+- The embedding model has limited capacity to capture nuance
+- Similarity is computed without the query and document directly interacting
+- The embedding doesn't know about the specific phrasing of the user's query
+
+The result: top-50 from first-stage retrieval usually has the right document somewhere in it, but not always at rank 1. The exact ordering of the top results is noisy.
+
+## What a reranker does differently
+
+A reranker is a model that takes a (query, document) pair and outputs a relevance score. Unlike embedding-based similarity, the reranker sees the query and document together and computes their relevance jointly.
+
+The result: much more accurate relevance scoring. The reranker captures nuances that the embedding can't:
+
+- Specific terminology in the query that's also in the doc (or absent)
+- Whether the doc actually answers the query vs. just being topically related
+- Whether the doc contradicts the query's premise
+- The doc's structure relative to the query's intent
+
+The cost: the reranker needs to run on every (query, doc) candidate pair. You can't run it on millions of docs. You run it on top-50 from first-stage and re-order.
+
+## The two-stage retrieval pattern
+
+```
+Query
+  → First-stage retrieval (vector + BM25)
+  → Top-50 candidates
+  → Reranker scores each (query, candidate)
+  → Top-5 or top-10 by reranker score
+  → LLM prompt
+```
+
+The first stage is fast (tens of milliseconds) and over-recalls. The second stage is slower per-doc (a few ms each) but only runs on the candidate set. Total time: 50-200ms typically.
+
+The quality difference: in retrieval evals I've run, adding a reranker on top of vector search typically lifts recall@5 by 10-20 percentage points. That's a large quality improvement for a small infrastructure addition.
+
+## Reranker options in 2026
+
+Several decent options:
+
+**Hosted API rerankers.** Cohere Rerank is the most widely used. Voyage and others offer competitive options. Pay per call. Easy to integrate.
+
+**Open-source rerankers.** BGE Rerank, Jina Rerank, mxbai Rerank. Self-host. One-time setup cost; predictable inference cost.
+
+**LLM-as-reranker.** Pass query and candidates to a small LLM with a "rank these" prompt. Slower and more expensive than dedicated rerankers, but more flexible (custom criteria possible).
+
+For most production systems, hosted API rerankers (Cohere Rerank, Voyage) are the right default. Easy setup, good quality, predictable performance. Move to self-hosted at high volume.
+
+## Reranker latency
+
+Rerankers add latency. Typical numbers:
+
+- Cohere Rerank on 50 docs: 50-150ms
+- BGE Rerank (self-hosted on GPU): 30-100ms
+- Open-source rerankers on CPU: 500ms+ (slow)
+
+For interactive use, 50-150ms is acceptable but noticeable. For latency-sensitive paths (autocomplete, instant search), it might be too much.
+
+Optimizations:
+
+- Run the reranker on fewer candidates (top-20 instead of top-50)
+- Use a smaller / faster reranker model
+- Run reranking in parallel with other work where possible
+
+The latency cost is real but bounded. Most production systems can absorb it.
+
+## When to skip the reranker
+
+A few cases.
+
+**Case 1: extreme latency requirements.** Sub-50ms total retrieval budget. Reranker doesn't fit.
+
+**Case 2: simple retrieval task.** First-stage is already producing very high-quality results. Reranker doesn't help. (Verify this empirically; intuitions are often wrong.)
+
+**Case 3: very low query volume.** The reranker's value is per-query; if you have few queries, the absolute lift is small.
+
+**Case 4: large k.** If your prompt takes top-30 docs as context (rather than top-5), the precise order matters less. The reranker's value is most pronounced for small k.
+
+For most production systems, none of these apply, and the reranker is the right call.
+
+## How to evaluate reranker contribution
+
+A useful test: run your retrieval bench with and without the reranker. Compare recall@5 and precision@5.
+
+If the reranker improves recall by less than 3-5 percentage points, it might not be worth the latency. If it improves by 10-20+ points, it's a clear win.
+
+Different rerankers perform differently on different domains. Evaluate the specific reranker you're considering on your data, not just the leaderboard claim.
+
+## Reranker prompts (when using LLM-as-reranker)
+
+If you're using an LLM as a reranker, the prompt matters. A pattern that works:
+
+```
+Given the following query and a list of documents, rank the
+documents from most relevant to least relevant for answering
+the query.
+
+Query: {query}
+
+Documents:
+1. {doc_1_excerpt}
+2. {doc_2_excerpt}
+...
+
+Output a JSON array of document indices in order from most to
+least relevant.
+```
+
+Use small documents (excerpts of 200-500 tokens). The model can't reliably read full documents at high accuracy. Use a small model (cheap and fast, since reranking is rerunning a simple task).
+
+## Reranker drift
+
+A subtle issue: the reranker is optimized on its training data. If your domain or query distribution drifts, the reranker's calibration on your data drifts too.
+
+Mitigation: periodically re-evaluate the reranker on your current data. If recall@5 starts dropping, consider switching rerankers or fine-tuning.
+
+For most teams, this isn't an immediate concern. For mature production systems with stable evaluation pipelines, it's worth periodic checks.
+
+## Multi-criteria reranking
+
+Sometimes you have multiple relevance criteria. A document is relevant if it's topically similar AND recent AND from a high-trust source.
+
+Three patterns:
+
+**Pattern 1: filter then rerank.** Filter on hard criteria (must be from trusted sources, must be after date X). Rerank only the filtered set.
+
+**Pattern 2: combine reranker score with other signals.** `final_score = reranker_score + recency_boost + trust_boost`. Tune the boosts.
+
+**Pattern 3: prompt the reranker with criteria.** If using LLM-as-reranker, include the criteria in the prompt.
+
+Pattern 1 is the cleanest. Patterns 2 and 3 can be more powerful but require careful tuning.
+
+## What rerankers don't fix
+
+A few things to remember.
+
+- *Rerankers can't surface documents that weren't retrieved.* If first-stage misses the relevant doc, reranker can't recover.
+- *Rerankers don't fix document quality.* If your indexed content is wrong or outdated, reranker still ranks it.
+- *Rerankers don't fix chunking.* If chunks are wrong (too small, too large, lacking context), reranker can't compensate.
+
+Reranker is a refinement layer, not a fix-all. Get the upstream retrieval and content right; the reranker improves on already-decent results.
+
+## The take
+
+A reranker on top of first-stage retrieval is one of the highest-ROI additions to a RAG system. Tens of milliseconds of latency for 10-20 percentage points of recall lift.
+
+Use a hosted reranker API (Cohere, Voyage) for most use cases. Self-host at high volume. Skip only when latency requirements are extreme or first-stage is already excellent.
+
+The teams shipping the best RAG products use rerankers. The teams whose RAG quality plateaued at "okay, but not great" usually don't.

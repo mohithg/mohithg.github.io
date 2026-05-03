@@ -1,0 +1,179 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Choosing a vector database: the criteria that actually matter"
+description: "Vector DB choice gets discussed at length and decided poorly. Most teams pick by feature checklist; the actual tradeoffs are different. Here's the framework."
+publishDate: "2026-06-10"
+pillar: retrieval
+slug: vector-db-choice
+---
+
+The vector database market in 2026 is crowded. Pinecone, Qdrant, Weaviate, Milvus, Chroma, pgvector, Turbopuffer, Vespa, the cloud providers' offerings. Each with distinguishing features, each with vocal advocates, each promising performance at scale.
+
+For most teams, the actual choice is much simpler than the marketing makes it look. A few characteristics of your use case dominate; the rest is noise. This essay is about how to make the choice without getting lost in feature comparisons.
+
+## The decision factors that matter
+
+In rough order of impact:
+
+1. **Scale of your corpus.** Number of vectors and total storage.
+2. **Query throughput.** Queries per second at peak.
+3. **Operational preference.** Self-hosted vs. managed.
+4. **Existing stack.** What's your DB and infra already?
+5. **Specific feature needs.** Filtering, hybrid search, multi-tenancy.
+
+The factors that get marketing attention but matter less:
+
+- HNSW vs. IVF vs. other index types (most options are similar in practice)
+- Specific benchmark numbers (real-world performance is more about your data and queries than the vector DB)
+- Latest features (e.g., specific quantization techniques) that don't move the needle for most use cases
+
+## Decision tree by scale
+
+**Small (under 1M vectors).** Use whatever's already in your stack.
+
+- If you have Postgres: pgvector. Single-database simplicity.
+- If you have Elasticsearch/OpenSearch: their vector capabilities. One system for keyword and vector.
+- If you're starting fresh: Chroma, Qdrant, or pgvector are all fine.
+
+At this scale, vector DB performance differences are imperceptible. The right choice is whatever's easiest to operate.
+
+**Medium (1M to 100M vectors).** Vector-DB choice starts mattering.
+
+- Self-hosted: Qdrant, Milvus, Weaviate. All capable. Pick by operational preference.
+- Managed: Pinecone, Qdrant Cloud, Weaviate Cloud, MongoDB Atlas Vector Search. Pick by ecosystem fit.
+- pgvector still works but performance starts to lag dedicated vector DBs at the high end of this range.
+
+**Large (100M+ vectors).** Specialized choices.
+
+- Cloud-native scaled offerings: Pinecone Serverless, Vespa, Turbopuffer. Designed for very large scale.
+- Self-hosted at this scale requires real DBA-style operational expertise. Make sure you have it.
+- Cost becomes a major factor; benchmark your specific workload and data.
+
+## Self-hosted vs managed
+
+Self-hosted (Qdrant, Milvus, etc. on your own infrastructure):
+- Lower per-vector cost at scale
+- Full control over data
+- Operational overhead is yours
+- Deployment, monitoring, backups, upgrades all your responsibility
+
+Managed (Pinecone, Qdrant Cloud, etc.):
+- Higher per-vector cost
+- Provider handles ops
+- Sometimes less control / less flexibility
+- Easier to start, easier to scale
+
+For most teams under 50M vectors, managed is the right call unless you have specific reasons (data residency, very high volume, existing infra). For large-scale or sensitive data, self-hosted often pencils out.
+
+## The pgvector option
+
+A specific case worth highlighting: pgvector (Postgres extension for vector search) is more capable than people often assume.
+
+It handles:
+- Vector similarity search with HNSW or IVFFlat indexes
+- Hybrid queries (vector + Postgres filters in one query)
+- Multi-tenancy via standard Postgres permissions
+- Backup, replication, all the Postgres infrastructure you already have
+
+Limitations:
+- Performance trails dedicated vector DBs at high vector counts (10M+)
+- Some advanced features (sparse vectors, multi-vector per row) require specific extensions
+
+For teams already using Postgres, pgvector is often the right call up to 5-10M vectors. Skip the complexity of a separate vector DB until you actually need it.
+
+## What "performance" actually means
+
+Vector DB benchmarks are everywhere. They mostly measure:
+
+- Throughput (queries per second at fixed latency)
+- Latency at various recall levels
+- Index build time
+- Memory and storage efficiency
+
+These benchmarks are usually run on standardized datasets (Glove, SIFT) at standardized scales. Your performance on your data may differ significantly. The relative ordering of vector DBs is roughly stable across datasets, but absolute numbers don't transfer.
+
+The performance question that matters most: at the scale and query rate you'll actually run, can the vector DB hit your latency target with acceptable recall?
+
+For most production workloads, almost any modern vector DB can. Differences matter at the extremes.
+
+## Filtering capabilities
+
+Most production systems need to filter retrieval (by user permissions, document type, recency, etc.). Vector DBs handle filtering differently:
+
+- **Pre-filter:** filter first, then vector-search the filtered set. Best when filters are highly selective.
+- **Post-filter:** vector-search first, then filter. Best when filters are loose.
+- **Inline filter:** combine the filter with the vector search. Some DBs do this elegantly; some don't.
+
+If your application has rich filtering needs (multi-tenant, time-based, type-based), evaluate vector DBs specifically on filtering performance. Some popular vector DBs handle filters surprisingly poorly.
+
+## Hybrid search support
+
+Some vector DBs natively support hybrid search (vector + keyword). Others don't, requiring you to run a separate keyword index.
+
+- Native support: Weaviate, Qdrant (recent versions), Vespa, OpenSearch
+- Two-system setup: pgvector + Postgres FTS, Pinecone + separate keyword index
+
+If hybrid is critical to your retrieval quality, native support saves engineering. If you're already running a keyword index for other reasons, a two-system setup is fine.
+
+## Multi-tenancy
+
+For B2B or multi-customer products, multi-tenancy matters. Each tenant should be isolated; you don't want to leak vectors across tenants.
+
+Approaches:
+- **Namespace per tenant.** Each tenant gets a logically separate index. Strong isolation. Some DBs charge per namespace.
+- **Filter per tenant.** All vectors in one index, filter by tenant_id. Cheaper but relies on filter correctness for isolation.
+- **Cluster per tenant.** Heaviest isolation, highest cost. For high-security tenants.
+
+Pinecone and Weaviate handle namespace-per-tenant well. pgvector and Qdrant use filter-based approaches. Match your security model to the DB's capabilities.
+
+## Migration cost
+
+Switching vector DBs requires re-indexing your corpus. Cost scales with corpus size and embedding cost.
+
+For a 10M-vector corpus at decent embedding rates, re-indexing takes hours and might cost a few thousand dollars in embedding API calls (or substantial GPU time if self-embedding).
+
+Don't switch reflexively. Evaluate migration cost as part of any change. The wrong vector DB you can live with for a year might be cheaper than a "better" DB that costs $5K to migrate to.
+
+## What to evaluate before committing
+
+If you're making a non-trivial vector DB choice (medium to large scale, production), do a proof of concept.
+
+Steps:
+1. Take a representative sample of your corpus (a few hundred thousand vectors)
+2. Index it in the candidate DBs
+3. Run your typical query patterns
+4. Measure: latency at your target recall, throughput, ease of operation, cost
+
+Write down what you found. Make the choice based on data, not on marketing pages.
+
+## Cost modeling
+
+Vector DB cost has multiple components:
+
+- **Storage cost.** Per GB of vectors stored.
+- **Compute cost.** Per query (managed) or fixed (self-hosted on your hardware).
+- **Bandwidth cost.** Egress, particularly for large result sets.
+- **Operational cost.** Time spent managing it.
+
+Total cost is the sum. For some DBs, storage dominates; for others, compute. For self-hosted, operational time is the largest hidden cost.
+
+Build a cost model for your expected scale and traffic. Compare DBs on total cost, not on a single dimension.
+
+## When to revisit
+
+A few signals that suggest re-evaluating your vector DB choice.
+
+- Corpus has grown 10x and the current DB struggles at the new scale
+- New features (hybrid, multi-vector, sparse) emerge that would significantly improve retrieval
+- Cost has crossed a threshold where alternatives are now meaningfully cheaper
+- The current DB has reliability issues you can't resolve
+
+Don't switch on every model release or new feature announcement. Switch when the evidence is clear.
+
+## The take
+
+Vector DB choice is over-discussed and usually obvious in practice. Match the DB to your scale, your operational preference, and your stack. Don't over-index on benchmarks or feature checklists.
+
+For most teams: pgvector if you're on Postgres, Qdrant or Weaviate for self-hosted scale, Pinecone or similar for managed scale. Decide by what you can operate, not by what's most exciting on Twitter.
+
+The teams that ship reliable RAG systems make the vector DB choice once, deliberately, and don't waste cycles re-evaluating it for marginal gains. The teams that struggle often switched DBs three times in a year and never built deep expertise in any one.

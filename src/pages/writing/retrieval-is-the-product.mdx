@@ -1,0 +1,140 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Retrieval is the unsexy half of every AI product"
+description: "Generative AI gets the attention. Retrieval does the work. The teams shipping reliable AI products spend most of their effort on the indexing, chunking, and ranking that nobody writes about."
+publishDate: "2026-06-03"
+pillar: retrieval
+slug: retrieval-is-the-product
+---
+
+When teams talk about their AI products, the conversation is mostly about prompts, models, and outputs. The model said this; we want it to say that. The prompt is engineered to nudge it toward better answers. The eval bench measures whether the answer was right.
+
+The thing that's usually missing from this conversation is *retrieval*. Where did the facts in the answer come from? How did the system find them? Was the right context in front of the model when it generated the answer?
+
+For most AI products that touch real-world data, retrieval is more important than generation. A model with mediocre prompting and excellent retrieval beats a model with brilliant prompting and bad retrieval, every time. The model can only generate what it has access to. If the context is wrong, the answer is wrong.
+
+This essay is the case for treating retrieval as a first-class engineering concern.
+
+## What retrieval actually is
+
+In the LLM context, retrieval is the process that decides what content shows up in the model's prompt. For most production systems, this means:
+
+- Indexing your knowledge base (documents, records, code, whatever)
+- Embedding chunks of it into a vector store
+- For each user query, finding the most relevant chunks
+- Stuffing those chunks into the prompt as context
+- Letting the model generate based on that context
+
+This is the basic RAG (retrieval-augmented generation) pattern. The "G" gets the attention. The "R" does the work.
+
+## Why retrieval dominates quality
+
+Three reasons retrieval is the bottleneck for most AI features.
+
+**Reason 1: the model can't fix bad context.** If the wrong documents are retrieved, the model produces an answer based on the wrong content. No amount of prompt engineering recovers from this. The model doesn't know it's working with bad data; it generates as if the data were correct.
+
+**Reason 2: hallucinations come from missing context.** When the model doesn't have the relevant information in the prompt, it generates plausible-looking content from its training. Retrieval failure is the upstream cause of much of what we call hallucination.
+
+**Reason 3: relevance is harder than it looks.** Vector similarity captures *some* relevance but misses important kinds. A query about "Q3 revenue" might pull a document about "third quarter sales" (semantically similar) but miss the actual financial filing (which doesn't use the same words). Retrieval design is the bulk of where production systems fail.
+
+If you're shipping an AI feature that uses any kind of knowledge base, fixing retrieval is the single highest-leverage thing you can do.
+
+## What "good retrieval" looks like
+
+A few properties.
+
+**Property 1: relevant docs are in the top-k.** If the answer to the user's question is in document X, document X should be retrieved. If it's not in top-k, the model can't use it.
+
+**Property 2: irrelevant docs are kept out.** If you retrieve 20 documents and only 3 are relevant, the model has to filter through 17 irrelevant ones. Quality drops; cost goes up.
+
+**Property 3: the retrieval is fast.** For interactive use, retrieval has to fit in the user's latency budget. Most retrievals should return in tens of milliseconds, not seconds.
+
+**Property 4: the retrieval is consistent.** The same query should return the same docs (modulo updates). Unpredictable retrieval makes downstream behavior unpredictable.
+
+Retrieval that hits all four is rare. Most systems hit two or three. The gap between mediocre retrieval and good retrieval is usually a 20-30% improvement in answer quality.
+
+## The retrieval stack
+
+A modern retrieval stack typically has these layers, in order of processing:
+
+1. **Query preprocessing.** Spell correction, synonym expansion, query rewriting.
+2. **Hybrid retrieval.** Combine BM25 (keyword search) with vector similarity. Take the union or weighted blend.
+3. **Reranking.** A neural reranker scores each retrieved doc against the query, refining the order.
+4. **Filtering.** Apply per-user permissions, recency filters, document-type filters.
+5. **Context assembly.** Format the retrieved docs into the prompt. Include metadata.
+
+Most production systems I've seen have layers 2 and 5. Sometimes 3. Rarely 1 and 4 done well. The layers nobody does well are where the quality lives.
+
+## What teams underinvest in
+
+Three retrieval areas where I see consistent underinvestment.
+
+**Underinvestment 1: query understanding.** The user's query is rarely the optimal retrieval query. A user asks *"what's wrong with my portfolio?"* and the right retrieval query is something like *"recent portfolio performance issues, risk metrics, allocation drift."* Query rewriting (often with an LLM call) dramatically improves retrieval.
+
+**Underinvestment 2: chunking strategy.** How you split documents matters more than people think. Chunks too small lose context; too large dilute relevance. Chunking by semantic boundaries beats chunking by token count. Chunking strategy is rarely revisited after launch.
+
+**Underinvestment 3: reranking.** First-pass retrieval (vector + BM25) is fast but noisy. A reranker (a small neural model that scores query-doc pairs) cleans up the order. Modern rerankers can be run on the top-50 results in tens of milliseconds. Most teams skip this and ship with worse quality.
+
+## How to know if retrieval is your bottleneck
+
+A diagnostic: take 50 cases where your AI feature produced a bad answer. For each, look at what the model had in its context.
+
+- *Was the right information in the context but the model ignored it?* That's a generation problem. Fix the prompt.
+- *Was the right information missing from the context?* That's a retrieval problem. Fix the retrieval.
+
+In my experience, 60-80% of bad answers in production systems are retrieval problems. The model would have generated a fine answer if it had the right context. It didn't, because retrieval failed.
+
+If your post-hoc analysis matches this pattern, retrieval is where to invest.
+
+## The retrieval-eval connection
+
+Eval for retrieval is different from eval for generation.
+
+Generation eval: did the model produce the right answer?
+Retrieval eval: did the retrieval surface the right documents?
+
+A retrieval eval bench measures recall@k (was the right doc in top-k?) and precision@k (how many of top-k are actually relevant?). It runs faster than generation eval (no model call needed) and tells you specifically about the retrieval layer.
+
+Most teams don't have a separate retrieval eval. They look at end-to-end answer quality and try to debug from there. With a retrieval eval, you can isolate the layer that's failing.
+
+## Hybrid is the default
+
+In 2026, hybrid retrieval (combining keyword search and vector search) is the right default for most production systems. Pure vector search misses too many cases where exact terminology matters; pure keyword search misses cases where semantic understanding helps.
+
+A typical hybrid setup:
+
+- BM25 search returns top-30
+- Vector search returns top-30
+- Union them, deduplicate
+- Reranker scores the combined set
+- Top-k after reranking goes to the model
+
+This is more infrastructure than pure vector search but the quality difference is large. For specific domains (legal, medical, technical) where exact terminology matters, hybrid is non-negotiable.
+
+## When pure-vector is enough
+
+Some cases where pure vector search works well:
+
+- Open-domain Q&A where the user is asking conceptual questions
+- Conversational interfaces where queries are natural language
+- Use cases where the documents and queries are in the same style
+
+For these, pure vector with a good embedding model gets you 80-90% of the quality of hybrid with simpler infrastructure. Skip the BM25 layer until you find cases where it would help.
+
+## The infrastructure choice
+
+Your retrieval infrastructure choice depends on scale and complexity.
+
+- *Small (under 100K docs):* a single Postgres with pgvector. Simple. Cheap. Adequate.
+- *Medium (100K to 10M docs):* dedicated vector DB (Qdrant, Weaviate, Pinecone). Better recall and latency at scale.
+- *Large (10M+ docs):* sharded vector DB or specialized infra. Multiple stages of retrieval.
+
+Most production systems are in the small-to-medium range. The temptation to over-engineer (deploy enterprise vector DB for 10K docs) is real. Start small; migrate when scale demands.
+
+## The take
+
+Retrieval is the part of AI products that determines how good the answers are. The model is the visible layer; retrieval is the load-bearing one underneath.
+
+Treat retrieval as first-class engineering: invest in query understanding, chunking, hybrid search, reranking, and dedicated retrieval eval. The teams that do this ship reliably better AI products than the teams that focus on prompts and let retrieval be whatever the default vector DB returns.
+
+The model gets the credit. The retrieval does the work. Build accordingly.

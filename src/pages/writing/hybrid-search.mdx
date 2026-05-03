@@ -1,0 +1,148 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Hybrid search: why pure vector retrieval isn't enough"
+description: "Vector search is great until it isn't. The cases it misses are the ones BM25 catches. Combining both is the right default for most production RAG, and it's not as hard as it looks."
+publishDate: "2026-06-05"
+pillar: retrieval
+slug: hybrid-search
+---
+
+When teams first build RAG, they reach for vector search. It's the new tool; it captures semantic similarity; it does the things keyword search can't. The default story is "vector search replaces keyword search."
+
+This story is incomplete. Vector search is excellent at conceptual queries and bad at exact-term queries. Keyword search (BM25 and friends) is the opposite. Production retrieval systems benefit from both, blended together. The pattern is called hybrid search, and in 2026 it's the right default for most production RAG.
+
+This essay is the case for hybrid, with concrete patterns for implementing it.
+
+## What pure vector search misses
+
+Vector search works by embedding documents and queries into a shared vector space. Similar concepts get similar vectors. The classic example: searching for "automobile" finds documents about "car" because the embeddings are close.
+
+This is great for conceptual queries. It fails for queries where exact terms matter:
+
+- *"Q3 2024 revenue"*: vector search might pull "third quarter financials" but might also miss the specific document with the literal phrase
+- *"error code E-4421"*: vector search has no special affinity for the exact code; it'll retrieve documents about errors generally
+- *"section 5.3.2 of the contract"*: semantically meaningless to a vector model; only keyword match will find it
+- Specific names of people, products, or places: vector search treats "John Smith" similarly to other names
+
+For these queries, BM25 (or modern variants) does better. BM25 is keyword-based: it ranks documents by exact word matches, weighted by term frequency and document length. It excels at queries where the user has used specific terms that should appear in the relevant document.
+
+## What BM25 misses
+
+The reverse failures are also real. BM25 fails when:
+
+- The query and the relevant document use different words for the same thing
+- The user describes a concept rather than naming it
+- Long-form natural language queries don't share terms with the documents
+- The relevant document is about a related concept not literally mentioned
+
+For these, vector search excels. The question isn't which is better; it's how to combine them.
+
+## How to blend them
+
+Three patterns, in order of complexity.
+
+**Pattern 1: union and rerank.** Run BM25 and vector search independently. Take the union of top-N from each. Rerank the combined set with a learned reranker. Take top-k after rerank.
+
+This is the most common production pattern. It's simple, it captures the strengths of both, and the reranker handles the merging intelligently.
+
+**Pattern 2: weighted score fusion.** Score each document with both methods. Combine: `final_score = a * bm25_score + b * vector_score`. Rank by final score.
+
+The weights need to be tuned. Different domains have different optimal weights. This pattern is faster than reranking but more brittle.
+
+**Pattern 3: reciprocal rank fusion (RRF).** Each method ranks documents independently. For each document, compute `1/(rank_in_method_1 + k) + 1/(rank_in_method_2 + k)`. Sum across methods. Rank by total.
+
+RRF doesn't need weight tuning and works robustly across domains. Slightly worse than carefully tuned weighted fusion, slightly better than naive merging. A good default when you don't have time to tune.
+
+## When pure vector is enough
+
+A few cases where pure vector is OK.
+
+**Case 1: queries are unambiguous natural language.** Conversational chat over generic knowledge. Users aren't using exact terminology; they're describing what they want.
+
+**Case 2: documents and queries are stylistically similar.** Both are in conversational English; vector embeddings capture them well.
+
+**Case 3: the corpus is small.** With a few thousand documents, the absolute number of relevance failures from vector-only is small enough not to matter.
+
+For these, hybrid is overkill. Stick with vector and ship.
+
+## When hybrid is essential
+
+Cases where pure vector is not enough.
+
+**Case 1: domain-specific terminology.** Legal, medical, scientific. Specific terms have precise meanings. Vector search blurs them; users notice.
+
+**Case 2: technical documentation.** Code, error codes, version numbers. Exact matches matter.
+
+**Case 3: enterprise document search.** Mix of policies, contracts, FAQs, internal communications. Different document types have different optimal retrieval methods.
+
+**Case 4: search-style products.** When users are deliberately searching (typing keywords) rather than chatting, BM25 matches their mental model.
+
+For these, hybrid is the right default. The gap in quality is large enough to justify the engineering.
+
+## The reranker: hybrid's secret weapon
+
+A neural reranker (like Cohere Rerank, BGE Rerank, or similar open models) takes a query and a list of candidate documents and scores each candidate's relevance to the query.
+
+In a hybrid pipeline, the reranker handles the messy work of combining BM25 results and vector results into a coherent order. It also catches relevance signals that neither BM25 nor vector search captured perfectly.
+
+A reranker on top-50 candidates from hybrid retrieval typically gives the top-5 or top-10 output that goes to the LLM. The LLM sees a clean, well-ordered set.
+
+Rerankers add latency (10-100ms typically) and cost (API calls if hosted) but the quality lift is large. Most production hybrid setups use them.
+
+## The infrastructure picture
+
+Hybrid retrieval typically requires:
+
+- A keyword index (Postgres full-text search, Elasticsearch, OpenSearch, or similar)
+- A vector index (pgvector, Qdrant, Pinecone, etc.)
+- A reranker (API or self-hosted)
+- A retrieval service that orchestrates the three
+
+This is more infrastructure than pure vector. The complexity is bounded; most production systems have all three layers.
+
+For new projects, starting with Postgres full-text + pgvector + a reranker API gets you hybrid with minimal infrastructure. You can migrate to dedicated systems as scale demands.
+
+## The latency picture
+
+Hybrid retrieval is typically slower than pure vector, but not by much.
+
+- Keyword search: ~10-30ms
+- Vector search: ~10-50ms (depends on index size)
+- Reranker on 50 candidates: ~30-100ms
+- Total hybrid pipeline: ~50-180ms
+
+For interactive use, this fits comfortably within most latency budgets. Optimization can push it lower (parallelize keyword and vector, use a faster reranker, etc.).
+
+For sub-100ms requirements, hybrid still works but you may need to skip the reranker or use a smaller one.
+
+## Evaluating hybrid
+
+When you're evaluating hybrid retrieval, compare three configurations:
+
+- Pure BM25
+- Pure vector
+- Hybrid (whichever fusion approach)
+
+Run all three on your eval set. Measure recall@k and precision@k. Hybrid should beat both pure approaches on most query types. If it doesn't, your fusion is wrong, your eval set is dominated by one query type, or one method is so dominant that adding the other isn't helping.
+
+The eval is cheap (just retrieval, no LLM calls) and tells you whether hybrid is worth the infrastructure for your specific data.
+
+## Common antipatterns
+
+A few hybrid patterns that don't work as well as people expect.
+
+**Antipattern 1: just concatenating top-N from each.** Take top-10 from BM25 and top-10 from vector. Pass all 20 to the LLM. This often hurts more than helps; the LLM has to filter through 20 docs, half of which may be irrelevant.
+
+**Antipattern 2: tuning weights once and forgetting.** Optimal weights drift as your corpus and query distribution change. Re-tune periodically.
+
+**Antipattern 3: skipping the reranker.** Hybrid without a reranker often performs slightly worse than vector-only with a reranker. The reranker is doing the heavy lifting; don't skip it.
+
+**Antipattern 4: hybrid for retrieval but only one signal for filtering.** Apply your filters (permissions, date ranges, etc.) consistently to both keyword and vector retrieval. Mismatched filters silently break the merge.
+
+## The take
+
+Pure vector retrieval is great until it isn't. Adding BM25 and a reranker on top fixes the cases vector-only misses, with bounded engineering complexity.
+
+For most production RAG systems, hybrid is the right default. Skip it only when your queries are conversational, your domain is generic, and your corpus is small.
+
+The teams shipping the best RAG products use hybrid. The teams whose RAG quality plateaued at "okay" usually didn't.

@@ -14,7 +14,7 @@ const posts = Object.entries(all)
       title: mod.frontmatter.title as string,
       description: mod.frontmatter.description as string,
       publishDate: mod.frontmatter.publishDate as string,
-      pillar: mod.frontmatter.pillar as 'prompts' | 'evals' | 'agents' | 'economics' | 'product',
+      pillar: mod.frontmatter.pillar as 'prompts' | 'evals' | 'agents' | 'economics' | 'product' | 'retrieval' | 'safety' | 'infra',
     };
   })
   .filter((p) => p.title)

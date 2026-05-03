@@ -1,0 +1,177 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Document preprocessing for RAG: garbage in, garbage out"
+description: "RAG systems are downstream of your document preprocessing. Bad text extraction, lost structure, broken tables: each one degrades retrieval. Here's the pipeline that matters."
+publishDate: "2026-06-11"
+pillar: retrieval
+slug: document-preprocessing-rag
+---
+
+The story of building a RAG system usually goes: pick an embedding model, pick a vector DB, pick a chunking strategy, run the corpus through it, deploy. The corpus is treated as a given. Whatever's in the documents is what gets indexed.
+
+The actual quality of your RAG system depends heavily on what gets indexed. If the document preprocessing turns clean structured documents into messy text, the embeddings carry that mess. If tables get flattened into unreadable strings, queries that should hit those tables will fail.
+
+This essay is about document preprocessing: the unglamorous step before chunking and embedding that determines what your retrieval can actually find.
+
+## What can go wrong in preprocessing
+
+Several places.
+
+**Place 1: text extraction.** PDFs, Word docs, HTML, scanned images. Each format has its own extraction pitfalls. Multi-column PDFs can produce text in the wrong order. Footnotes can interleave with body text. Headers and footers can repeat across pages.
+
+**Place 2: structure loss.** A document that's structured (headings, lists, tables) becomes flat text. The structure was meaningful for understanding the content; the embedding loses that meaning.
+
+**Place 3: noise.** Boilerplate (legal disclaimers, navigation menus, headers/footers), advertising, page numbers. Noise dilutes the signal in each chunk.
+
+**Place 4: encoding.** Special characters, non-ASCII text, OCR errors. Bad encoding breaks tokenization and embedding.
+
+**Place 5: media handling.** Images, figures, equations, charts. By default, these are lost entirely. The relevant information was in the figure caption; the embedding has no idea.
+
+Each of these silently degrades retrieval. The cumulative effect can be substantial.
+
+## A preprocessing pipeline
+
+A robust pipeline has these stages:
+
+1. **Format detection and routing.** Different documents to different extractors.
+2. **Text extraction.** Format-specific tools (pdfplumber, mammoth for docx, BeautifulSoup for HTML, etc.).
+3. **Structure preservation.** Headings as headings, lists as lists, tables as structured data.
+4. **Noise removal.** Boilerplate, navigation, repeated headers.
+5. **Normalization.** Encoding fixes, whitespace cleanup, special character handling.
+6. **Enrichment.** Adding metadata, captions for figures, structured representations for tables.
+7. **Chunking.** Now you chunk the cleaned, structured text.
+
+Each stage matters. Skipping stages produces lower-quality input to retrieval.
+
+## PDF: the hardest format
+
+PDFs are designed for visual presentation, not for machine parsing. Common problems:
+
+- Multi-column layouts: text reading order is layout-dependent, not document-order
+- Tables: rows and columns get flattened to gibberish
+- Headers and footers repeat on every page
+- Images and equations are unrendered or garbled
+- Hyphenation breaks words across line ends
+- Footnotes and references intermix with body
+
+For PDFs, invest in a real extraction pipeline. Modern tools (Unstructured, LlamaParse, GPT-based PDF parsers) handle these problems much better than naive extraction. The cost of a quality extractor is worth it for any production system that ingests PDFs at scale.
+
+## Tables: a special case
+
+Tables in documents are common and usually mishandled. A table flattened to text becomes meaningless: "Q1 Revenue $5M Q2 Revenue $7M Q3..." The structure was the meaning; the structure is gone.
+
+Patterns for handling tables:
+
+**Pattern 1: render tables to markdown.** Markdown tables preserve structure; embedding models can use them. *"| Quarter | Revenue | | Q1 | $5M | | Q2 | $7M |"*
+
+**Pattern 2: include both raw and structured.** Keep the table as data; also include a natural-language description. Index both.
+
+**Pattern 3: use a multimodal embedder for tables.** Some newer embedders handle tables natively.
+
+For systems where tabular data is important (financial reports, scientific data, product specs), table handling is a primary preprocessing concern. Don't let tables get flattened.
+
+## HTML: easier but with traps
+
+HTML extraction is generally cleaner than PDF, but has its own issues:
+
+- Navigation, sidebars, footers should be removed
+- Inline scripts and styles should be stripped
+- Semantic tags (`<article>`, `<section>`, headings) preserve structure
+- Images: the alt text is your friend; capture it
+
+Use a dedicated HTML cleanup library (Trafilatura, Readability, BeautifulSoup with custom rules). Don't roll your own; the edge cases are numerous.
+
+## Word documents: usually fine
+
+DOCX is structured XML under the hood. Tools like mammoth or python-docx extract text and structure cleanly.
+
+The main issue: tables and embedded objects. Same as PDFs, but generally easier to extract.
+
+## Code: special preprocessing
+
+Code documents (source files, technical docs with code blocks) need different handling:
+
+- Preserve formatting (indentation, line breaks)
+- Don't try to flow text across lines (code is line-oriented)
+- Tokenize differently for embedding (code-aware tokenizers help)
+- Consider code-specific embedding models for code-heavy corpora
+
+Mixing code and prose in a single embedding pipeline often degrades both. Consider separating: index code chunks with code embeddings, prose chunks with general embeddings.
+
+## Metadata extraction
+
+Beyond text, capture metadata:
+
+- Title, author, publication date
+- Document type, category, tags
+- Section headings (parent of each chunk)
+- Last updated date
+- Source URL or path
+
+Metadata enables filtering ("only docs from 2026", "only legal documents", "only docs the user has access to"). It also gives the LLM context about each retrieved chunk.
+
+The cost of capturing metadata is small (usually free during extraction). The benefit is large (better retrieval, better answers, better filtering).
+
+## Versioning the preprocessed corpus
+
+A subtle but important practice: version your preprocessing pipeline.
+
+Why: if you change the preprocessing (better PDF extractor, better chunking, better noise removal), you need to re-process the corpus. Different documents may have been processed with different versions. Knowing which version processed which document helps debugging.
+
+Pattern: store preprocessing_version on each chunk. When you upgrade the pipeline, re-process old documents and update the version. The pipeline knows which documents are current.
+
+## Incremental preprocessing
+
+For corpora that grow, you don't want to re-preprocess everything every time you add a doc. Make the pipeline incremental:
+
+- Compute a stable identifier for each document (path + content hash)
+- Check the index: is this document already preprocessed at the current version?
+- If yes, skip
+- If no, preprocess and index
+
+Saves time and money on re-runs. Important for any production system where corpora are large and growing.
+
+## Handling updates to documents
+
+When a document updates, you need to re-process and re-index it.
+
+Pattern:
+- Detect the update (file change, source system notification)
+- Re-extract the document
+- Compare to the previous version (text diff)
+- Re-chunk the changed sections
+- Re-embed only the changed chunks
+- Update the index
+
+Saves cost vs. naive "re-process the whole document on every update." Especially valuable for large documents that change in small ways.
+
+## Eval for preprocessing
+
+You can evaluate preprocessing quality without involving the full RAG pipeline.
+
+Spot-check: pick 10-20 random documents. Look at the extracted text. Compare to the original.
+
+- Was the text complete?
+- Was structure preserved?
+- Were tables handled?
+- Was boilerplate removed?
+
+Tedious but high-signal. Most preprocessing failures are visible by inspection. The expensive RAG eval doesn't catch them; the manual spot-check does.
+
+## What to invest in early
+
+If you're starting a RAG system, invest in preprocessing earlier than feels necessary. Reasons:
+
+- Bad preprocessing infects every downstream layer; fixing it later means re-doing everything
+- Preprocessing quality is hard to discover by aggregate metrics; you find it by inspecting outputs
+- Modern preprocessing tools have improved enough that the marginal cost is low
+
+A weekend on the preprocessing pipeline at the start is better than a month of debugging downstream RAG quality issues that turned out to be upstream.
+
+## The take
+
+Document preprocessing is upstream of every RAG decision. Garbage in, garbage out applies as strongly here as anywhere.
+
+Use real extraction tools for PDFs and HTML. Preserve structure (headings, lists, tables). Capture metadata. Strip boilerplate. Handle code separately if relevant. Version the pipeline; preprocess incrementally; spot-check the outputs.
+
+The teams that ship the best RAG systems treat preprocessing as a real engineering concern. The teams whose RAG quality plateaued early often had fine retrieval and embedding choices but indexed garbage upstream.

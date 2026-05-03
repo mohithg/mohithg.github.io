@@ -1,0 +1,166 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Evaluating RAG: separating retrieval quality from answer quality"
+description: "Most teams evaluate the final answer their RAG system produces. That's necessary but not sufficient. Without evaluating retrieval separately, you can't tell what to fix."
+publishDate: "2026-06-08"
+pillar: retrieval
+slug: rag-evaluation
+---
+
+A team building a RAG system measures answer quality. They run their bench, score 78% pass rate, and conclude "the system needs improvement." They tweak the prompt. Score moves to 81%. They tweak more. Score plateaus.
+
+The actual problem: retrieval was returning the wrong documents on 25% of queries. No prompt engineering was going to fix that. The team was optimizing the wrong layer because their eval lumped retrieval and generation together.
+
+This essay is about how to evaluate RAG with the right granularity, so you can tell which layer is failing and what to fix.
+
+## The two failure modes
+
+A RAG system can produce a wrong answer in two distinct ways.
+
+**Failure mode 1: retrieval failed.** The right document wasn't retrieved. The model didn't have access to the relevant information. The answer is wrong because the context was wrong.
+
+**Failure mode 2: generation failed.** The right document was retrieved. The model had the relevant information. But the model's output was wrong: misread the doc, hallucinated a fact, or produced a poorly structured answer.
+
+Both produce wrong answers. They require completely different fixes:
+
+- Retrieval failures: better chunking, hybrid search, reranker, embedding upgrade
+- Generation failures: better prompts, better model, structured output, fewer distractors in context
+
+If your eval only measures end-to-end answer quality, you don't know which mode is failing. You guess at fixes.
+
+## Eval at three layers
+
+A mature RAG eval has three layers, each measuring a different thing.
+
+**Layer 1: retrieval eval.** For each query, did the retrieval surface the right documents?
+
+Metrics:
+- Recall@k: fraction of relevant docs that appear in top-k
+- Precision@k: fraction of top-k that are actually relevant
+- MRR: mean reciprocal rank of the first relevant doc
+
+You need a labeled set: (query, set of relevant docs). Run retrieval; check whether relevant docs are in top-k.
+
+**Layer 2: generation eval (with retrieval held constant).** Given the right context, does the model produce the right answer?
+
+For this, you provide the model with known-good context (not the retrieved context). You're isolating the generation step.
+
+Metrics: standard LLM eval metrics on the answer (correctness, format, etc.).
+
+**Layer 3: end-to-end eval.** With the actual retrieved context, is the final answer right?
+
+This is what most teams measure today. It's necessary; it's not sufficient on its own.
+
+The three together let you answer: *"On this query, did retrieval find the right docs? Did the model use them well? What was the actual answer quality?"*
+
+## Building the labeled set
+
+The hardest part of retrieval eval is the labeled set. You need queries paired with ground-truth relevant documents.
+
+Three sources.
+
+**Source 1: hand-labeled.** A domain expert reads queries, identifies the relevant docs from your corpus, labels them. Highest quality, slowest.
+
+**Source 2: derived from existing data.** If you have user feedback ("this answer was useful" tied to a specific doc), that's a label. If you have human-curated FAQs, the question-answer-source link is a label. Faster but noisier.
+
+**Source 3: synthetic.** Use an LLM to generate queries from your documents. Each generated query is paired with the doc it was generated from. Easy to scale; generated queries may not match the real query distribution.
+
+For a serious eval set, do hand-labeling on a few hundred queries from real user traffic, supplemented by larger amounts of derived or synthetic data.
+
+## What "relevant" means precisely
+
+A subtle issue: relevance is not binary in practice. A query might have a "perfect" doc, several "useful" docs, and many "tangentially related" docs.
+
+Two ways to handle.
+
+**Binary: relevant or not.** Simple. You count whether the labeled relevant docs appear in top-k.
+
+**Graded: relevance score 0-3.** More nuanced. Metrics like NDCG can use the grades. More work to label.
+
+For most production systems, binary is fine. Graded is worth it for high-precision use cases (research, legal, medical) where the gap between "perfect" and "okay" matters.
+
+## Retrieval-only metrics
+
+The metrics that capture retrieval quality alone:
+
+- **Recall@k.** Of the labeled relevant docs, how many are in top-k? (k = the number of docs the model sees in its prompt)
+- **Precision@k.** Of top-k, how many are labeled relevant? Higher is better; LLM is wading through less noise.
+- **Hit rate@k.** Did at least one relevant doc make it to top-k? Often this is the operationally meaningful metric (the LLM only needs one good doc to answer).
+
+Track these per-query and aggregate. Watch the trend as you change retrieval (chunking, embedding, reranker). The metrics tell you whether the change helped retrieval specifically.
+
+## Diagnosing retrieval failures
+
+When recall@k drops, identify why. A few common causes.
+
+**Cause 1: chunking missed the relevant content.** The relevant info was split across two chunks; neither chunk is fully relevant. Fix: re-chunk with better boundaries.
+
+**Cause 2: embedding doesn't capture the query-doc connection.** Specific terminology, unusual phrasing, or domain-specific concepts. Fix: hybrid search (add BM25), or upgrade embedding model.
+
+**Cause 3: reranker is mis-scoring.** First-stage caught the doc but reranker pushed it out of top-k. Fix: tune reranker or test alternatives.
+
+**Cause 4: filtering excluded the doc.** Permission filters, recency filters, or document-type filters removed the relevant doc. Fix: review filter logic.
+
+The diagnosis is fast if you can inspect what was retrieved. The retrieval eval should expose the per-query results: what docs were retrieved, in what order, whether the relevant doc was among them.
+
+## Diagnosing generation failures
+
+When the right docs were retrieved but the answer is wrong, the issue is in generation. Look at:
+
+- Does the model's answer match what's in the retrieved docs? (Or did it hallucinate beyond the context?)
+- Did the model attend to the relevant doc, or did it focus on a wrong doc in the context?
+- Is the answer well-structured? (Format issues are different from content issues.)
+- Did the model refuse when it should have answered, or vice versa?
+
+Each of these has different fixes (prompt engineering, structured output, in-context demonstrations).
+
+## End-to-end eval still matters
+
+Retrieval and generation eval don't replace end-to-end eval. The end-to-end answer is what users see. End-to-end can fail in ways that neither layer-eval detects:
+
+- Cumulative drift across the pipeline
+- Format issues introduced by post-processing
+- User-experience issues independent of correctness
+
+Run end-to-end eval as your primary quality measure. Use the layered evals to diagnose when end-to-end fails.
+
+## Production sampling
+
+Synthetic eval sets are useful for regression testing. They miss the long tail of production queries.
+
+Pattern: sample real production queries periodically. For each, manually inspect the retrieved docs and the answer. Mark whether retrieval succeeded and whether generation succeeded.
+
+This becomes your ongoing source of new eval cases. Production failures get added to the eval set; future regressions get caught.
+
+## Pipeline-level eval gates
+
+When you change something in the pipeline, the eval should tell you which layer is affected.
+
+- Changed the chunking? Watch recall@k.
+- Changed the embedding model? Watch recall@k.
+- Changed the reranker? Watch top-k composition.
+- Changed the prompt? Watch generation eval.
+- Changed the model? Watch generation eval.
+
+If you change something and the wrong metric moves, you have a hint about what's actually happening. Often unexpected: a chunking change can affect generation quality (different context patterns), or a prompt change can affect retrieval (if you're using LLM-as-reranker).
+
+## What "good" eval coverage looks like
+
+A mature RAG eval bench has:
+
+- 100-500 retrieval-focused cases (query + relevant docs)
+- Same cases also have ground-truth answers (for end-to-end)
+- A separate generation-focused subset (with known-good context)
+- A production-sampled subset (real user queries with labeled outcomes)
+- Per-layer metrics tracked over time
+- Alerts on metric regressions
+
+Most production teams have end-to-end eval and call it done. The teams shipping the best RAG products have all of the above.
+
+## The take
+
+RAG fails for two reasons: retrieval failures and generation failures. They have different fixes. End-to-end eval can't tell them apart.
+
+Build a retrieval eval (recall@k, precision@k) and a generation eval (with held-constant context). Use them to diagnose where end-to-end failures come from. Optimize the layer that's actually failing.
+
+The teams that ship reliable RAG systems have layered evals. The teams that ship okay-then-stuck RAG systems usually don't.

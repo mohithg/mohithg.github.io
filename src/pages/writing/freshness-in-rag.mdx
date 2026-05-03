@@ -1,0 +1,176 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Freshness in RAG: keeping the index in sync with the world"
+description: "A RAG system that returns yesterday's data on questions about today's reality is a liability. Keeping the index fresh is harder than it sounds. Here's the patterns."
+publishDate: "2026-06-14"
+pillar: retrieval
+slug: freshness-in-rag
+---
+
+A user asks a question. The model gives an answer based on retrieved data. The data was indexed three days ago. The world changed two days ago. The answer is now wrong.
+
+This is the freshness problem in RAG. The index is a snapshot; the world isn't. The gap between snapshot and now is where wrong answers come from.
+
+For some RAG products, freshness doesn't matter much (a corpus of legal precedents that updates yearly). For others, it's critical (financial data, customer support tickets, internal status). Most teams underestimate how fresh they need to be until the first user complaint about stale info.
+
+This essay is about how to keep RAG indexes fresh without breaking the bank.
+
+## The freshness target
+
+Before building infrastructure, decide how fresh the data needs to be.
+
+- *Real-time (seconds to minutes):* live data, status, prices
+- *Near-real-time (minutes to hours):* customer-facing content that updates throughout the day
+- *Daily:* most enterprise documentation, FAQs, knowledge bases
+- *Weekly or slower:* reference docs, historical data, established knowledge
+
+The freshness target drives architecture. Sub-minute freshness needs streaming pipelines; daily freshness can use batch jobs.
+
+Match the architecture to the actual need. Sub-minute freshness for data that changes monthly is over-engineered. Daily indexing for data that changes hourly is under-engineered.
+
+## Update detection
+
+To re-index changed documents, you need to know what changed. Three patterns.
+
+**Pattern 1: source system notifications.** The system that owns the data emits events when content changes. Your indexing pipeline subscribes. Updates propagate within seconds.
+
+Pros: real-time, efficient (only changed docs re-indexed).
+Cons: requires source system support; some sources don't emit events.
+
+**Pattern 2: scheduled polling.** Periodic full or partial scans of the source. Compute checksums; re-index any docs whose checksum changed.
+
+Pros: works with any source.
+Cons: latency of detection (hourly polls = up to hour-old data); inefficient if sources are large.
+
+**Pattern 3: timestamp-based queries.** Query the source for "all docs updated since last sync." Source returns just the changed ones.
+
+Pros: efficient, near-real-time depending on poll frequency.
+Cons: requires source to track update timestamps reliably.
+
+For most enterprise RAG, Pattern 1 (notifications) where supported and Pattern 3 (timestamps) elsewhere is the right combination.
+
+## Incremental indexing
+
+Once you've detected changes, re-index only the changes.
+
+- For text changes: re-extract, re-chunk, re-embed only the changed chunks
+- For structural changes (added sections, deleted sections): handle additions and deletions explicitly
+- For metadata-only changes: update metadata without re-embedding
+
+The naive approach is "re-process the whole document on any change." Works but wasteful. Incremental indexing makes high-frequency updates affordable.
+
+## Deletion handling
+
+Documents get deleted from the source. The index has to reflect this.
+
+Three patterns.
+
+**Pattern 1: tombstone.** Mark the index entry as deleted. Filter out tombstoned entries at retrieval time. Garbage-collect tombstones periodically.
+
+**Pattern 2: hard delete.** Remove the index entry. Clean immediately.
+
+**Pattern 3: soft delete.** Move the doc to a separate archive. Don't retrieve from active index but keep history.
+
+Pattern 2 is fine for most use cases. Pattern 3 is needed where audit trails matter (legal, regulatory).
+
+The crucial part: actually do the deletion. Indexes that grow forever, including content that's no longer in the source, leak ghosts.
+
+## Conflicts and ordering
+
+In high-update systems, two updates to the same doc can race. The second update arrives at the indexer first (network lag); the first update arrives second; the index ends up with stale content.
+
+Mitigation: include a version or timestamp on each update. The indexer rejects updates older than what it has. Last-writer-wins, with last determined by source timestamp not arrival time.
+
+For high-frequency update systems, this matters. For low-frequency, it rarely does in practice.
+
+## Refresh-then-search
+
+A pattern for use cases where staleness is unacceptable on certain queries: refresh the relevant content before searching.
+
+```
+User query → identify which sources are relevant → trigger refresh of those sources → wait for refresh → search
+```
+
+Adds latency. Useful for queries where the user has explicitly indicated they want current data ("show me my latest...", "what's happening right now...").
+
+For most queries, the eventual consistency from the background indexing is fine. For specific queries, force-refresh ensures accuracy.
+
+## Showing freshness in the UI
+
+For RAG products where freshness varies, surface it in the UI:
+
+- "Last updated 2 hours ago"
+- Badge on retrieved docs showing their date
+- Warning when answering from stale data: "This information is from 3 days ago and may not reflect recent changes."
+
+The user knows what they're getting. They can decide whether to trust it or ask for a fresh check.
+
+The opposite (showing all data as if equally current) leads to surprised users when they discover the answer was old.
+
+## Time-based filters in retrieval
+
+For some queries, the user wants recent data: *"What changed this week?"* or *"What's the latest on X?"*
+
+Implement time-based retrieval filters: the retrieval engine can filter by document age. Recency boosts can also work: weight more-recent docs higher in the rankings.
+
+Without this, "recent" queries retrieve docs from any time, and the model has to filter mentally. With it, retrieval handles the time filter directly.
+
+## Background jobs for re-embedding
+
+Sometimes you need to re-embed not because the doc changed but because something else did:
+
+- Embedding model upgrade: re-embed everything
+- Chunking strategy change: re-chunk and re-embed
+- Metadata schema change: re-process metadata
+
+These are expensive operations. Plan for them:
+
+- Queue the work; process in the background
+- Don't block real-time queries during re-indexing
+- Maintain old index in parallel until new index is fully built
+- Switch over atomically when ready
+
+Don't re-embed in production during peak hours. Schedule for low-traffic windows.
+
+## Eval for freshness
+
+You can build eval cases that test freshness specifically.
+
+Pattern: insert a known fact into the source. Wait some time. Query for it.
+
+- If the fact is in the answer: index has caught up
+- If the fact is missing: staleness exceeds expected
+
+Track time-to-freshness as a metric. Alert when it exceeds your SLA.
+
+This is more useful than aggregate quality metrics for catching freshness regressions specifically.
+
+## Multi-region freshness
+
+For globally distributed RAG, each region's index needs to stay in sync.
+
+Patterns:
+
+- *Single source of truth, replicated indexes.* All updates go to a primary; replicate to regions.
+- *Eventually consistent regions.* Updates propagate over time; some regional staleness during propagation.
+- *Region-local indexes.* Each region indexes its own content; cross-region queries are slower.
+
+Match to your latency and consistency requirements.
+
+## When freshness fights cost
+
+Aggressive freshness costs. Re-embedding costs API calls or compute. Frequent indexing has overhead.
+
+Tradeoffs:
+
+- More frequent indexing: more current; more expensive
+- Larger batch sizes: cheaper; less current
+- Selective refresh (only frequently-queried content): cheap and current for the important parts; uneven elsewhere
+
+Most production systems benefit from tiered freshness: high-frequency for popular content, lower-frequency for rarely-queried content. Bytes the rest of the index just need to exist; they don't need to be hot-fresh.
+
+## The take
+
+Freshness in RAG isn't free; it has to be designed. Match the freshness architecture to your actual needs (sub-minute is rare; daily is common). Use source notifications where available, polling where not. Index incrementally. Handle deletions explicitly. Show freshness in the UI when it matters.
+
+The teams that ship reliable RAG systems treat freshness as a real engineering concern with measurable SLAs. The teams that don't have indexes that drift quietly out of sync, with users discovering staleness one wrong answer at a time.

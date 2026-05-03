@@ -2,7 +2,7 @@
 // grouping, OG image selection, and pillar-page navigation.
 
 export type Pillar = {
-  id: 'prompts' | 'evals' | 'agents' | 'economics' | 'product';
+  id: 'prompts' | 'evals' | 'agents' | 'economics' | 'product' | 'retrieval' | 'safety' | 'infra';
   title: string;
   blurb: string;
   accent: 'violet' | 'mint' | 'pink' | 'paper';
@@ -26,6 +26,24 @@ export const PILLARS: readonly Pillar[] = [
     title: 'Agent architecture',
     blurb: 'Loops, tool calls, state, observability. The patterns that ship in production.',
     accent: 'pink',
+  },
+  {
+    id: 'retrieval',
+    title: 'Retrieval and RAG',
+    blurb: 'The unsexy half of every AI product. Indexing, chunking, reranking, hybrid search.',
+    accent: 'mint',
+  },
+  {
+    id: 'safety',
+    title: 'AI safety and guardrails',
+    blurb: 'Prompt injection, jailbreaks, content moderation. Engineering discipline, not philosophy.',
+    accent: 'pink',
+  },
+  {
+    id: 'infra',
+    title: 'AI infrastructure',
+    blurb: 'Serving, deployment, MCP, GPU economics. The plumbing that decides if you scale.',
+    accent: 'violet',
   },
   {
     id: 'economics',

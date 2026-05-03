@@ -1,0 +1,151 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Chunking strategies that hold up in production"
+description: "How you split documents for retrieval is one of the highest-leverage RAG decisions and one of the most under-discussed. Here's the chunking playbook that actually works."
+publishDate: "2026-06-04"
+pillar: retrieval
+slug: chunking-strategies
+---
+
+The most consequential decision in a RAG system might be the one made fastest: how do you split documents into chunks before embedding them? Most teams pick a number ("1000 tokens per chunk") on intuition, run with it, and never revisit.
+
+The number isn't right. There's no universal right number. The chunking strategy that fits your documents and your queries needs to be designed, not defaulted. Bad chunking is responsible for a lot of "RAG doesn't work as well as I expected."
+
+This essay is about how to chunk documents in ways that actually help retrieval.
+
+## Why chunking matters
+
+When you embed a document chunk, you get one vector. That vector represents the whole chunk's content. At retrieval time, the user's query is embedded as a vector and you find chunks whose vectors are close.
+
+Two failure modes from poor chunking:
+
+**Failure 1: chunks too large.** A chunk that contains 10 different concepts gets one vector that's an average of all of them. Queries about any one concept retrieve this chunk only weakly. Specificity is lost.
+
+**Failure 2: chunks too small.** A chunk that's a single sentence often lacks the surrounding context that makes it meaningful. The embedding captures the words but not their meaning in context.
+
+The right chunk size is the one where each chunk has roughly one cohesive idea, and that idea is fully expressed in the chunk.
+
+## What "one cohesive idea" looks like
+
+For most documents, a cohesive idea is roughly the size of a paragraph. Sometimes a section. Rarely a full chapter; rarely a single sentence.
+
+The chunking strategy that works best is usually one that respects the document's natural structure:
+
+- Markdown documents: chunk by header sections, with a max length cap
+- Code: chunk by function or class
+- Conversation logs: chunk by topic shift, or by Q&A pair
+- Legal documents: chunk by clause or section
+- News articles: chunk by paragraph, with first paragraph kept as overlap
+
+The structural boundaries align with semantic boundaries. The chunks have natural cohesion.
+
+## What "fixed-size token" chunking misses
+
+The most common (and worst) chunking strategy: split every document into N-token chunks regardless of content.
+
+Problems:
+- A chunk break can fall mid-sentence, losing context
+- Two unrelated topics can land in the same chunk if they happen to fit in N tokens
+- The structure of the document is lost
+
+Fixed-size chunking is fast to implement and rarely the right answer. It's a default that should be replaced for any production system that cares about retrieval quality.
+
+## The overlap pattern
+
+A useful pattern: chunks overlap slightly so context isn't lost at boundaries.
+
+If chunk A ends with "the user clicked Submit," and chunk B starts with "and the form was validated," neither chunk alone tells the full story. With overlap, the last sentence of A is also the first sentence of B. Either chunk can answer queries about that boundary case.
+
+Typical overlap: 10-20% of chunk size. Larger overlap means more storage and more chunks retrieved per query (potentially diluting relevance). Smaller overlap means more boundary-loss issues. 15% is a reasonable default.
+
+## Hierarchical chunking
+
+For long documents, hierarchical chunking helps.
+
+The pattern:
+- Top level: chunks that represent a section (e.g., 2K tokens each)
+- Bottom level: chunks that represent paragraphs within sections (e.g., 200 tokens each)
+
+At retrieval time, you can retrieve top-level chunks for high-level questions ("what is this document about?") and bottom-level chunks for specific questions ("what did it say about X?").
+
+Some systems retrieve at one level and use the parent chunk as additional context. Useful for queries where the specific paragraph is what matters but the broader section provides context.
+
+## Metadata: the underused chunk attribute
+
+Each chunk shouldn't just be text. It should be text plus metadata:
+
+- Source document ID and path
+- Section heading the chunk belongs to
+- Document type (FAQ, policy, conversation, etc.)
+- Last update date
+- Author or owner
+- Permission scope
+
+Metadata lets you filter retrieval ("only retrieve from FAQs", "only documents updated this year", "only docs the user has permission to see"). It also gives the model context: knowing a chunk came from a "Policy Document" vs. a "Customer Email" changes how the model should treat it.
+
+Most teams skip metadata or include only a doc ID. The opportunity cost is large.
+
+## When to re-chunk
+
+A common late-stage problem: you launched with chunk size N. Six months in, you realize a different size would work better. Now you have to re-index your whole corpus.
+
+Re-indexing is unpleasant. It takes time, it costs money (embedding all the chunks again), and it potentially changes retrieval behavior in ways your downstream prompts depend on.
+
+The discipline to avoid this: invest in chunking experiments early, before the corpus is huge and the cost of re-indexing is high. Try 3-5 different chunking strategies on a small sample, measure retrieval quality, pick the best one, then index the full corpus. Worth a week upfront.
+
+## Tested chunking patterns by document type
+
+Some chunking strategies that work well for specific document types.
+
+**FAQs.** One Q&A per chunk. The chunk includes both the question and the answer. Metadata: category, last reviewed date.
+
+**Long technical documentation.** Split by H2 (or H3 for very long sections). Each chunk includes the heading. Overlap is short (one sentence) or zero (since headings prevent boundary issues).
+
+**Code.** One function or class per chunk. Include the file path, the surrounding class context (if applicable), and the docstring. Don't chunk inside a function unless the function is very long.
+
+**Customer support transcripts.** One conversation thread per chunk if short; otherwise one Q&A round per chunk. Metadata: customer ID, agent ID, resolution status.
+
+**Long-form articles.** One paragraph per chunk for fine-grained retrieval; or one section per chunk for higher-level retrieval. Hierarchical chunking works well here.
+
+**Legal documents.** One clause per chunk. Include the section number. Metadata: contract type, parties, effective date.
+
+These are starting points. Your specific documents may have features that suggest different strategies. The point is to look at the documents and design accordingly, not to apply a default.
+
+## Chunking eval
+
+You can evaluate your chunking strategy by measuring retrieval quality.
+
+The setup: take a labeled set of (query, relevant document) pairs. Embed all chunks. For each query, check whether the relevant document's chunks appear in top-k.
+
+Compare different chunking strategies on the same data. The strategy with the best recall@k is the one to use.
+
+This is a cheap test (no LLM calls; just retrieval). It's also rarely done. Most teams pick a strategy, ship it, and never validate it.
+
+## The interaction with embedding model
+
+The right chunk size depends partly on the embedding model.
+
+Older embedding models (BERT-based, 512-token max) needed smaller chunks. Modern embedding models (8192-token max or higher) can handle larger chunks without truncation.
+
+But "can handle" is not "performs best on." Even with larger context windows, embedding quality on long chunks is often worse than on focused medium-sized chunks. The embedding model's effective resolution is what matters, not its max context.
+
+Test your specific embedding model with different chunk sizes. The optimum is usually in the 200-1000 token range, regardless of the model's stated capacity.
+
+## What changes when you upgrade
+
+When you upgrade your embedding model, chunking decisions may change.
+
+A new embedding model might be better at:
+- Capturing nuance in shorter chunks (allowing finer-grained chunking)
+- Handling longer context (allowing larger chunks)
+- Specific domains (allowing chunking that respects domain structure)
+
+Don't just swap the embedding model. Re-evaluate chunking on a sample, see if a different strategy now works better, and re-index appropriately.
+
+## The take
+
+Chunking is not a default to set and forget. It's an engineering decision that affects retrieval quality more than most teams realize.
+
+Respect document structure. Use overlap to handle boundaries. Add metadata. Evaluate different chunking strategies before committing. Re-evaluate when the embedding model changes.
+
+The teams that ship the best RAG systems treat chunking as a first-class concern. The teams whose RAG systems disappoint usually have chunking as an afterthought, with a fixed token count and no overlap, indexed in a hurry and never revisited.

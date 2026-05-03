@@ -1,0 +1,197 @@
+---
+layout: ../../layouts/Writing.astro
+title: "RAG with permissions: keeping users out of each other's data"
+description: "A multi-tenant RAG system has to enforce permissions at retrieval time, not after. Get this wrong and you have a data leak. Here's the architecture that holds up."
+publishDate: "2026-06-13"
+pillar: retrieval
+slug: rag-with-permissions
+---
+
+For consumer RAG products, all data is public; permissions don't apply. For enterprise or multi-tenant RAG, every retrieval has a permission question: which documents can this user actually see?
+
+Get this wrong, and your AI product becomes a data leak. The model will happily synthesize information from documents the user shouldn't have access to. The leak is hard to notice because the model fluently incorporates the leaked data into the answer.
+
+This essay is about how to build RAG with permissions enforced architecturally, so the model only sees data the user is allowed to see.
+
+## The shapes of access control
+
+Three patterns of access control in RAG products.
+
+**Pattern 1: per-tenant.** Each customer has their own data. User in tenant A should never see tenant B's data.
+
+**Pattern 2: per-user within tenant.** Within a tenant, different users have different access (department, role, project membership).
+
+**Pattern 3: per-document attributes.** Documents have attributes (sensitivity level, category, owner) that determine who sees what.
+
+Most enterprise RAG systems have all three layered together. The permission check at retrieval time has to evaluate all of them.
+
+## Where permission checks fail
+
+Several failure modes.
+
+**Failure 1: filter applied post-retrieval.** Retrieve top-50 from the index, then filter for permissions. If the user can't see top-1 through top-49, you return whatever's at top-50 even though it's a poor match. Worse: if all top-N are inaccessible, you return nothing or fall back to less-relevant docs.
+
+This is also slow: you retrieved 50 docs only to throw most away.
+
+**Failure 2: filter not applied at all.** Code path forgets to filter. User gets answers based on data they shouldn't see. Hard to detect because the answer "works"; it's just from the wrong source.
+
+**Failure 3: stale permission state.** User had access to a doc; access was revoked; they query and get info from the doc anyway because the index has cached permissions.
+
+**Failure 4: cross-tenant leakage.** A bug in the tenant-id filter lets one tenant's query hit another's data. Catastrophic.
+
+## The architecture that holds up
+
+Three principles.
+
+**Principle 1: filter inline, not post-hoc.** The filter is part of the retrieval query. The vector DB returns only docs the user can see. Permission failures don't return wrong docs; they don't return at all (which the system handles gracefully).
+
+**Principle 2: permission is a property of the index, not the query.** Each indexed doc has metadata indicating who can see it. The retrieval engine enforces. No code path can accidentally bypass.
+
+**Principle 3: per-tenant isolation by default.** Tenants are physically separated when possible (separate indices, separate namespaces). Bug-induced leakage is impossible because there's nothing for a tenant to leak into.
+
+## Implementing inline filters
+
+Most modern vector DBs support filters in the retrieval query:
+
+```python
+results = vector_db.search(
+    query_vector=embedded_query,
+    top_k=10,
+    filter={
+        "tenant_id": user.tenant_id,
+        "user_id": user.id,
+        "permissions_required": {"$in": user.permissions}
+    }
+)
+```
+
+The DB does the filter as part of retrieval, not after. You always get top-10 from the user's permitted set.
+
+The performance: pre-filtering is usually fast if the filter is selective (most users have access to a small subset of docs). Post-filtering is fast if the filter is loose (most retrievals would have been allowed anyway). For well-designed permission models, pre-filtering is the right default.
+
+## Tenant isolation patterns
+
+For multi-tenant RAG, three isolation levels.
+
+**Level 1: shared index, tenant_id filter.** Cheapest. All tenants in one index; tenant_id filter on every retrieval.
+
+Risk: bug in filter logic leaks across tenants. Has happened in real production systems. Hard to fully audit.
+
+**Level 2: namespace per tenant.** Each tenant has its own namespace within a shared cluster. The vector DB enforces namespace boundaries.
+
+Risk: namespace isolation depends on the DB's correctness. Most modern vector DBs handle this well.
+
+**Level 3: cluster per tenant.** Each tenant has its own physical index. Maximum isolation; maximum cost.
+
+Used for: high-security tenants, regulatory requirements, where the cost is justified.
+
+For most B2B products, Level 2 is the right balance. Level 3 for sensitive tenants only.
+
+## Per-user permissions within a tenant
+
+Within a tenant, users have different access. The permission model needs to encode this.
+
+Common patterns:
+
+**Pattern 1: ACLs per document.** Each doc has an `allowed_users` field. Filter: `allowed_users contains user.id`.
+
+Works for explicit per-doc access. Doesn't scale if every user has access to most docs (filter becomes expensive).
+
+**Pattern 2: groups / roles.** Users belong to groups; docs are accessible by groups. Filter: `allowed_groups intersects user.groups`.
+
+Common for team / department access. Cleaner than per-user lists for most enterprise data.
+
+**Pattern 3: attribute-based.** Documents have classification attributes (project, sensitivity); users have clearances. Filter: `doc.classification matches user.clearances`.
+
+Most flexible. Most complex to implement and audit.
+
+Pick the simplest model that fits your access patterns. Layer on complexity only when needed.
+
+## Permission updates
+
+What happens when permissions change? The index has cached permissions; the source-of-truth has new ones.
+
+Patterns:
+
+**Pattern 1: re-index on permission change.** When a user's permissions change, mark them as needing a re-fetch. Their next query triggers fresh permission lookup.
+
+**Pattern 2: permission service inline.** Don't cache permissions in the index. On every retrieval, query a permission service to resolve which docs the user can see. Slower, but always fresh.
+
+**Pattern 3: short cache with invalidation.** Cache permissions for some TTL (1 minute, 1 hour). Accept brief staleness. Critical permission changes (revocation) explicitly invalidate.
+
+For most products, Pattern 3 is the right balance. Permissions don't usually change in real time; brief caches are fine; explicit invalidation handles the cases that matter.
+
+## Auditing permission decisions
+
+Every retrieval should produce an audit trail:
+
+```
+{
+  "query_id": "...",
+  "user_id": "...",
+  "tenant_id": "...",
+  "docs_retrieved": ["doc_1", "doc_2", ...],
+  "permission_filters_applied": {...},
+  "timestamp": "..."
+}
+```
+
+This audit log lets you answer: *"Did user X retrieve content from doc Y?"* Critical for incident response, compliance, and detecting permission bugs.
+
+The audit log is also where you'd notice "user X is accessing 1000x more docs than peers" patterns that might indicate something wrong.
+
+## Testing permission boundaries
+
+A specific test pattern: for a permission-sensitive RAG system, have eval cases that test permission boundaries.
+
+```
+Test case:
+  User: user_in_tenant_A
+  Query: "what's the contract terms with [Company X]?"
+  Expected: should retrieve from tenant A's docs only
+  Should NOT retrieve from tenant B's docs (which also has [Company X])
+```
+
+Run these tests as part of your regular eval. Permission failures should never make it past the bench.
+
+## Defense in depth
+
+A robust permission architecture has multiple layers.
+
+- *Database / vector DB level:* tenant separation
+- *Query level:* permission filter on every retrieval
+- *Application level:* user authorization before query is processed
+- *Audit level:* logging for forensics
+
+Each layer should fail safe (reject the query rather than let it through). Multiple layers means a bug in one is caught by another.
+
+## Common antipatterns
+
+A few patterns I've seen go wrong.
+
+**Antipattern 1: prompting the model to "only use authorized data."** The model is not the security boundary. It will not reliably enforce permissions. This is a non-fix.
+
+**Antipattern 2: trusting user input for tenant ID.** The tenant ID should come from the authenticated session, not from a request parameter. A user could change their tenant ID and access other tenants' data.
+
+**Antipattern 3: caching across users.** A single cache key shared across users can leak data. Cache keys should include user (or at least tenant).
+
+**Antipattern 4: missing permissions in indexed metadata.** If you forget to index a permission attribute, you can't filter on it. Schema design upfront matters.
+
+## What to do if you have a leak
+
+If you discover a permission leak in a deployed system:
+
+1. Disable the affected feature immediately
+2. Audit logs to determine what was leaked, to whom, when
+3. Notify affected users / tenants per your obligations
+4. Fix the root cause
+5. Add eval cases to prevent regression
+6. Resume with the fix in place
+
+The first step is hardest because it disrupts the product. Do it anyway. The cost of letting the leak continue is much higher than the cost of a temporary outage.
+
+## The take
+
+Permissions in RAG are an architectural concern, not a prompting concern. Filter inline at retrieval time. Isolate tenants at the index level. Audit every retrieval. Test permission boundaries explicitly.
+
+The teams that ship enterprise RAG safely treat permissions as a first-class part of the architecture. The teams that bolt permissions on at the application layer eventually have a leak that's hard to recover from. Build it right from the start.

@@ -136,6 +136,30 @@ const PAGES = [
     headlineColor: { 0: '#F5F5F0', 1: '#A088FF', 2: '#9B9B9B' },
     sub: 'Building things people use, not demos that wow.',
   },
+  {
+    out: 'og/writing-retrieval.png',
+    accent: 'mint',
+    eyebrow: '/  WRITING  /  RETRIEVAL',
+    headline: ['Retrieval', 'and RAG.', 'The unsexy half.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#00E5A0', 2: '#9B9B9B' },
+    sub: 'Indexing, chunking, reranking, hybrid search. The work behind the answers.',
+  },
+  {
+    out: 'og/writing-safety.png',
+    accent: 'pink',
+    eyebrow: '/  WRITING  /  SAFETY',
+    headline: ['AI safety', 'and guardrails.', 'Engineering, not philosophy.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#FF5C8A', 2: '#9B9B9B' },
+    sub: 'Prompt injection, jailbreaks, content moderation, red teaming.',
+  },
+  {
+    out: 'og/writing-infra.png',
+    accent: 'violet',
+    eyebrow: '/  WRITING  /  INFRA',
+    headline: ['AI', 'infrastructure.', 'The boring critical path.'],
+    headlineColor: { 0: '#F5F5F0', 1: '#A088FF', 2: '#9B9B9B' },
+    sub: 'Serving, deployment, MCP, GPU economics. Plumbing that decides if you scale.',
+  },
 ];
 
 function svgFor(page) {

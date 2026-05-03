@@ -1,0 +1,163 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Choosing an embedding model: the decision that compounds"
+description: "Your embedding model decision affects retrieval quality, cost, and the cost of every future migration. Most teams pick by leaderboard. Here's the decision that actually fits your product."
+publishDate: "2026-06-06"
+pillar: retrieval
+slug: embedding-model-choice
+---
+
+The embedding model you pick is one of the highest-leverage decisions in a RAG system. It affects retrieval quality on every query. It locks you into an embedding dimension that your vector DB depends on. Switching it later requires re-embedding your entire corpus, which costs money and time.
+
+Most teams pick by leaderboard: see what's at the top of MTEB, pick that, ship. This sometimes works and sometimes doesn't. The leaderboard measures average performance on a benchmark; your specific use case might have different optimal choices.
+
+This essay is about how to pick deliberately and how to evaluate against your actual data.
+
+## What an embedding model does
+
+An embedding model takes text and produces a vector. The vector represents the text's meaning in a high-dimensional space. Two texts with similar meaning produce similar vectors.
+
+The properties that matter:
+
+- **Dimension.** Higher-dimensional vectors hold more information but cost more to store and compute against.
+- **Domain coverage.** Some models are tuned for general text; some for code, medical, multilingual, etc.
+- **Context length.** How many tokens of input the model can embed.
+- **Quality at retrieval.** How well does similarity correlate with actual relevance for your queries?
+
+Different models trade these off differently. The "best" model depends on what you're doing.
+
+## The leaderboard problem
+
+MTEB (Massive Text Embedding Benchmark) and similar leaderboards rank embedding models on a battery of tasks. Useful as a starting point. Misleading as a sole decision input.
+
+Reasons:
+
+- Benchmarks measure average performance across diverse tasks. Your task might benefit different models differently.
+- Leaderboards favor models that benchmark well, which sometimes means models tuned to game the benchmark.
+- Newer models on the leaderboard may not have been validated on your specific data type.
+- Open-source vs hosted models often have different operational characteristics that the leaderboard doesn't capture.
+
+The leaderboard tells you which models are competitive in general. Your data tells you which model is right for you.
+
+## How to evaluate embedding models for your data
+
+The right test:
+
+1. Take your corpus (or a representative sample, 1K-10K docs).
+2. Take your eval queries (a labeled set of query-relevant-doc pairs).
+3. For each candidate embedding model, embed the corpus and the queries.
+4. Run retrieval and measure recall@k, precision@k.
+5. Compare results.
+
+The model that performs best on your eval data wins. Often it's not the leaderboard leader.
+
+This test is cheaper than it sounds. Embedding APIs are cheap (or self-hosted models are nearly free for one-time evals). The work is in setting up the eval queries.
+
+If you don't have an eval query set, you can bootstrap one:
+
+- Take 50-100 documents
+- For each, write a query that should retrieve it
+- Use those as your eval set
+
+Crude but useful for relative comparisons. Better than picking by leaderboard.
+
+## The dimension tradeoff
+
+Higher dimensions generally mean better retrieval quality. They also mean:
+
+- More storage (3KB per vector at 768 dims, 12KB at 3072 dims)
+- More compute per similarity calculation
+- Slower retrieval at scale
+
+For small corpora (under 1M docs), the storage cost is negligible; pick higher dimensions for quality. For very large corpora, the storage and compute costs matter; lower-dimensional models with good quality win.
+
+A useful pattern: some modern embedding models support "matryoshka" dimensions where the first N dimensions are usable as a smaller embedding. Embed at full dimension, store at lower dimension. Quality drops only modestly. Storage and compute drop dramatically.
+
+## Domain-specific vs general
+
+For general English text, modern general-purpose models (OpenAI text-embedding-3, Cohere embed-v3, Voyage, BGE) are competitive.
+
+For specialized domains:
+
+- **Code:** code-specific models (e.g., Voyage code embeddings) outperform general models on code retrieval. Significantly.
+- **Multilingual:** models trained on multilingual data outperform English-only models on non-English queries.
+- **Medical, legal:** domain-tuned models exist; for high-stakes domains, they're worth evaluating.
+
+If your domain is specialized, evaluate domain-specific models alongside general ones. The gap can be 20-40% in retrieval quality, which is large.
+
+## Hosted vs self-hosted
+
+The hosted API option (OpenAI, Cohere, etc.):
+- Pay per call
+- Reliable infrastructure
+- Always up to date with provider's improvements
+- Vendor lock-in (switching requires re-embedding)
+
+Self-hosted (BGE, Nomic, etc.):
+- One-time cost to set up
+- Predictable cost (no per-call charges)
+- Full control
+- Operational overhead
+
+For most teams, hosted makes sense at start. Self-hosted becomes attractive at high embedding volume (cost dominance) or when data residency requires it.
+
+## The migration cost
+
+A subtle but important factor: switching embedding models requires re-embedding your entire corpus. The cost scales with corpus size.
+
+For a 1M-doc corpus at $0.10 per 1M tokens (typical hosted cost), re-embedding might cost a few hundred dollars. For a 100M-doc corpus, it's a real budget item.
+
+Consider the migration cost when picking the initial model. Don't pick a model you're likely to switch from in 6 months. If you're uncertain, pick a model that's well-supported and likely to remain so.
+
+## Embedding caching
+
+Once you've embedded a document, cache the embedding (in your vector DB) so you don't re-embed it. Obvious but worth saying.
+
+For documents that update frequently, embed only the changes (or chunks that changed) rather than re-embedding the whole document.
+
+For deduplication, hash the text before embedding; if the hash matches, reuse the embedding. Saves cost on duplicate or near-duplicate content.
+
+## Asymmetric vs symmetric embedding
+
+Some embedding models distinguish between query embeddings and document embeddings. A query like "what is X?" gets a different embedding than a document that *answers* "what is X?", even if they reference the same X.
+
+These asymmetric models often outperform symmetric ones on retrieval tasks where queries and documents have different stylistic characteristics.
+
+For asymmetric models, you embed queries with the query mode and documents with the doc mode. Make sure your retrieval code does this correctly; mixing them up degrades quality.
+
+## When to upgrade your embedding model
+
+A few signals.
+
+- A new model significantly outperforms yours on your eval data
+- Your corpus has grown to a size where lower-dimensional models would help (storage cost)
+- A domain-specific model has emerged that fits your domain
+- Your provider deprecates the model you're using
+
+When upgrading, plan the migration:
+
+- Re-embed the corpus with the new model (cost and time)
+- Run both old and new in parallel briefly to validate
+- Switch traffic to the new model
+- Monitor retrieval quality
+
+Don't upgrade reflexively on every model release. Each upgrade has migration cost. Upgrade when the new model meaningfully outperforms on your data.
+
+## What to evaluate beyond retrieval
+
+A few practical considerations:
+
+- **API latency.** For interactive use, embedding latency matters. Some models are dramatically faster than others.
+- **Rate limits.** If your embedding throughput is high, the provider's rate limits matter.
+- **Cost per token.** Compare total expected cost; some providers charge differently for queries vs docs.
+- **Context length.** If your chunks are large, the model's max context matters.
+
+These don't show up on retrieval quality benchmarks but matter in production.
+
+## The take
+
+Embedding model choice is more consequential than it looks. Pick by evaluating on your actual data, not by leaderboard.
+
+Consider domain fit, dimension tradeoffs, asymmetric vs symmetric, hosted vs self-hosted, and migration cost. Plan for re-embedding when you upgrade.
+
+The teams shipping the best RAG systems pick their embedding model deliberately, evaluate on their data, and revisit the choice periodically. The default of "whatever's at the top of MTEB this week" is rarely the best fit for your specific product.

@@ -1,0 +1,178 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Query rewriting: the underused RAG optimization"
+description: "User queries are not optimal retrieval queries. Rewriting the query before retrieval, often with an LLM, can dramatically improve recall. Most teams don't do it."
+publishDate: "2026-06-09"
+pillar: retrieval
+slug: query-rewriting-rag
+---
+
+In production RAG, the user types a query. Most systems take that query, embed it, and use it for retrieval directly. The user's query *is* the retrieval query.
+
+This is rarely optimal. Users phrase questions as natural language, often with context or assumptions baked in. The optimal retrieval query, the one that finds the relevant documents, is sometimes quite different from what the user typed.
+
+The fix is query rewriting: a step between user input and retrieval that transforms the query into something better-matched to the corpus. It's one of the highest-leverage and most under-used RAG optimizations.
+
+This essay is about how to do it.
+
+## Why user queries are bad retrieval queries
+
+Several reasons.
+
+**Reason 1: conversational framing.** *"Can you tell me what's been going on with my portfolio lately?"* is a natural query. The good retrieval query for this is something more like "recent portfolio performance, recent transactions, current allocation." The conversational fluff dilutes the embedding.
+
+**Reason 2: implicit context.** *"What about Q3?"* is meaningless without context. The user is following up on a previous turn. The retrieval query needs the carried-over context made explicit.
+
+**Reason 3: ambiguous terms.** A user types "Java": coffee or programming language? The user knows; the retrieval engine doesn't. Disambiguation can happen by adding clarifying terms or by branching retrieval.
+
+**Reason 4: missing terminology.** The user uses informal language; the documents use technical terminology. *"My computer's slow"* in user-speak; *"system performance degradation"* in the docs. Vector search bridges some of this gap; it doesn't bridge all of it.
+
+**Reason 5: multi-intent queries.** A query that's actually two questions. *"How do I cancel my subscription and what happens to my data?"* Best handled as two retrievals, not one.
+
+For each of these, query rewriting helps.
+
+## What query rewriting looks like
+
+The pattern: an LLM call that takes the user query (and optionally conversation history) and produces a transformed query suitable for retrieval.
+
+Example:
+
+```
+User input: "What about last quarter?"
+Conversation context: "User has been discussing their investment portfolio."
+
+Rewrite prompt: Given the conversation context, rewrite this query
+to be self-contained and optimized for retrieval. The corpus contains
+financial reports, transaction history, and portfolio analytics.
+
+Rewritten query: "Q3 2026 portfolio performance, returns, transactions"
+```
+
+The rewritten query is what gets embedded for retrieval. It's specific, self-contained, and uses terminology likely to appear in the corpus.
+
+## Patterns for query rewriting
+
+Several patterns work for different situations.
+
+**Pattern 1: contextualization.** Take the user's query and the conversation history; produce a self-contained query. Useful for chat interfaces where users speak in incomplete fragments.
+
+**Pattern 2: query expansion.** Take the user's query and produce 2-5 alternative phrasings. Run retrieval against all of them; combine results. Useful for queries where the right phrasing is uncertain.
+
+**Pattern 3: HyDE (hypothetical document embedding).** Generate a hypothetical document that would answer the query. Embed the hypothetical doc. Retrieve docs similar to it. Sometimes works better than embedding the query directly because docs have different stylistic patterns than queries.
+
+**Pattern 4: decomposition.** Break a complex query into sub-queries. Retrieve for each. Combine. Useful for multi-part questions.
+
+**Pattern 5: filtering inference.** Infer filters from the query ("recent" → date filter; "internal" → document type filter). Apply the filters during retrieval rather than relying on vector similarity alone.
+
+For most production systems, contextualization is the highest-value and easiest to implement. Add the others as you find specific failure modes that justify them.
+
+## The LLM-call cost
+
+Query rewriting adds an LLM call before retrieval. This costs latency and money.
+
+Latency: a small/fast model (e.g., Claude Haiku, GPT-5-nano) can rewrite in 200-500ms. For some applications, this is too much. For most chat interfaces with multi-second response times, it's fine.
+
+Cost: a few hundred tokens in, a few hundred tokens out. Cheap. At scale, still meaningful but bounded.
+
+The tradeoff: a few hundred milliseconds of latency for typically 5-15 percentage point improvement in retrieval quality. For most products, that's a win.
+
+## When to skip query rewriting
+
+A few cases.
+
+**Case 1: queries are already structured.** Search-style products where users type keywords intentionally. Rewriting can hurt because the user has already expressed their intent.
+
+**Case 2: extreme latency requirements.** Sub-200ms total latency. The rewriting call doesn't fit.
+
+**Case 3: very small corpus.** With a tiny corpus, retrieval quality is already high; rewriting's marginal lift is small.
+
+**Case 4: queries are too sensitive to alter.** Some legal or medical contexts where the user's exact terms must drive retrieval.
+
+For most consumer and prosumer AI products, query rewriting is worth it.
+
+## Rewriting prompt patterns
+
+A query-rewriting prompt that works well:
+
+```
+You're rewriting user queries for retrieval over a corpus of {corpus_description}.
+
+Rewrite the user's query so it's:
+- Self-contained (no pronouns referring to prior context)
+- Specific (concrete terms, not vague ones)
+- Aligned with the corpus terminology
+
+User query: {user_query}
+Recent conversation: {conversation_context}
+
+Output ONLY the rewritten query, no explanation.
+```
+
+The prompt is short, the output is constrained, the call is fast and cheap. Works for most general use cases.
+
+## Multi-query retrieval
+
+Some queries genuinely need multiple retrievals.
+
+*"How do I cancel my subscription, and what happens to my data?"* These are different questions, likely with different relevant documents.
+
+Pattern: decompose into sub-queries, retrieve for each, dedupe and combine results.
+
+```python
+def multi_query_retrieve(user_query):
+    sub_queries = decompose(user_query)  # LLM call
+    all_results = []
+    for q in sub_queries:
+        docs = retrieve(q)
+        all_results.extend(docs)
+    return dedupe(all_results)
+```
+
+The cost: one LLM call to decompose, plus one retrieval per sub-query. Worth it when retrieval quality on combined queries is poor.
+
+## Cache query rewrites
+
+A subtle but useful optimization: cache the rewritten queries.
+
+If the same user query (or a near-duplicate) appears, reuse the rewrite. Cuts the LLM call cost on repeated queries. Especially valuable for high-frequency queries (FAQ-style traffic).
+
+For chat (where context matters), cache by (user_query, recent_context) tuple. For one-shot queries, cache by user_query alone.
+
+## Evaluating query rewriting
+
+The right test: run your retrieval bench with and without query rewriting.
+
+- Recall@k: should go up
+- Precision@k: should also go up (rewritten queries are more focused)
+- Latency: will go up by the LLM rewrite cost
+- Total cost per query: will go up by the LLM rewrite cost
+
+If recall and precision improve enough to justify the latency and cost, ship rewriting. If not, your queries don't need it (or your rewriting prompt needs work).
+
+## Common failures of query rewriting
+
+A few patterns that don't work.
+
+**Failure 1: over-aggressive rewriting.** The rewriter loses important specifics in the user's query. *"What was the price of Apple stock on May 5?"* gets rewritten to *"Apple stock historical price"*, losing the date.
+
+Fix: rewriter prompt should preserve specifics. *"Keep all specific dates, names, numbers."*
+
+**Failure 2: hallucinated context.** The rewriter invents context that wasn't there. *"User asked about portfolio"* but conversation never mentioned portfolios.
+
+Fix: rewriter should only add context from the actual conversation history. Verify in eval.
+
+**Failure 3: query drift over multi-turn.** Each turn, the rewriter adds more context. By turn 5, the query is unrecognizable.
+
+Fix: rewrite based on recent turns only, not full conversation. Or limit rewrite expansion length.
+
+**Failure 4: rewriter is the bottleneck.** Rewriter takes 800ms; retrieval takes 50ms. Latency is dominated by something that's supposed to be a small step.
+
+Fix: use a smaller/faster model for rewriting.
+
+## The take
+
+User queries are rarely optimal retrieval queries. Adding a query rewriting step, often with a small LLM call, can dramatically improve retrieval quality.
+
+Use contextualization for chat interfaces. Use decomposition for multi-part questions. Skip rewriting only when your queries are already structured or your latency budget is tight.
+
+The teams shipping the best chat-style RAG products have query rewriting as a default. The teams whose RAG quality is "okay but doesn't quite get it" usually skip this step.

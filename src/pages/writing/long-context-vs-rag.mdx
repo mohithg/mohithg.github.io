@@ -1,0 +1,161 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Long context vs RAG: when to retrieve and when to stuff"
+description: "Modern models support 200K+ token contexts. Some say RAG is dead. The reality is more nuanced. Here's the framing for when each approach actually wins."
+publishDate: "2026-06-12"
+pillar: retrieval
+slug: long-context-vs-rag
+---
+
+A debate that comes up regularly in 2026: with models that support 200K, 1M, even 2M token contexts, do we still need RAG? Why not stuff the whole knowledge base in the prompt and let the model figure out what's relevant?
+
+The bold framing is "long context kills RAG." The reality is more nuanced. Long context wins for some tasks, RAG wins for others, and many production systems benefit from both used together. The decision factors aren't intuitive; teams that pick one based on hype rather than fit pay for it.
+
+This essay is about the actual decision.
+
+## What long context can and can't do
+
+Modern long-context models can:
+
+- Process documents up to their context limit (200K-2M tokens)
+- Retrieve specific facts from anywhere in the context with reasonable accuracy
+- Synthesize across the full context
+- Answer questions where the relevant info is anywhere in the document
+
+Modern long-context models can't (or do poorly):
+
+- Match RAG's cost efficiency on per-query basis
+- Match RAG's latency on per-query basis
+- Hold an entire knowledge base in context (corpora are usually larger than even 1M tokens)
+- Maintain reasoning quality across very long contexts (degradation in the middle)
+
+Long context is a powerful tool for the right tasks. It doesn't replace retrieval for most production RAG use cases.
+
+## Where long context wins
+
+Three scenarios.
+
+**Scenario 1: single-document analysis.** The user uploads a 100-page PDF and asks questions about it. The whole document fits in context. RAG would chunk it; long context can read the whole thing. For this scenario, long context produces better answers, simpler architecture, and acceptable cost (because you're processing one user's document).
+
+**Scenario 2: deep reasoning across content.** Tasks where the model needs to synthesize across many parts of a document. Coherent narrative reasoning across the full text. RAG's chunking can lose this synthesis ability; long context preserves it.
+
+**Scenario 3: small knowledge bases.** If the entire corpus is under 100K tokens (a small documentation set, a handbook, a focused reference), you can stuff it all in the context. No RAG infrastructure needed.
+
+For these, lean toward long context.
+
+## Where RAG wins
+
+Several scenarios.
+
+**Scenario 1: large knowledge bases.** Hundreds of thousands or millions of documents. Cannot fit in any context window. RAG is the only option.
+
+**Scenario 2: high query volume.** Per-query cost matters. RAG retrieves a small relevant subset; long context processes everything. At scale, RAG's cost is dramatically lower.
+
+**Scenario 3: latency-sensitive applications.** Long context latency scales with context length. RAG keeps the per-query work small. For chat applications expecting sub-2s response, RAG wins.
+
+**Scenario 4: per-tenant data.** Each user has their own documents. You can't stuff everyone's data in every prompt. RAG keeps the per-query context limited to that user's relevant data.
+
+**Scenario 5: dynamic data.** Content updates frequently. RAG can index the latest. Long context requires re-sending the data on every query.
+
+For these, RAG is the right call.
+
+## The hybrid pattern
+
+Many production systems benefit from both.
+
+**Pattern 1: RAG for retrieval, long context for the result.** Use RAG to narrow from millions of documents to dozens of relevant ones. Pass the dozens (which might be 50K tokens) to a long-context model for synthesis. Best of both: scalable retrieval, deep reasoning.
+
+**Pattern 2: long context for active document, RAG for everything else.** When the user is working on a specific document, that document is in context. The rest of their data is retrieved as needed. Common in document-centric AI products.
+
+**Pattern 3: RAG to find the right document, long context to read it.** Rather than chunking the document and retrieving chunks, retrieve the most relevant *full document* and pass it (long context) to the model. Avoids chunking-related issues.
+
+These patterns work because long context and RAG are complementary, not competing. Use each where it fits.
+
+## The cost framing
+
+A back-of-envelope: at ~$1 per million input tokens (mid-tier model pricing in 2026):
+
+- RAG with 5K tokens of context: $0.005 per query
+- Long context with 200K tokens: $0.20 per query
+- Long context with 1M tokens: $1 per query
+
+Per-query, long context is 40-200x more expensive than RAG. For high-volume use, this is enormous.
+
+Caching helps both: cached content is much cheaper. But the relative gap remains.
+
+For products with high query volume and large data, RAG's cost advantage is decisive. For products with low query volume and small data, the gap doesn't matter.
+
+## The latency framing
+
+Per-query latency:
+
+- RAG: retrieval (~100ms) + small-context generation (~1s) = ~1.1s
+- Long context (200K): generation alone is ~5-15s
+- Long context (1M): generation alone is ~30s+
+
+For interactive use, RAG fits within most latency budgets. Long context often doesn't.
+
+Streaming helps long context (the user sees output start sooner) but doesn't change total time.
+
+## The quality framing
+
+This one is more nuanced. For the right task:
+
+- Long context can produce better answers (no chunking artifacts, full context for reasoning)
+- RAG can produce worse answers (chunking lossy, retrieval imperfect)
+
+For the wrong task:
+
+- Long context can produce worse answers (degradation across very long context, attention dilution)
+- RAG can produce better answers (focused, relevant context, less noise)
+
+The "wrong" task for long context: questions where the answer depends on exactly one paragraph in a 1M-token document. The model may "lose" that paragraph in the noise. RAG would have surfaced exactly that paragraph.
+
+The "right" task for long context: questions requiring integration across many parts of a document. Long context's full visibility helps.
+
+## When teams pick wrong
+
+A few patterns I see.
+
+**Pattern 1: stuffing for stuffing's sake.** Team has a 50K-token corpus and decides to stuff it all because "long context now supports it." The cost per query is 10x what RAG would cost; quality is no better; they didn't measure.
+
+**Pattern 2: RAG for everything regardless.** Team has a single-document use case and chunks it, RAGs it, and produces fragmented answers. Long context would have produced better answers without chunking artifacts.
+
+**Pattern 3: refusing to use both.** Team treats this as either-or. Misses hybrid patterns where each tool fits its role.
+
+The right approach: think about what the task actually needs. If it's narrowing from many docs to few, RAG. If it's deep reasoning over a fixed set of docs, long context. If both, hybrid.
+
+## What "doesn't fit in context" actually looks like
+
+A common rationalization: "our corpus is X tokens, that fits in long context, so we should use long context."
+
+Check the per-query cost and latency at that size. Often the answer is "yes it technically fits, but the per-query cost is unacceptable for our volume."
+
+Long context's claim is "the data can fit." That's true. The economic claim of "and you should put it there" is much narrower.
+
+## When long context replaces RAG entirely
+
+A few cases where long context is genuinely the right replacement for what would have been RAG.
+
+- *Single-document Q&A products.* Upload a document, ask questions. The whole document is the context. RAG was always overkill.
+- *Personal knowledge assistants for small corpora.* Your personal notes (a few MB of text) fit in context. RAG infrastructure isn't needed.
+- *Research / one-off analysis.* You're analyzing a specific document set deeply. Long context's per-query cost is acceptable because volume is low.
+
+For these, the team that builds RAG infrastructure where long context would suffice is over-engineering.
+
+## When RAG is irreplaceable
+
+A few cases where long context can't substitute.
+
+- *Multi-tenant products with tenant-specific data.* Per-user data isolation requires per-query data assembly. RAG.
+- *Very large public corpora.* Wikipedia, the entire web, large legal databases. Don't fit in any context.
+- *High-volume consumer applications.* Cost per query matters. RAG wins.
+- *Real-time data.* Live updates that need to be reflected immediately. RAG can re-index.
+
+For these, RAG is the right architecture and probably will be for the foreseeable future.
+
+## The take
+
+Long context didn't kill RAG; it added a tool to the toolbox. Use long context for single-document analysis, deep reasoning, and small corpora. Use RAG for large corpora, high volume, latency-sensitive, multi-tenant, and dynamic data scenarios. Use both together when each fits a part of the problem.
+
+The decision should be driven by your actual cost, latency, and quality requirements, not by hype about either approach. The teams shipping reliable AI products in 2026 use whatever fits; the teams chasing the latest framing often pick wrong and pay for it.
