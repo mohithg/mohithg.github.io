@@ -1,0 +1,196 @@
+---
+layout: ../../layouts/Writing.astro
+title: "Shipping AI products in 2026: the playbook by phase"
+description: "If I were building a new AI product today, here's the order I'd do it in. Phase by phase, with the specific decisions that matter at each stage."
+publishDate: "2026-07-07"
+pillar: product
+slug: ai-product-playbook-2026
+---
+
+The other capstone on this site is [a map of the AI engineering discipline](/writing/ai-engineering-stack-2026), organized by layer. This one is the same body of work organized by phase: if you were building a new AI product today, here's the order I'd do it in and the decisions that matter at each step.
+
+Each phase links to the deeper essays on the specific decisions inside it. Treat this as the playbook; treat the stack overview as the index.
+
+## Phase 0: before you write any code
+
+Decisions that shape everything downstream.
+
+**Decision 1: is this actually an AI feature or a regular feature?** Not every problem needs LLMs. Real friction in the existing flow, real demand from users, real value from the AI specifically. Not "AI for AI's sake."
+
+**Decision 2: is this a workflow, a chained prompt, or an agent?** Most "agent" features should be [workflows](/writing/when-to-use-agents). Workflows are predictable, fast, cheap, and reliable. Reserve agents for genuinely open-ended work.
+
+**Decision 3: what's the [quality bar](/writing/ai-product-quality-bar)?** Define what "ready to ship" means in concrete terms before you start. Pass rate, cost per use, latency, safety properties.
+
+These are 30-minute decisions that save weeks of misdirected work.
+
+## Phase 1: prototype
+
+The goal: prove the core idea works. Not production; just demonstrably useful.
+
+**Pick the model.** Start with a frontier model from the API. You'll [optimize cost later](/writing/optimizing-llm-spend-late-stage); right now, prove the idea with the best capability available.
+
+**Write the prompt.** Treat it as [a type signature](/writing/prompts-as-type-signatures), not instructions. Specify the output shape; let the model fill it. Use [structured outputs](/writing/schema-first-prompts) where applicable.
+
+**Wire it up.** Just enough code to call the model, format the output, show it to a user (probably you, internally).
+
+**Iterate on prompts.** Fast loop: try a prompt, look at outputs, adjust. Don't add complexity yet.
+
+This phase is days to weeks. You should have something that works on hand-picked inputs and demonstrably solves the problem.
+
+## Phase 2: the eval bench
+
+Before you ship to anyone, build evals. The flagship: [what an LLM eval bench actually needs](/writing/llm-eval-bench-actually-needs).
+
+**Write the bench.** Start with [the minimum viable version](/writing/minimum-viable-eval-bench): 10-30 cases with pass/fail criteria. Pick cases that reflect [real production traffic](/writing/eval-datasets-that-hold-up) plus a few [adversarial ones](/writing/adversarial-evals).
+
+**Run it.** Get a baseline pass rate. If you're below your quality bar (Phase 0), iterate on prompts before going further.
+
+**Make it CI.** Every prompt change runs the bench. Regressions block merge.
+
+This phase is a few days. The bench is the foundation for everything downstream; skip it and you'll regret it.
+
+## Phase 3: the gateway
+
+If you're going to ship more than one LLM call, build [the LLM gateway](/writing/llm-gateway-pattern). It's the architectural backbone.
+
+**The gateway handles:** tagging (feature, user), tracing, cost computation, retries, basic logging.
+
+**The gateway enables:** later additions like multi-provider failover, caching, [model routing](/writing/model-routing-cost), prompt management.
+
+A few hundred lines of code that pay for themselves the first time you need to add a cross-cutting concern.
+
+## Phase 4: retrieval (if applicable)
+
+For AI features that touch real-world data: [retrieval is the product](/writing/retrieval-is-the-product). Most quality complaints are retrieval failures, not generation failures.
+
+**Pick infrastructure.** [Vector DB choice](/writing/vector-db-choice) depends on scale; pgvector is fine to start.
+
+**Get [chunking](/writing/chunking-strategies) right.** Respect document structure. Use [overlap](/writing/chunking-strategies). Add [metadata](/writing/chunking-strategies).
+
+**Use [hybrid search](/writing/hybrid-search).** Vector + BM25 + reranker is the right default for production.
+
+**[Evaluate retrieval separately](/writing/rag-evaluation).** Recall@k, precision@k. Don't rely on end-to-end answer quality alone.
+
+For most products that involve "ask questions about my data," this phase is where the most impactful work happens.
+
+## Phase 5: observability
+
+Build the trace pipeline before you have users. The flagship pattern: [trace everything](/writing/trace-everything-debugging).
+
+**Log every LLM call** with full context: prompt, response, model, tokens, cost, metadata.
+
+**Build dashboards** for run rate, latency, cost, quality. The six dashboards in [agent observability](/writing/agent-observability) cover most needs.
+
+**Set alerts** on the things that matter: error rate, cost spikes, quality drops.
+
+**Build the trace UI** (or pay for one). When something breaks, you need to drill into specific runs.
+
+This phase is a week. It pays for itself the first time you debug a production issue.
+
+## Phase 6: rollout discipline
+
+Now you have something to ship. Don't ship it to everyone at once.
+
+**[Feature flag](/writing/ai-feature-flags) the rollout.** Per-AI-feature flags, with kill switches.
+
+**[Staged rollout](/writing/ai-deployment-rollouts):** internal users → power users → small percentage → full deployment. Watch quality, cost, latency at each stage.
+
+**Define rollback criteria** upfront. When metrics drift, roll back; investigate after.
+
+**Communicate** the rollout internally. Customer support and marketing need to know what's changing.
+
+## Phase 7: cost discipline
+
+By now you have real traffic. Cost discipline starts paying off.
+
+**Enable [prompt caching](/writing/prompt-caching-economics).** Free money for most teams. Structure your prompt with stable parts at the start.
+
+**Add [cost attribution](/writing/cost-attribution-llm).** Tag every call with feature, user, prompt version. Build per-feature cost dashboards.
+
+**Track [unit economics](/writing/llm-unit-economics).** Cost per user, by cohort. The aggregate average lies; the cohort breakdown tells the story.
+
+**Plan for [pricing](/writing/llm-pricing-tier-design).** If your unit economics fail at the top of the user distribution, your pricing model needs tiers.
+
+## Phase 8: safety (in parallel from day one, formalized here)
+
+[Safety as engineering](/writing/ai-safety-as-engineering), not philosophy.
+
+**Build [the safety architecture](/writing/ai-safety-as-engineering):** capability bounds, action confirmation, [output moderation](/writing/content-moderation-pipeline), [audit trails](/writing/audit-trails-ai).
+
+**Defend against [prompt injection](/writing/prompt-injection-defense).** The model is not the security boundary; the architecture is.
+
+**[Red-team your own system](/writing/red-teaming-ai).** Find the failures before users do.
+
+**Handle [PII appropriately](/writing/pii-handling-llm).** Map the data flow; redact or tokenize where appropriate.
+
+**Build the [incident response playbook](/writing/ai-incident-response).** When safety incidents happen, you want a playbook, not improvisation.
+
+## Phase 9: scaling
+
+You have product-market fit. Traffic is growing. The pieces that matter at scale.
+
+**[Multi-region deployment](/writing/multi-region-ai)** if your users are global.
+
+**[Multi-provider failover](/writing/llm-rate-limits)** for reliability.
+
+**[Self-hosted models](/writing/llm-build-vs-buy)** if your volume justifies the engineering cost.
+
+**[Load test regularly](/writing/llm-load-testing).** Find the failure modes before traffic does.
+
+**[Cost optimization at scale](/writing/optimizing-llm-spend-late-stage):** prompt caching, model routing, trajectory caps, restructuring heavy workloads.
+
+## Phase 10: ongoing operations
+
+The phase that never ends. The disciplines that keep the product working as the foundation moves.
+
+**Monitor [eval drift](/writing/eval-drift).** Re-ground from production monthly.
+
+**Manage model upgrades** carefully: [version your models](/writing/ai-product-versioning), eval before upgrading, roll out gradually.
+
+**Watch the [cost per active user](/writing/llm-unit-economics)** trend. Investigate when it shifts.
+
+**Review the [quality dashboard](/writing/measuring-ai-product-success)** weekly. Trend lines, not snapshots.
+
+**Refresh the [eval bench](/writing/eval-datasets-that-hold-up)** quarterly with current production patterns.
+
+## What gets skipped
+
+Some phases get compressed in real life. The compression is OK for some teams.
+
+- *Pre-product-fit:* Phase 9 (multi-region, multi-provider, self-hosting) isn't urgent. Stay on API; ship in one region.
+- *Internal tools:* Phases 1-3 plus 5-6 are sufficient. You can be looser on cost discipline and product polish.
+- *Mature companies:* Phase 0 might be heavier (more stakeholder alignment) and Phase 6 might be longer (more careful rollout).
+
+Match the phase work to your context. Don't over-engineer for scale you don't have.
+
+## The phases for an existing product
+
+If you're not starting from scratch but adding AI to an existing product, the phases compress:
+
+- Phases 1-3 are mostly the same
+- Phase 4 (retrieval) plugs into your existing data
+- Phase 5 (observability) extends your existing observability
+- Phase 6 (rollout) uses your existing feature flag system
+- Phases 7-10 are the same
+
+The team has more context but also more legacy to integrate with. Plan for the integration work; don't pretend it's a greenfield build.
+
+## What I'd do differently from past projects
+
+A few things I'd change about how I built earlier products, with hindsight:
+
+- Build the [eval bench](/writing/llm-eval-bench-actually-needs) earlier. Easier than I thought, more valuable than I expected.
+- Take [retrieval](/writing/retrieval-is-the-product) more seriously upstream. The quality bottleneck.
+- Treat [the AI vocabulary as a contract](/writing/the-ai-vocabulary-problem) between systems. Avoids drift between engine and language.
+- Build the [LLM gateway](/writing/llm-gateway-pattern) on day one, not month six.
+- Spend less time on prompts and more on architecture.
+
+These would have saved months across multiple projects. The patterns are clearer now than they were two years ago; new builds get to start with them.
+
+## The take
+
+AI products are buildable as a sequence. Phase 0 (decisions) → Phase 1 (prototype) → Phase 2 (evals) → Phase 3 (gateway) → Phase 4 (retrieval) → Phase 5 (observability) → Phase 6 (rollout) → Phase 7 (cost) → Phase 8 (safety) → Phase 9 (scale) → Phase 10 (operate).
+
+Each phase has decisions that pay for themselves later. The biggest mistakes are skipping early phases (no evals, no observability, no gateway) for the sake of "shipping faster," then paying double the cost when those gaps catch up.
+
+If you're building an AI product and want a checklist of what to do in what order, this is mine. The deeper essays on each phase are linked. Use them as needed; skip what you've already mastered. The discipline of phased work is what separates products that survive from products that don't.

@@ -16,6 +16,24 @@ type Props = FM & { frontmatter?: FM };
 const fm: FM = (Astro.props as Props).frontmatter ?? (Astro.props as FM);
 const { title, description, publishDate, pillar } = fm;
 const pillarMeta = pillarById(pillar);
+
+const allPosts = import.meta.glob<any>('../pages/writing/*.mdx', { eager: true });
+const currentSlug = Astro.url.pathname.replace(/^\/writing\//, '').replace(/\/$/, '');
+const related = Object.entries(allPosts)
+  .map(([path, mod]) => {
+    const slug = path.replace(/^.*\//, '').replace(/\.mdx$/, '');
+    return {
+      slug,
+      url: `/writing/${slug}`,
+      title: mod.frontmatter?.title as string,
+      description: mod.frontmatter?.description as string,
+      pillar: mod.frontmatter?.pillar as Pillar['id'],
+      publishDate: mod.frontmatter?.publishDate as string,
+    };
+  })
+  .filter((p) => p.title && p.slug !== currentSlug && p.pillar === pillar)
+  .sort((a, b) => (a.publishDate < b.publishDate ? 1 : -1))
+  .slice(0, 4);
 const accentText =
   pillarMeta.accent === 'mint'
     ? 'text-mint'
@@ -96,6 +114,33 @@ const articleJsonLd = {
         ">
         <slot />
       </div>
+
+      <!-- Related reading -->
+      {related.length > 0 && (
+        <section class="mt-16 border-t border-white/5 pt-10">
+          <p class:list={['font-mono text-[10px] uppercase tracking-[0.3em]', accentText]}>
+            / more on {pillarMeta.title.toLowerCase()}
+          </p>
+          <ul class="mt-6 grid gap-5 sm:grid-cols-2">
+            {related.map((p) => (
+              <li>
+                <a href={p.url} class="group block rounded-lg border border-white/5 bg-ink-2/30 p-4 transition-all hover:border-white/15 hover:bg-ink-2/60">
+                  <h3 class="font-display text-base font-semibold text-paper text-balance leading-snug">
+                    {p.title}
+                  </h3>
+                  <p class="mt-2 text-sm text-paper-dim text-pretty line-clamp-2">
+                    {p.description}
+                  </p>
+                  <span class="mt-3 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-paper-muted transition-colors group-hover:text-paper">
+                    read
+                    <ArrowUpRight className="h-3 w-3" />
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <!-- Footer / CTA -->
       <footer class="mt-16 border-t border-white/5 pt-10">

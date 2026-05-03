@@ -1,0 +1,164 @@
+---
+layout: ../../layouts/Writing.astro
+title: "The AI engineering stack in 2026: a map of the discipline"
+description: "AI product engineering has become a real discipline with its own stack. Here's the map I've ended up with after 18 months of writing about each piece, and where each piece fits."
+publishDate: "2026-07-06"
+pillar: product
+slug: ai-engineering-stack-2026
+---
+
+When I started writing on this site, AI product engineering was an emerging set of practices. By mid-2026, it's a discipline with a real stack. The practices have settled enough that you can describe them as a map: layers of concern, each with its own decisions, each with patterns that work and antipatterns that don't.
+
+This essay is that map. It's a tour through the stack, with links to the deeper essays on each layer. Treat it as the index to the rest of my writing on AI engineering.
+
+## The eight layers
+
+Building a production AI product involves work in roughly eight layers. None can be skipped; each can be done well or poorly. The teams shipping reliable AI products have invested in all eight.
+
+1. **Prompts** as the contract between code and model
+2. **Evals** as the test bench for non-deterministic systems
+3. **Agents** as the loop pattern when work has variable shape
+4. **Retrieval** as the system that decides what the model sees
+5. **Safety** as engineering discipline, not philosophy
+6. **Infrastructure** as the plumbing that decides if you scale
+7. **Economics** as the math that decides if you survive
+8. **Product** as the surface that meets the user
+
+I'll walk through each layer, link to the deeper essays, and call out the cross-layer interactions that matter.
+
+## Layer 1: Prompts
+
+The prompt is the closest thing to source code in an AI system. The flagship essay on this layer is [the AI vocabulary problem](/writing/the-ai-vocabulary-problem): treating the words your AI is allowed to use as a versioned API contract between the engine and the language layer.
+
+From there, the practical questions: how to structure prompts ([prompts as type signatures](/writing/prompts-as-type-signatures), [system prompts that age well](/writing/system-prompts-that-age-well)), how to manage them as code ([prompt versioning](/writing/prompt-versioning-practical), [when to ship a prompt change](/writing/when-to-ship-a-prompt-change)), and what techniques actually pay for themselves ([few-shot design](/writing/few-shot-design), [schema-first prompts](/writing/schema-first-prompts), [personas: useful or theatre](/writing/personas-useful-or-theatre)).
+
+The cross-cutting principle: prompts should be type signatures more than instructions. Specify the shape of the output; let the model fill in the content.
+
+## Layer 2: Evals
+
+You can't ship something you can't measure. The flagship: [what an LLM eval bench actually needs](/writing/llm-eval-bench-actually-needs).
+
+The shape of an eval program: start with [the minimum viable eval bench](/writing/minimum-viable-eval-bench), grow into [three kinds of evals](/writing/continuous-vs-deep-vs-shadow-evals) at different cadences, and treat [the eval rubric as the work](/writing/eval-rubrics-are-the-work) (not the implementation).
+
+The hard problems: [LLM-as-judge: what works](/writing/llm-as-judge-what-works), [eval datasets that hold up](/writing/eval-datasets-that-hold-up) over time, [eval drift](/writing/eval-drift) as your bench loses contact with reality, [adversarial evals](/writing/adversarial-evals) for breaking before users do, and [human-in-the-loop evals](/writing/human-in-the-loop-evals) where automation can't reach.
+
+The tradeoffs: [the hidden cost of evals](/writing/hidden-cost-of-evals) when you don't manage them.
+
+## Layer 3: Agents
+
+Agents are the pattern when the work has variable shape. The flagship: [agent loops are graphs](/writing/agent-loops-are-graphs).
+
+The first decision: [when to use an agent and when not to](/writing/when-to-use-agents). Most "agents" should be workflows; reserve the agent pattern for genuinely open-ended work.
+
+When you do build agents: [tool design for agents](/writing/tool-design-for-agents) (the highest-leverage decision), [agent state management](/writing/agent-state-management), [single agent vs multi-agent](/writing/multi-agent-vs-single-agent), [agent tool permissions](/writing/agent-tool-permissions).
+
+Operating agents: [the five most common agent failure modes](/writing/agent-failure-modes), [evaluating agents](/writing/agent-evals) (where trajectory matters as much as outcome), [agent latency](/writing/agent-latency), [agent observability](/writing/agent-observability), [agent cost control](/writing/agent-cost-control).
+
+## Layer 4: Retrieval
+
+Retrieval is the unsexy half of every AI product that touches real-world data. The flagship: [retrieval is the product](/writing/retrieval-is-the-product).
+
+The fundamentals: [chunking strategies](/writing/chunking-strategies), [embedding model choice](/writing/embedding-model-choice), [hybrid search](/writing/hybrid-search) (vector + keyword), [reranking in RAG](/writing/reranking-in-rag), [vector DB choice](/writing/vector-db-choice).
+
+The advanced moves: [query rewriting](/writing/query-rewriting-rag), [document preprocessing](/writing/document-preprocessing-rag), [long context vs RAG](/writing/long-context-vs-rag), [RAG with permissions](/writing/rag-with-permissions) for multi-tenant, [freshness in RAG](/writing/freshness-in-rag).
+
+The eval connection: [evaluating RAG](/writing/rag-evaluation) means separating retrieval quality from answer quality. The two have different fixes.
+
+## Layer 5: Safety
+
+Safety as engineering, not philosophy. The flagship: [AI safety as engineering discipline](/writing/ai-safety-as-engineering).
+
+The threats: [prompt injection: the actual threat model](/writing/prompt-injection-defense), [jailbreak resistance](/writing/jailbreak-resistance), [hallucination mitigation](/writing/hallucination-mitigation).
+
+The defenses: [content moderation pipelines](/writing/content-moderation-pipeline), [refusal design](/writing/refusal-design), [PII handling in LLM products](/writing/pii-handling-llm), [audit trails for AI](/writing/audit-trails-ai), [abuse detection](/writing/ai-abuse-detection).
+
+The discipline: [red-teaming your own AI](/writing/red-teaming-ai) before users do. [Incident response for AI](/writing/ai-incident-response) when things go wrong.
+
+## Layer 6: Infrastructure
+
+The plumbing. The flagship: [AI infrastructure decides if you scale](/writing/ai-infrastructure-decides-scale).
+
+The patterns: [the LLM gateway](/writing/llm-gateway-pattern) as the foundation, [LLM caching layers](/writing/llm-caching-layers) (prompt cache, response cache, semantic cache), [streaming LLM responses](/writing/streaming-llm-responses) for UX, [Model Context Protocol (MCP)](/writing/mcp-explained) for tool integration.
+
+When self-hosting: [inference serving frameworks](/writing/inference-serving-frameworks), [GPU economics](/writing/gpu-economics).
+
+At scale: [multi-region AI deployment](/writing/multi-region-ai), [LLM load testing](/writing/llm-load-testing), [AI deployment rollouts](/writing/ai-deployment-rollouts).
+
+## Layer 7: Economics
+
+Costs that surprise teams. The flagship: [the economics of LLM in production](/writing/economics-of-llm-in-production).
+
+The fundamentals: [LLM unit economics](/writing/llm-unit-economics), [LLM rate limits](/writing/llm-rate-limits), [build vs buy decisions](/writing/llm-build-vs-buy).
+
+The optimizations: [prompt caching economics](/writing/prompt-caching-economics), [model routing for cost](/writing/model-routing-cost), [the cost of context](/writing/cost-of-context), [batch vs realtime workloads](/writing/llm-batch-vs-realtime), [hidden cost of long system prompts](/writing/hidden-cost-of-long-system-prompts).
+
+The product side: [LLM pricing tier design](/writing/llm-pricing-tier-design), [cost attribution for LLM features](/writing/cost-attribution-llm).
+
+The late game: [optimizing LLM spend after the bill is big](/writing/optimizing-llm-spend-late-stage).
+
+## Layer 8: Product
+
+The user-facing layer. The flagship: [build substance, then surface](/writing/build-substance-then-surface).
+
+The framing: [AI features that disappear](/writing/ai-features-that-disappear) (the best ones don't have an "AI" label), [setting the quality bar](/writing/ai-product-quality-bar), [building user trust in AI](/writing/ai-product-trust).
+
+The lifecycle: [AI product onboarding](/writing/ai-product-onboarding), [feature flags for AI features](/writing/ai-feature-flags), [measuring AI product success](/writing/measuring-ai-product-success), [from demo to production](/writing/from-demo-to-production), [versioning AI products](/writing/ai-product-versioning).
+
+The team side: [team shapes for AI products](/writing/ai-product-team-shape), [AI product roadmapping](/writing/ai-product-roadmap).
+
+## How the layers interact
+
+The layers aren't independent. A change in one cascades into others.
+
+A model upgrade (infra) shifts behavior (prompts) which means re-running evals (evals), checking cost (economics), running rollout discipline (product), and watching for safety regressions (safety). The single act has effects across the stack.
+
+Similarly: a new tool added to an agent (agents) has implications for tool design conventions, eval coverage, permission boundaries (safety), latency budgets (infra), and cost (economics). Adding the tool isn't done until you've handled all these.
+
+The teams shipping reliably treat the stack as a unified system. The teams that struggle often optimize one layer (usually prompts or models) and let the others lag. The mismatch produces fragile products.
+
+## Where to start
+
+If you're building a new AI product:
+
+1. Start with [evals](/writing/minimum-viable-eval-bench) and [observability](/writing/agent-observability). You need to know what's working before optimizing.
+2. Get [retrieval](/writing/retrieval-is-the-product) right. Most quality issues are retrieval issues.
+3. Build the [LLM gateway](/writing/llm-gateway-pattern). Centralize the cross-cutting concerns.
+4. Iterate on [prompts](/writing/the-ai-vocabulary-problem) with rigor.
+5. Layer in [safety](/writing/ai-safety-as-engineering) as you scope expands.
+6. Design for [economics](/writing/economics-of-llm-in-production) from day one; retrofitting is painful.
+7. Ship the [product](/writing/from-demo-to-production) carefully, with proper rollout discipline.
+
+This isn't strict order; many things happen in parallel. But the priorities map to where the leverage is.
+
+## What I haven't written about
+
+The map has gaps. Areas I haven't covered in depth (yet):
+
+- Fine-tuning (when, how, and the operational model)
+- Multimodal AI (image, audio, video integration)
+- AI for specific domains (clinical, legal, financial in depth)
+- The transition from API to self-hosted at scale
+- The team-level patterns for AI orgs
+- Specific case studies of products I've built
+
+These are real topics; I expect to write about them as the practices in each one settle further. Some are still moving too quickly to write definitively about.
+
+## What stays stable
+
+What's stayed stable across the 18 months I've been writing this:
+
+- Prompts as type signatures, not instructions
+- Evals as the foundation, not an afterthought
+- Architecture (not prompts) as the safety boundary
+- Retrieval quality as the bottleneck for most products
+- The discipline of measurement over vibes
+
+The specifics shift as models, tools, and providers evolve. The practices above transcend the specifics.
+
+## The take
+
+AI product engineering in 2026 is a real discipline. The stack is mappable: prompts, evals, agents, retrieval, safety, infrastructure, economics, product.
+
+Each layer has its own decisions, its own patterns, its own ways to do well or poorly. The teams shipping reliable AI products invest in all eight. The teams that struggle usually optimize one and neglect others.
+
+If you're building AI products, this map is the index to the practices that work. Use it as a checklist; skip the layers you've already mastered; invest in the ones you haven't. The work is bounded; the payoff is products that ship.
