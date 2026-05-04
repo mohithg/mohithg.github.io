@@ -65,8 +65,8 @@ const articleJsonLd = {
   image: new URL(ogImage, SITE.url).toString(),
   author: { '@type': 'Person', name: SITE.name, url: SITE.url },
   publisher: { '@type': 'Person', name: SITE.name, url: SITE.url },
-  datePublished: publishDate,
-  dateModified: publishDate,
+  datePublished: `${publishDate}T00:00:00+00:00`,
+  dateModified: `${publishDate}T00:00:00+00:00`,
   mainEntityOfPage: canonicalUrl,
   articleSection: pillarMeta.title,
 };
